@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """lox"""
-# pylint: disable=line-too-long,too-many-arguments,multiple-statements
+# pylint: disable=line-too-long,too-many-arguments,multiple-statements,too-many-lines
 import enum
 import typing
 
@@ -106,16 +106,16 @@ class Token:
         )
 
 
-class ScannerError(RuntimeError):
-    """Scanner error"""
-    def __init__(self, line, offset, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.scanner_line = line
-        self.scanner_offset = offset
-
-
 class Scanner:
     """Scanner"""
+
+    class ScannerError(RuntimeError):
+        """Scanner error"""
+        def __init__(self, line, offset, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.scanner_line = line
+            self.scanner_offset = offset
+
     def __init__(self, source):
         self.source = source
         self.tokens = []
@@ -149,11 +149,11 @@ class Scanner:
     def scan_error(self, msg, fatal=False):
         """scanner error handling"""
         lines = self.source.split('\n')
-        line = lines[self.line]
+        line = lines[self.line - 1]
         print(f"Error: {msg} at line {self.line}, column {self.start}")
         print(f"\t{line}")
         if fatal:
-            raise ScannerError(line, self.start, msg)
+            raise self.ScannerError(line, self.start, msg)
 
     def string(self):
         """scan a string"""
@@ -406,54 +406,116 @@ class While(Stmt):
         self.body = body
 
 
-class ParserError(RuntimeError):
-    """Parser error"""
-
-
 class Parser:
     """
-    expression     → conditional ;
+    program        → declaration* EOF ;
+    declaration    → varDecl | statement ;
+    varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+    statement      → exprStmt | printStmt | block ;
+    exprStmt       → expression ";" ;
+    printStmt      → "print" expression ";" ;
+    block          → "{" declaration* "}" ;
+
+    expression     → assignment ;
+    assignment     → IDENTIFIER "=" assignment
+                   | conditional ;
     conditional    → equality ( "?" expression ":" conditional )? ;
     equality       → comparison ( ( "!=" | "==" ) comparison )* ;
     comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
     term           → factor ( ( "-" | "+" ) factor )* ;
     factor         → unary ( ( "/" | "*" ) unary )* ;
-    unary          → ( "!" | "-" ) unary
-                   | primary ;
-    primary        → NUMBER | STRING | "true" | "false" | "nil"
-                   | "(" expression ")" ;
-
+    unary          → ( "!" | "-" ) unary | primary ;
+    primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
                    // Error productions...
                    | ( "!=" | "==" ) equality
                    | ( ">" | ">=" | "<" | "<=" ) comparison
                    | ( "+" ) term
                    | ( "/" | "*" ) factor ;
     """
+    # pylint: disable=too-many-public-methods
     previous = property(lambda self: self.tokens[self.current - 1], doc="return the previous token")
     peek = property(lambda self: self.tokens[self.current], doc="return the current token")
     is_at_end = property(lambda self: self.peek.type == TokenType.EOF, doc="check if we are at the EOF token")
 
+    class ParserError(RuntimeError):
+        """Parser error"""
+
     def __init__(self, scanner:Scanner):
+        """Take the scanner and parse
+
+            This could just take the scanner tokens but having the full scanner means we might be
+            able to get better error messages.
+        """
         self.scanner = scanner
-        self.tokens = scanner.tokens
+        self.tokens = scanner.tokens  # dumb ref
         self.current = 0
+        self.has_error = False
 
-    def parse(self):
+    def parse(self) -> typing.List[Stmt]:
         """main entry point to start the parsing"""
+        statements = []
+        while not self.is_at_end:
+            stmt = self.declaration()
+            if stmt:
+                statements.append(stmt)
+        return statements
+
+    def declaration(self) -> typing.Optional[Stmt]:
+        """declaration    → varDecl | statement ;"""
         try:
-            return self.expression()
-        except ParserError as exc:
+            if self.match(TokenType.VAR): return self.var_declaration()
+            return self.statement()
+        except self.ParserError as exc:
             print(exc)
-        return None
+            self.synchronize()
+            return None
 
-    def error(self, msg:str) -> None:
+    def var_declaration(self):
+        """varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;"""
+        name:Token = self.consume(TokenType.IDENTIFIER, "Expect variable name.")
+        initializer:Expr = self.expression() if self.match(TokenType.EQUAL) else None
+        self.consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.")
+        return Var(name, initializer)
+
+    def statement(self) -> Stmt:
+        """
+            statement      → exprStmt
+                           | printStmt ;
+        """
+        if self.match(TokenType.PRINT): return self.print_statement()
+        if self.match(TokenType.LEFT_BRACE): return Block(self.block())  # instantiate Block here so as to reuse block() for functions etc
+        return self.expression_statement()
+
+    def block(self) -> typing.List[Stmt]:
+        """block          → "{" declaration* "}" ;"""
+        statements:typing.List[Stmt] = []
+
+        while not self.check(TokenType.RIGHT_BRACE) and not self.is_at_end:
+            statements.append(self.declaration())
+
+        self.consume(TokenType.RIGHT_BRACE, "Expect '}' after block.")
+        return statements
+
+    def expression_statement(self) -> Stmt:
+        """ exprStmt       → expression ";" ;"""
+        expr:Expr = self.expression()
+        self.consume(TokenType.SEMICOLON, "Expect ';' after expression.")
+        return Expression(expr)
+
+    def print_statement(self) -> Stmt:
+        """printStmt      → "print" expression ";" ;"""
+        value:Expr = self.expression()
+        self.consume(TokenType.SEMICOLON, "Expect ';' after value.")
+        return Print(value)
+
+    def error(self, token:Token, msg:str) -> None:
         """Error handling"""
-        token = self.peek
+        self.has_error = True
         if token.type == TokenType.EOF:
-            raise ParserError(f"Parser error on line {token.line}, unexpected EOF: {msg}")
-        raise ParserError(f"Parser error on line {token.line} at {token.lexeme}: {msg}")
+            raise self.ParserError(f"Parser error on line {token.line}, unexpected EOF: {msg}")
+        raise self.ParserError(f"Parser error on line {token.line} at {token.lexeme}: {msg}")
 
-    def advance(self):
+    def advance(self) -> Token:
         """advance to the next token"""
         if not self.is_at_end:
             self.current += 1
@@ -474,6 +536,25 @@ class Parser:
 
     def expression(self) -> Expr:
         """expression     → equality ;"""
+        expr:Expr = self.assignment()
+
+        if self.match(TokenType.EQUAL):
+            equals:Token = self.previous
+            value:Expr = self.assignment()
+
+            if isinstance(expr, Variable):
+                name:Token = expr.name
+                return Assign(name, value)
+
+            self.error(equals, "Invalid assignment target.")
+
+        return expr
+
+    def assignment(self) -> Expr:
+        """
+            assignment     → IDENTIFIER "=" assignment
+                           | conditional ;
+        """
         return self.conditional()
 
     def conditional(self) -> Expr:
@@ -541,7 +622,7 @@ class Parser:
             return Unary(operator, right)
         return self.primary()
 
-    def primary(self) -> Expr:
+    def primary(self) -> typing.Optional[Expr]:
         """primary        → NUMBER | STRING | "true" | "false" | "nil"
                           | "(" expression ")" ;
         """
@@ -558,33 +639,36 @@ class Parser:
             self.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.")
             return Grouping(expr)
 
+        if self.match(TokenType.IDENTIFIER):
+            return Variable(self.previous)
+
         # handle error productions here
         if self.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL):
-            self.error("Missing left-hand operand.")
+            self.error(self.peek, "Missing left-hand operand.")
             self.equality()
             return None
 
         if self.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL):
-            self.error("Missing left-hand operand.")
+            self.error(self.peek, "Missing left-hand operand.")
             self.comparison()
             return None
 
         if self.match(TokenType.PLUS):
-            self.error("Missing left-hand operand.")
+            self.error(self.peek, "Missing left-hand operand.")
             self.term()
             return None
 
         if self.match(TokenType.SLASH, TokenType.STAR):
-            self.error("Missing left-hand operand.")
+            self.error(self.peek, "Missing left-hand operand.")
             self.factor()
             return None
 
-        return self.error("Expression expected")
+        return self.error(self.peek, "Expression expected")
 
-    def consume(self, token_type:TokenType, msg:str):
+    def consume(self, token_type:TokenType, msg:str) -> None:
         """check for next expected token, raise error msg if not"""
         if self.check(token_type): return self.advance()
-        return self.error(msg)
+        return self.error(self.peek, msg)
 
     SYNCHRONIZE_TOKEN_TYPES = (
         TokenType.CLASS,
@@ -606,6 +690,44 @@ class Parser:
             self.advance()
 
 
+class Environment:
+    """Environment to store variables and values"""
+
+    class RuntimeError(RuntimeError):
+        """Environment runtime error"""
+
+    def __init__(self, enclosing:'Environment' = None):
+        """Optional enclosing environment scope to check on get/assign"""
+        self.values = {}
+        self.enclosing = enclosing
+
+    def define(self, name:str, value:typing.Any) -> None:
+        """bind a name to a value"""
+        # NOTE we could consider redefinition an error here
+        self.values[name] = value
+
+    def get(self, token:Token) -> typing.Any:
+        """return a value by name"""
+        try:
+            return self.values[token.lexeme]
+        except KeyError as exc:
+            if self.enclosing:
+                return self.enclosing.get(token)
+            raise self.RuntimeError(f"Undefined variable {token.lexeme}") from exc
+
+    def assign(self, token:Token, value:typing.Any) -> None:
+        """Assign a value"""
+        if token.lexeme not in self.values:
+            if self.enclosing:
+                self.enclosing.assign(token, value)
+                return
+            raise self.RuntimeError(f"Undefined variable {token.lexeme}")
+        self.values[token.lexeme] = value
+
+    def __repr__(self):
+        return str(self.values)
+
+
 class Interpreter:
     """Interpreter"""
 
@@ -620,72 +742,127 @@ class Interpreter:
 
     def __init__(self):
         """init"""
+        self.environment = Environment()
 
-    def evaluate(self, expression:typing.Union[Expr, Stmt]):
-        """Evaluate an expression"""
-        self.eval(expression)
+    def interpret(self, statements:typing.List[Stmt]):
+        """Interpret statements"""
+        try:
+            for statement in statements:
+                self.eval(statement)
+        except self.RuntimeError as exc:
+            print(exc)
 
-    @classmethod
-    def eval(cls, expression:typing.Union[Expr, Stmt]):
+    def eval(self, expression:typing.Union[Expr, Stmt]) -> typing.Any:
         """eval an expression or statement"""
-        # pylint: disable=too-many-statements,too-many-return-statements
+        # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
         if isinstance(expression, Literal):
             return expression.value
         if isinstance(expression, Grouping):
-            return cls.eval(expression.expression)
+            return self.eval(expression.expression)
         if isinstance(expression, Unary):
-            right = cls.eval(expression.right)
+            right = self.eval(expression.right)
             if expression.operator.type == TokenType.MINUS:
-                cls.check_numbers(expression.operator, right)
-                return -right
+                self.check_numbers(expression.operator, right)
+                return -right  # pylint: disable=invalid-unary-operand-type
             if expression.operator.type == TokenType.BANG: return not right
-        if isinstance(expression, Binary):
-            right = cls.eval(expression.right)
-            left = cls.eval(expression.left)
-            if expression.operator.type == TokenType.BANG_EQUAL:
-                cls.check_numbers(expression.operator, left, right)
-                return left != right
-            if expression.operator.type == TokenType.EQUAL_EQUAL:
-                cls.check_numbers(expression.operator, left, right)
-                return left == right
-            if expression.operator.type == TokenType.GREATER:
-                cls.check_numbers(expression.operator, left, right)
-                return left > right
-            if expression.operator.type == TokenType.GREATER_EQUAL:
-                cls.check_numbers(expression.operator, left, right)
-                return left >= right
-            if expression.operator.type == TokenType.LESS:
-                cls.check_numbers(expression.operator, left, right)
-                return left < right
-            if expression.operator.type == TokenType.LESS_EQUAL:
-                cls.check_numbers(expression.operator, left, right)
-                return left <= right
-            if expression.operator.type == TokenType.MINUS:
-                cls.check_numbers(expression.operator, left, right)
-                return left - right
-            if expression.operator.type == TokenType.PLUS:
-                # cls.check_numbers(expression.operator, left, right)
-                if not all(isinstance(_, (str, int, float)) for _ in (left, right)):
-                    raise cls.RuntimeError(expression.operator, "Operands not supported for operator")
-                # NOTE if adding and one is a string, all are strings
-                if len(set((type(left), type(right)))) > 1 and any(isinstance(_, str) for _ in (left, right)):
-                    left = str(left)
-                    right = str(right)
-                return left + right
-            if expression.operator.type == TokenType.SLASH:
-                cls.check_numbers(expression.operator, left, right)
-                if right == 0:
-                    raise cls.RuntimeError(expression.operator, "Divide by zero")
-                return left // right
-            if expression.operator.type == TokenType.STAR:
-                cls.check_numbers(expression.operator, left, right)
-                return left * right
         if isinstance(expression, Conditional):
-            if cls.eval(expression.expression):
-                return cls.eval(expression.left)
-            return cls.eval(expression.right)
+            if self.eval(expression.expression):
+                return self.eval(expression.left)
+            return self.eval(expression.right)
+        if isinstance(expression, Expression):
+            self.eval(expression.expression)
+            return None
+        if isinstance(expression, Print):
+            value = self.eval(expression.expression)
+            if value is None:
+                print("nil")
+            elif value is True:
+                print("true")
+            elif value is False:
+                print("false")
+            else:
+                print(value)
+            return None
+        if isinstance(expression, Variable):
+            return self.environment.get(expression.name)  # passing Token
+        if isinstance(expression, Assign):
+            value = self.eval(expression.value)
+            self.environment.assign(expression.name, value)
+            return value
+        if isinstance(expression, Binary):
+            return self._eval_binary(expression)
+        if isinstance(expression, Stmt):
+            return self._eval_statement(expression)
 
         return None
+
+    def _eval_binary(self, expression:Expr) -> typing.Any:
+        """evaluate a binary expression"""
+        # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
+        right = self.eval(expression.right)
+        left = self.eval(expression.left)
+        if expression.operator.type == TokenType.BANG_EQUAL:
+            self.check_numbers(expression.operator, left, right)
+            return left != right
+        if expression.operator.type == TokenType.EQUAL_EQUAL:
+            self.check_numbers(expression.operator, left, right)
+            return left == right
+        if expression.operator.type == TokenType.GREATER:
+            self.check_numbers(expression.operator, left, right)
+            return left > right
+        if expression.operator.type == TokenType.GREATER_EQUAL:
+            self.check_numbers(expression.operator, left, right)
+            return left >= right
+        if expression.operator.type == TokenType.LESS:
+            self.check_numbers(expression.operator, left, right)
+            return left < right
+        if expression.operator.type == TokenType.LESS_EQUAL:
+            self.check_numbers(expression.operator, left, right)
+            return left <= right
+        if expression.operator.type == TokenType.MINUS:
+            self.check_numbers(expression.operator, left, right)
+            return left - right
+        if expression.operator.type == TokenType.PLUS:
+            # self.check_numbers(expression.operator, left, right)
+            if not all(isinstance(_, (str, int, float)) for _ in (left, right)):
+                raise self.RuntimeError(expression.operator, "Operands not supported for operator")
+            # NOTE if adding and one is a string, all are strings
+            if len(set((type(left), type(right)))) > 1 and any(isinstance(_, str) for _ in (left, right)):
+                left = str(left)
+                right = str(right)
+            return left + right
+        if expression.operator.type == TokenType.SLASH:
+            self.check_numbers(expression.operator, left, right)
+            if right == 0:
+                raise self.RuntimeError(expression.operator, "Divide by zero")
+            return left // right
+        if expression.operator.type == TokenType.STAR:
+            self.check_numbers(expression.operator, left, right)
+            return left * right
+
+        return None
+
+    def _eval_statement(self, stmt:Stmt) -> typing.Any:
+        """evaluate a statement"""
+        if isinstance(stmt, Var):
+            value = self.eval(stmt.initializer) if stmt.initializer else None
+            self.environment.define(stmt.name.lexeme, value)
+            return None
+        if isinstance(stmt, Block):
+            self.execute_block(stmt.statements, Environment(self.environment))
+            return None
+
+        return None
+
+    def execute_block(self, statements:typing.List[Stmt], environment:Environment):
+        """execute a block of statements"""
+        previous:Environment = self.environment
+        try:
+            self.environment = environment
+            for stmt in statements:
+                self.eval(stmt)
+        finally:
+            self.environment = previous
 
     @classmethod
     def check_numbers(cls, token:Token, *values:typing.List[typing.Any]):
@@ -708,13 +885,20 @@ def tests():
         ('nil;', [Token(TokenType.NIL, 'nil', None, 1, 0), Token(TokenType.SEMICOLON, ';', None, 1, 3), Token(TokenType.EOF, '', None, 1, -1)]),
         ('"foo" + "bar"', [Token(TokenType.STRING, '"foo"', 'foo', 1, 0), Token(TokenType.PLUS, '+', None, 1, 6), Token(TokenType.STRING, '"bar"', 'bar', 1, 8), Token(TokenType.EOF, '', None, 1, -1)]),
         ('true ? 1 : 2', [Token(TokenType.TRUE, 'true', None, 1, 0), Token(TokenType.QUESTION, '?', None, 1, 5), Token(TokenType.NUMBER, '1', 1, 1, 7), Token(TokenType.COLON, ':', None, 1, 9), Token(TokenType.NUMBER, '2', 2, 1, 11), Token(TokenType.EOF, '', None, 1, -1)]),
+        ('"foo', Scanner.ScannerError),
     )
 
     for tc_input, result in scanner_testcases:
-        s = Scanner(tc_input)
-        assert s.tokens == result, s.tokens
+        if isinstance(result, type) and issubclass(result, RuntimeError):
+            try:
+                assert not Scanner(tc_input), "this should always fail"
+            except RuntimeError:
+                pass
+        else:
+            s = Scanner(tc_input)
+            assert s.tokens == result, s.tokens
 
-    parser_testcases = (
+    parser_expression_testcases = (
         (Scanner('1-2+3'), Binary(left=Binary(left=Literal(value=1), operator=Token(TokenType.MINUS, '-', None, 1, 1), right=Literal(value=2)), operator=Token(TokenType.PLUS, '+', None, 1, 3), right=Literal(value=3))),
         (Scanner('1<6>3'), Binary(left=Binary(left=Literal(value=1), operator=Token(TokenType.LESS, '<', None, 1, 1), right=Literal(value=6)), operator=Token(TokenType.GREATER, '>', None, 1, 3), right=Literal(value=3))),
         (Scanner('!1'), Unary(operator=Token(TokenType.BANG, '!', None, 1, 0), right=Literal(value=1))),
@@ -733,12 +917,29 @@ def tests():
         (Scanner('true ? 1 : 2'), Conditional(expression=Literal(value=True), left=Literal(value=1), right=Literal(value=2))),
         (Scanner('false ? 1 : 2'), Conditional(expression=Literal(value=False), left=Literal(value=1), right=Literal(value=2))),
     )
-    for tc_input, result in parser_testcases:
+    for tc_input, result in parser_expression_testcases:
+        p = Parser(tc_input)
+        r = p.expression()
+        assert r == result, r
+
+    parser_statement_testcases = (
+        (Scanner('print "Hello, world!";'), [Print(expression=Literal(value='Hello, world!'))]),
+        (Scanner('print 2*3;'), [Print(expression=Binary(left=Literal(value=2), operator=Token(TokenType.STAR, '*', None, 1, 7), right=Literal(value=3)))]),
+        (Scanner('var foo;'), [Var(name=Token(TokenType.IDENTIFIER, 'foo', None, 1, 4), initializer=None)]),
+        (Scanner('var foo = "bar";'), [Var(name=Token(TokenType.IDENTIFIER, 'foo', None, 1, 4), initializer=Literal(value='bar'))]),
+        (Scanner('var foo = 2*3;'), [Var(name=Token(TokenType.IDENTIFIER, 'foo', None, 1, 4), initializer=Binary(left=Literal(value=2), operator=Token(TokenType.STAR, '*', None, 1, 11), right=Literal(value=3)))]),
+        (Scanner('foo;'), [Expression(expression=Variable(name=Token(TokenType.IDENTIFIER, 'foo', None, 1, 0)))]),
+        (Scanner('var jason = 2 > 1 ? true : false; print jason;'), [Var(name=Token(TokenType.IDENTIFIER, 'jason', None, 1, 4), initializer=Conditional(expression=Binary(left=Literal(value=2), operator=Token(TokenType.GREATER, '>', None, 1, 14), right=Literal(value=1)), left=Literal(value=True), right=Literal(value=False))), Print(expression=Variable(name=Token(TokenType.IDENTIFIER, 'jason', None, 1, 40)))]),
+        (Scanner('var a; a = 2;'), [Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 4), initializer=None), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 7), value=Literal(value=2)))]),
+        (Scanner('var a; var b = a = 2;print "a is " + a; print "b is " + b;'), [Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 4), initializer=None), Var(name=Token(TokenType.IDENTIFIER, 'b', None, 1, 11), initializer=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 15), value=Literal(value=2))), Print(expression=Binary(left=Literal(value='a is '), operator=Token(TokenType.PLUS, '+', None, 1, 35), right=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 37)))), Print(expression=Binary(left=Literal(value='b is '), operator=Token(TokenType.PLUS, '+', None, 1, 54), right=Variable(name=Token(TokenType.IDENTIFIER, 'b', None, 1, 56))))]),
+        (Scanner('{ var a; var b = a = 2;}'), [Block(statements=[Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 6), initializer=None), Var(name=Token(TokenType.IDENTIFIER, 'b', None, 1, 13), initializer=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 17), value=Literal(value=2)))])]),
+    )
+    for tc_input, result in parser_statement_testcases:
         p = Parser(tc_input)
         r = p.parse()
         assert r == result, r
 
-    interpreter_testcases = (
+    interpreter_eval_testcases = (
         (Parser(Scanner('1')), 1),
         (Parser(Scanner('(1)')), 1),
         (Parser(Scanner('(-1)')), -1),
@@ -763,17 +964,40 @@ def tests():
         (Parser(Scanner('"foo" + 4')), "foo4"),  # yeah not sure about this
         (Parser(Scanner('true ? 1 : 2')), 1),
         (Parser(Scanner('false ? 1 : 2')), 2),
-        # (Parser(Scanner('!=')), None),
-        # (Parser(Scanner('==')), None),
+        (Parser(Scanner('!=')), Parser.ParserError),
+        (Parser(Scanner('==')), Parser.ParserError),
     )
-    for tc_input, result in interpreter_testcases:
-        r = Interpreter.eval(tc_input.parse())
-        if result is None:
-            assert r is None
+    for tc_input, result in interpreter_eval_testcases:
+        if result is Parser.ParserError:
+            try:
+                expr = tc_input.expression()
+                assert not expr, "this should always fail"
+            except Parser.ParserError:
+                pass
         else:
-            assert r == result, r
+            r = Interpreter().eval(tc_input.expression())
+            if result is None:
+                assert r is None
+            else:
+                assert r == result, r
 
-    # print("Success")
+    interpret_testcases = (
+        (Parser(Scanner('print "Hello, world!";')), None),
+        (Parser(Scanner('var foo = 2 * 2;')), None),
+        (Parser(Scanner('var foo = "bar";')), None),
+        (Parser(Scanner('var foo = "wehavevarassignment"; print foo;')), None),
+        (Parser(Scanner('print true; print nil; print false; var name = "varname"; var foo = 2; var bar = foo; print name; print bar;')), None),
+        (Parser(Scanner('var jason = 2 > 1 ? true : false; print jason;')), None),
+        (Parser(Scanner('var jason; jason = 2 > 1 ? true : false; jason == true;')), lambda i: i.environment.values['jason'] is True),
+        (Parser(Scanner('var a; var b = a = 2;print "a is " + a; print "b is " + b;')), lambda i: i.environment.values['a'] == 2 and i.environment.values['b'] == 2),
+        (Parser(Scanner('var a = 10; {a = 11; var b = a;}')), lambda i: i.environment.values['a'] == 11 and 'b' not in i.environment.values),
+        (Parser(Scanner('var a = 10; {var a = 11;}')), lambda i: i.environment.values['a'] == 10 and 'b' not in i.environment.values),
+    )
+    for tc_input, cb in interpret_testcases:
+        i = Interpreter()
+        i.interpret(tc_input.parse())
+        if cb is not None:
+            assert cb(i), tc_input.scanner.source
 
 
 if __name__ == '__main__':
