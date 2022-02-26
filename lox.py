@@ -2,6 +2,7 @@
 """lox"""
 # pylint: disable=line-too-long,too-many-arguments,multiple-statements,too-many-lines
 import enum
+import time
 import typing
 
 
@@ -129,7 +130,7 @@ class Scanner:
 
     def __init__(self, source) -> None:
         self.source = source
-        self.tokens = []
+        self.tokens:typing.List[Token] = []
         self.start = 0
         self.current = 0
         self.line = 1
@@ -191,7 +192,7 @@ class Scanner:
 
     def identifier(self) -> None:
         """scan an identifier"""
-        while self.peek.isidentifier(): self.advance()
+        while self.peek.isalnum() or self.peek == '_': self.advance()
         value = self.source[self.start:self.current]
         if value in KEYWORDS:
             self.add_token(KEYWORDS[value])
@@ -378,6 +379,15 @@ class Block(Stmt):
         self.statements = statements
 
 
+class FunctionType(enum.Enum):
+    """function types"""
+    FUNCTION = "function"
+    METHOD = "method"
+
+    def __str__(self):
+        return self.value
+
+
 class Function(Stmt):
     """Function statement"""
     def __init__(self, name:Token, params:typing.List[Token], body:typing.List[Stmt]):
@@ -450,13 +460,17 @@ class Continue(Stmt):
 class Parser:
     """
     program        → declaration* EOF ;
-    declaration    → varDecl | statement ;
+    declaration    → funDecl | varDecl | statement ;
+    funDecl        → "fun" function ;
+    function       → IDENTIFIER "(" parameters? ")" block ;
+    parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
     varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-    statement      → exprStmt | forStmt | ifStmt | printStmt | whileStmt | breakStmt | continueStmt | block ;
+    statement      → exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | breakStmt | continueStmt | block ;
     exprStmt       → expression ";" ;
     forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
     ifStmt         → "if" "(" expression ")" statement ( "else" statement )? ;
     printStmt      → "print" expression ";" ;
+    returnStmt     → "return" expression? ";" ;
     whileStmt      → "while" "(" expression ")" statement ;
     breakStmt      → "break" ";" ;
     continueStmt   → "continue" ";" ;
@@ -471,7 +485,9 @@ class Parser:
     comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
     term           → factor ( ( "-" | '--' | '-=' | "+" | '++' | '+=') factor )* ;
     factor         → unary ( ( "/" | '/=' | "*" | "*=" ) unary )* ;
-    unary          → ( "!" | "-" ) unary | primary ;
+    unary          → ( "!" | "-" ) unary | call ;
+    call           → primary ( "(" arguments? ")" )* ;
+    arguments      → expression ( "," expression )* ;
     primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
                    // Error productions...
                    | ( "!=" | "==" ) equality
@@ -498,19 +514,21 @@ class Parser:
         self.current = 0
         self.has_error = False
         self.loop_depth = 0
+        self.call_depth = 0
 
     def parse(self) -> typing.List[Stmt]:
         """main entry point to start the parsing"""
-        statements = []
+        statements:typing.List[Stmt] = []
         while not self.is_at_end:
-            stmt = self.declaration()
+            stmt:typing.Optional[Stmt] = self.declaration()
             if stmt:
                 statements.append(stmt)
         return statements
 
-    def declaration(self) -> typing.Optional[Stmt]:
+    def declaration(self) -> typing.Union[Stmt, Expr, None]:
         """declaration    → varDecl | statement ;"""
         try:
+            if self.match(TokenType.FUN): return self.function(FunctionType.FUNCTION)
             if self.match(TokenType.VAR): return self.var_declaration()
             return self.statement()
         except self.ParserError as exc:
@@ -518,7 +536,27 @@ class Parser:
             self.synchronize()
             return None
 
-    def var_declaration(self):
+    def function(self, kind:FunctionType) -> Stmt:
+        """function       → IDENTIFIER "(" parameters? ")" block ;"""
+        name:Token = self.consume(TokenType.IDENTIFIER, f"Expec {kind} name")
+
+        self.consume(TokenType.LEFT_PAREN, f"Expect '(' after {kind} name.")
+        parameters:typing.List[Token] = []
+        if not self.check(TokenType.RIGHT_PAREN):
+            parameters.append(self.consume(TokenType.IDENTIFIER, "Expect parameter name."))
+            while self.match(TokenType.COMMA):
+                parameters.append(self.consume(TokenType.IDENTIFIER, "Expect parameter name."))
+                if len(parameters) >= 255:
+                    self.error(self.peek, "Can't have more than 255 parameters.")
+        self.consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.")
+
+        self.consume(TokenType.LEFT_BRACE, "Expect '{' before " + str(kind) + " body.")
+        self.call_depth += 1
+        body:typing.List[Stmt] = self.block()
+        self.call_depth -= 1
+        return Function(name, parameters, body)
+
+    def var_declaration(self) -> Expr:
         """varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;"""
         name:Token = self.consume(TokenType.IDENTIFIER, "Expect variable name.")
         initializer:Expr = self.expression() if self.match(TokenType.EQUAL) else None
@@ -534,20 +572,34 @@ class Parser:
         if self.match(TokenType.FOR): return self.for_statement()
         if self.match(TokenType.IF): return self.if_statement()
         if self.match(TokenType.PRINT): return self.print_statement()
+        if self.match(TokenType.RETURN): return self.return_statement()
         if self.match(TokenType.WHILE): return self.while_statement()
         if self.match(TokenType.BREAK): return self.break_statement()
         if self.match(TokenType.CONTINUE): return self.continue_statement()
         if self.match(TokenType.LEFT_BRACE): return Block(self.block())  # instantiate Block here so as to reuse block() for functions etc
         return self.expression_statement()
 
-    def break_statement(self):
+    def return_statement(self) -> Stmt:
+        """returnStmt     → "return" expression? ";" ;"""
+        if not self.call_depth:
+            self.error(self.previous, "Must be inside a callable to use 'return'.")
+        keyword:Token = self.previous
+        value:typing.Optional[Expr] = None
+
+        if not self.check(TokenType.SEMICOLON):
+            value = self.expression()
+
+        self.consume(TokenType.SEMICOLON, "Expect ';' after return value.")
+        return Return(keyword, value)
+
+    def break_statement(self) -> Stmt:
         """breakStmt      → "break" ";" ;"""
         if self.loop_depth == 0:
             self.error(self.previous, "Must be inside a loop to use 'break'.")
         self.consume(TokenType.SEMICOLON, "Expect ';' after break statement.")
         return Break()
 
-    def continue_statement(self):
+    def continue_statement(self) -> Stmt:
         """continueStmt   → "continue" ";" ;"""
         if self.loop_depth == 0:
             self.error(self.previous, "Must be inside a loop to use 'continue'.")
@@ -784,7 +836,26 @@ class Parser:
             operator:Token = self.previous
             right:Expr = self.unary()
             return Unary(operator, right)
-        return self.primary()
+        return self.call()
+
+    def call(self) -> Expr:
+        """call           → primary ( "(" arguments? ")" )* ;"""
+        expr:Expr = self.primary()
+        while self.match(TokenType.LEFT_PAREN):
+            expr = self.finish_call(expr)
+        return expr
+
+    def finish_call(self, callee:Expr) -> Expr:
+        """..."""
+        arguments:typing.List[Expr] = []
+        if not self.check(TokenType.RIGHT_PAREN):
+            arguments.append(self.expression())
+            while self.match(TokenType.COMMA):
+                arguments.append(self.expression())
+        if len(arguments) > 255:
+            self.error(self.peek, "Can't have more than 255 arguments.")
+        paren:Token = self.consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.")
+        return Call(callee, paren, arguments)
 
     def primary(self) -> typing.Optional[Expr]:  # noqa:C901 # too-complex
         """primary        → NUMBER | STRING | "true" | "false" | "nil"
@@ -867,7 +938,8 @@ class Environment:
 
     def define(self, name:str, value:typing.Any) -> None:
         """bind a name to a value"""
-        # NOTE we could consider redefinition an error here
+        if name in self.values:
+            raise self.RuntimeError(f"Var {name} is already defined.")
         self.values[name] = value
 
     def get(self, token:Token) -> typing.Any:
@@ -910,17 +982,61 @@ class Interpreter:
     class ContinueException(Exception):
         """Continue iteration"""
 
+    class ReturnException(Exception):
+        """Return statement value that breaks evaluation of a function"""
+        def __init__(self, value):
+            super().__init__(self.__class__.__name__)
+            self.value = value
+
+    class Callable:
+        """Callable"""
+        def __init__(self, name, arity:int, func:typing.Callable):
+            self.name = name
+            self.arity = arity
+            self.func = func
+
+        def __call__(self, interpreter:'Interpreter', arguments:typing.List[typing.Any]):
+            return self.func(interpreter, *(arguments or []))
+
+        def __str__(self):
+            return f"<fn {self.name}>"
+
+    class Function(Callable):
+        """Function"""
+        def __init__(self, declaration:Stmt, closure:Environment):
+            super().__init__(name=declaration.name.lexeme, arity=len(declaration.params), func=None)
+            self.declaration = declaration
+            self.closure:Environment = closure
+
+        def __call__(self, interpreter:'Interpreter', arguments:typing.List[typing.Any]):
+            environment = Environment(self.closure)
+            for param, argument in zip(self.declaration.params, arguments):
+                environment.define(param.lexeme, argument)
+            try:
+                interpreter.execute_block(self.declaration.body, environment)
+            except Interpreter.ReturnException as exc:
+                return exc.value
+            return None
+
     def __init__(self) -> None:
         """init"""
-        self.environment = Environment()
+        self.globals = Environment()
+        self.environment = self.globals
+        self.has_errors = False
+
+        # builtins/ffi
+        self.globals.define("clock", self.Callable("clock", arity=0, func=lambda _, *args: int(time.time())))
+        self.globals.define("echo", self.Callable("echo", arity=1, func=lambda _, *args: args[0]))
 
     def interpret(self, statements:typing.List[Stmt]) -> None:
         """Interpret statements"""
+        self.has_errors = False
         try:
             for statement in statements:
                 self.eval(statement)
-        except self.RuntimeError as exc:
-            print(exc)
+        except (self.RuntimeError, Environment.RuntimeError) as exc:
+            self.has_errors = True
+            print(f"Interpreter error {exc.__class__.__name__}: {exc}")
 
     def eval(self, expression:typing.Union[Expr, Stmt]) -> typing.Any:  # noqa:C901 # too-complex
         """eval an expression or statement"""
@@ -946,10 +1062,8 @@ class Interpreter:
             value = self.eval(expression.expression)
             if value is None:
                 print("nil")
-            elif value is True:
-                print("true")
-            elif value is False:
-                print("false")
+            elif isinstance(value, bool):
+                print("true" if value else "false")
             else:
                 print(value)
             return None
@@ -965,8 +1079,25 @@ class Interpreter:
             return self._eval_binary(expression)
         if isinstance(expression, Stmt):
             return self._eval_statement(expression)
+        if isinstance(expression, Call):
+            return self._eval_call(expression)
 
         return None
+
+    def _eval_call(self, expr:Expr) -> typing.Any:
+        """evaluate a call expression"""
+        function:typing.Callable = self.eval(expr.callee)
+
+        if not isinstance(function, self.Callable):
+            raise self.RuntimeError(expr.paren, "Can only call functions and classes.")
+
+        arguments:typing.List[typing.Any] = []
+        for argument in expr.arguments:
+            arguments.append(self.eval(argument))
+
+        if function.arity != len(arguments):
+            raise self.RuntimeError(expr, f"Call to {function} expected {function.arity} arguments but got {len(arguments)}.")
+        return function(self, arguments)
 
     def _eval_logical(self, expression:Expr) -> typing.Any:
         """evaluate a logical expression"""
@@ -1036,10 +1167,19 @@ class Interpreter:
             else:
                 self.eval(stmt.else_branch)
             return None
+        if isinstance(stmt, Function):
+            function = self.Function(stmt, self.environment)
+            self.environment.define(stmt.name.lexeme, function)
+            return None
         if isinstance(stmt, Break):
             raise self.BreakException
         if isinstance(stmt, Continue):
             raise self.ContinueException
+        if isinstance(stmt, Return):
+            value:typing.Any = None
+            if stmt.value is not None:
+                value = self.eval(stmt.value)
+            raise self.ReturnException(value)
         if isinstance(stmt, While):
             while self.eval(stmt.condition):
                 try:
@@ -1089,17 +1229,19 @@ def tests():  # noqa:C901 # too-complex
         ('var a; if (1 == 1) { a = "yes"; } else { a = "no";} ', [Token(TokenType.VAR, 'var', None, 1, 0), Token(TokenType.IDENTIFIER, 'a', None, 1, 4), Token(TokenType.SEMICOLON, ';', None, 1, 5), Token(TokenType.IF, 'if', None, 1, 7), Token(TokenType.LEFT_PAREN, '(', None, 1, 10), Token(TokenType.NUMBER, '1', 1, 1, 11), Token(TokenType.EQUAL_EQUAL, '==', None, 1, 13), Token(TokenType.NUMBER, '1', 1, 1, 16), Token(TokenType.RIGHT_PAREN, ')', None, 1, 17), Token(TokenType.LEFT_BRACE, '{', None, 1, 19), Token(TokenType.IDENTIFIER, 'a', None, 1, 21), Token(TokenType.EQUAL, '=', None, 1, 23), Token(TokenType.STRING, '"yes"', 'yes', 1, 25), Token(TokenType.SEMICOLON, ';', None, 1, 30), Token(TokenType.RIGHT_BRACE, '}', None, 1, 32), Token(TokenType.ELSE, 'else', None, 1, 34), Token(TokenType.LEFT_BRACE, '{', None, 1, 39), Token(TokenType.IDENTIFIER, 'a', None, 1, 41), Token(TokenType.EQUAL, '=', None, 1, 43), Token(TokenType.STRING, '"no"', 'no', 1, 45), Token(TokenType.SEMICOLON, ';', None, 1, 49), Token(TokenType.RIGHT_BRACE, '}', None, 1, 50), Token(TokenType.EOF, '', None, 1, -1)]),
         ('break;', [Token(TokenType.BREAK, 'break', None, 1, 0), Token(TokenType.SEMICOLON, ';', None, 1, 5), Token(TokenType.EOF, '', None, 1, -1)]),
         ('continue;', [Token(TokenType.CONTINUE, 'continue', None, 1, 0), Token(TokenType.SEMICOLON, ';', None, 1, 8), Token(TokenType.EOF, '', None, 1, -1)]),
+        ('foo(a, b);', [Token(TokenType.IDENTIFIER, 'foo', None, 1, 0), Token(TokenType.LEFT_PAREN, '(', None, 1, 3), Token(TokenType.IDENTIFIER, 'a', None, 1, 4), Token(TokenType.COMMA, ',', None, 1, 5), Token(TokenType.IDENTIFIER, 'b', None, 1, 7), Token(TokenType.RIGHT_PAREN, ')', None, 1, 8), Token(TokenType.SEMICOLON, ';', None, 1, 9), Token(TokenType.EOF, '', None, 1, -1)]),
+        ('fun sum(a, b){return a + b; } var total = sum(1, 2);', [Token(TokenType.FUN, 'fun', None, 1, 0), Token(TokenType.IDENTIFIER, 'sum', None, 1, 4), Token(TokenType.LEFT_PAREN, '(', None, 1, 7), Token(TokenType.IDENTIFIER, 'a', None, 1, 8), Token(TokenType.COMMA, ',', None, 1, 9), Token(TokenType.IDENTIFIER, 'b', None, 1, 11), Token(TokenType.RIGHT_PAREN, ')', None, 1, 12), Token(TokenType.LEFT_BRACE, '{', None, 1, 13), Token(TokenType.RETURN, 'return', None, 1, 14), Token(TokenType.IDENTIFIER, 'a', None, 1, 21), Token(TokenType.PLUS, '+', None, 1, 23), Token(TokenType.IDENTIFIER, 'b', None, 1, 25), Token(TokenType.SEMICOLON, ';', None, 1, 26), Token(TokenType.RIGHT_BRACE, '}', None, 1, 28), Token(TokenType.VAR, 'var', None, 1, 30), Token(TokenType.IDENTIFIER, 'total', None, 1, 34), Token(TokenType.EQUAL, '=', None, 1, 40), Token(TokenType.IDENTIFIER, 'sum', None, 1, 42), Token(TokenType.LEFT_PAREN, '(', None, 1, 45), Token(TokenType.NUMBER, '1', 1, 1, 46), Token(TokenType.COMMA, ',', None, 1, 47), Token(TokenType.NUMBER, '2', 2, 1, 49), Token(TokenType.RIGHT_PAREN, ')', None, 1, 50), Token(TokenType.SEMICOLON, ';', None, 1, 51), Token(TokenType.EOF, '', None, 1, -1)]),
     )
 
     for tc_input, result in scanner_testcases:
-        if isinstance(result, type) and issubclass(result, RuntimeError):
+        if result is Scanner.ScannerError:
             try:
                 assert not Scanner(tc_input), "this should always fail"
-            except RuntimeError:
+            except Scanner.ScannerError:
                 pass
         else:
             s = Scanner(tc_input)
-            assert s.tokens == result, s.tokens
+            assert s.tokens == result, (tc_input, s.tokens)
 
     parser_expression_testcases = (
         (Scanner('1-2+3'), Binary(left=Binary(left=Literal(value=1), operator=Token(TokenType.MINUS, '-', None, 1, 1), right=Literal(value=2)), operator=Token(TokenType.PLUS, '+', None, 1, 3), right=Literal(value=3))),
@@ -1119,11 +1261,19 @@ def tests():  # noqa:C901 # too-complex
         (Scanner('1 != "false"'), Binary(left=Literal(value=1), operator=Token(TokenType.BANG_EQUAL, '!=', None, 1, 2), right=Literal(value='false'))),
         (Scanner('true ? 1 : 2'), Conditional(expression=Literal(value=True), left=Literal(value=1), right=Literal(value=2))),
         (Scanner('false ? 1 : 2'), Conditional(expression=Literal(value=False), left=Literal(value=1), right=Literal(value=2))),
+        (Scanner('foo(a, b);'), Call(callee=Variable(name=Token(TokenType.IDENTIFIER, 'foo', None, 1, 0)), paren=Token(TokenType.RIGHT_PAREN, ')', None, 1, 8), arguments=[Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 4)), Variable(name=Token(TokenType.IDENTIFIER, 'b', None, 1, 7))])),
+        (Scanner('foo(' + ", ".join(f'variable{_}' for _ in range(260)) + ');'), Parser.ParserError),
     )
     for tc_input, result in parser_expression_testcases:
         p = Parser(tc_input)
-        r = p.expression()
-        assert r == result, r
+        if result is Parser.ParserError:
+            try:
+                assert not p.expression(), "this should always fail"
+            except Parser.ParserError:
+                pass
+        else:
+            r = p.expression()
+            assert r == result, (tc_input, r)
 
     parser_statement_testcases = (
         (Scanner('print "Hello, world!";'), [Print(expression=Literal(value='Hello, world!'))]),
@@ -1147,11 +1297,12 @@ def tests():  # noqa:C901 # too-complex
         (Scanner('var a = 0; while (a < 10) { a = a + 1;  if (a == 2) { break; } }'), [Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 4), initializer=Literal(value=0)), While(condition=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 18)), operator=Token(TokenType.LESS, '<', None, 1, 20), right=Literal(value=10)), body=Block(statements=[Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 28), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 32)), operator=Token(TokenType.PLUS, '+', None, 1, 34), right=Literal(value=1)))), If(condition=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 44)), operator=Token(TokenType.EQUAL_EQUAL, '==', None, 1, 46), right=Literal(value=2)), then_branch=Block(statements=[Break()]), else_branch=None)]))]),
         (Scanner('for (var a = 0; a < 10; a = a + 1) { print a; if (a == 2) { break; } }'), [Block(statements=[Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 9), initializer=Literal(value=0)), While(condition=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 16)), operator=Token(TokenType.LESS, '<', None, 1, 18), right=Literal(value=10)), body=Block(statements=[Block(statements=[Print(expression=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 43))), If(condition=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 50)), operator=Token(TokenType.EQUAL_EQUAL, '==', None, 1, 52), right=Literal(value=2)), then_branch=Block(statements=[Break()]), else_branch=None)]), ForExpression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 24), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 28)), operator=Token(TokenType.PLUS, '+', None, 1, 30), right=Literal(value=1))))]))])]),
         (Scanner('var a = 2; a++; a += 1; a *= 2; a--; a -= 1; a /= 2;'), [Var(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 4), initializer=Literal(value=2)), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 11), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 11)), operator=Token(TokenType.PLUS_PLUS, '++', None, 1, 12), right=Literal(value=1)))), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 16), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 16)), operator=Token(TokenType.PLUS_EQUAL, '+=', None, 1, 18), right=Literal(value=1)))), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 24), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 24)), operator=Token(TokenType.STAR_EQUAL, '*=', None, 1, 26), right=Literal(value=2)))), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 32), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 32)), operator=Token(TokenType.MINUS_MINUS, '--', None, 1, 33), right=Literal(value=1)))), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 37), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 37)), operator=Token(TokenType.MINUS_EQUAL, '-=', None, 1, 39), right=Literal(value=1)))), Expression(expression=Assign(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 45), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 45)), operator=Token(TokenType.SLASH_EQUAL, '/=', None, 1, 47), right=Literal(value=2))))]),
+        (Scanner('fun sum(a, b){return a + b; } var total = sum(1, 2);'), [Function(name=Token(TokenType.IDENTIFIER, 'sum', None, 1, 4), params=[Token(TokenType.IDENTIFIER, 'a', None, 1, 8), Token(TokenType.IDENTIFIER, 'b', None, 1, 11)], body=[Return(keyword=Token(TokenType.RETURN, 'return', None, 1, 14), value=Binary(left=Variable(name=Token(TokenType.IDENTIFIER, 'a', None, 1, 21)), operator=Token(TokenType.PLUS, '+', None, 1, 23), right=Variable(name=Token(TokenType.IDENTIFIER, 'b', None, 1, 25))))]), Var(name=Token(TokenType.IDENTIFIER, 'total', None, 1, 34), initializer=Call(callee=Variable(name=Token(TokenType.IDENTIFIER, 'sum', None, 1, 42)), paren=Token(TokenType.RIGHT_PAREN, ')', None, 1, 50), arguments=[Literal(value=1), Literal(value=2)]))]),
     )
     for tc_input, result in parser_statement_testcases:
         p = Parser(tc_input)
         r = p.parse()
-        assert r == result, r
+        assert r == result, (tc_input, r)
 
     interpreter_eval_testcases = (
         (Parser(Scanner('1')), 1),
@@ -1180,6 +1331,7 @@ def tests():  # noqa:C901 # too-complex
         (Parser(Scanner('false ? 1 : 2')), 2),
         (Parser(Scanner('!=')), Parser.ParserError),
         (Parser(Scanner('==')), Parser.ParserError),
+        (Parser(Scanner('return;')), Parser.ParserError),  # must be inside a callable
     )
     for tc_input, result in interpreter_eval_testcases:
         if result is Parser.ParserError:
@@ -1193,15 +1345,15 @@ def tests():  # noqa:C901 # too-complex
             if result is None:
                 assert r is None
             else:
-                assert r == result, r
+                assert r == result, (tc_input, r)
 
     interpret_testcases = (
-        (Parser(Scanner('print "Hello, world!";')), None),
-        (Parser(Scanner('var foo = 2 * 2;')), None),
-        (Parser(Scanner('var foo = "bar";')), None),
-        (Parser(Scanner('var foo = "wehavevarassignment"; print foo;')), None),
+        (Parser(Scanner('print "Hello, world!";')), lambda i: not i.has_errors),
+        (Parser(Scanner('var foo = 2 * 2;')), lambda i: not i.has_errors),
+        (Parser(Scanner('var foo = "bar";')), lambda i: not i.has_errors),
+        (Parser(Scanner('var foo = "wehavevarassignment"; print foo;')), lambda i: not i.has_errors),
         (Parser(Scanner('print true; print nil; print false; var name = "varname"; var foo = 2; var bar = foo; print name; print bar;')), None),
-        (Parser(Scanner('var jason = 2 > 1 ? true : false; print jason;')), None),
+        (Parser(Scanner('var jason = 2 > 1 ? true : false; print jason;')), lambda i: not i.has_errors),
         (Parser(Scanner('var jason; jason = 2 > 1 ? true : false; jason == true;')), lambda i: i.environment.values['jason'] is True),
         (Parser(Scanner('var a; var b = a = 2;print "a is " + a; print "b is " + b;')), lambda i: i.environment.values['a'] == 2 and i.environment.values['b'] == 2),
         (Parser(Scanner('var a = 10; {a = 11; var b = a;}')), lambda i: i.environment.values['a'] == 11 and 'b' not in i.environment.values),
@@ -1217,6 +1369,12 @@ def tests():  # noqa:C901 # too-complex
         (Parser(Scanner('var b = 0; for (var a = 0; a < 10; a = a + 1) { if (a == 2) { break; } b = a;}')), lambda i: i.environment.values['b'] == 1),
         (Parser(Scanner('var b = 0; for (var a = 0; a < 3; a = a + 1) { if (a == 2) { continue; } b = b + a; }')), lambda i: i.environment.values['b'] == 1),
         (Parser(Scanner('var a = 2; a++; a += 1; a *= 2; a--; a -= 1; a /= 2;')), lambda i: i.environment.values['a'] == 3),
+        (Parser(Scanner('var c = clock(1);')), lambda i: i.has_errors),
+        (Parser(Scanner('var c = clock();')), lambda i: isinstance(i.environment.values['c'], int) and i.environment.values['c'] >= int(time.time())),
+        (Parser(Scanner('fun sum(a, b){return a + b; } var total = sum(1, 2);')), lambda i: isinstance(i.environment.values['sum'], Interpreter.Function) and i.environment.values['total'] == 3),
+        (Parser(Scanner('fun fib(n) { if (n <= 1) return n; return fib(n - 2) + fib(n - 1); } var f = fib(10);')), lambda i: i.environment.values['f'] == 55),
+        (Parser(Scanner('var a = 1; var b = a();')), lambda i: i.has_errors),
+        (Parser(Scanner('fun counter() { var i = 0; fun inc() { i += 1; return i;} return inc;} var c = counter(); c(); c(); c();')), lambda i: i.environment.values['c'].closure.values['i'] == 3),
     )
     for tc_input, cb in interpret_testcases:
         i = Interpreter()
