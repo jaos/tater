@@ -269,6 +269,9 @@ class Expr:
             return False
         return self.__dict__ == other.__dict__
 
+    def __hash__(self):
+        return hash(repr(self))
+
 
 class Stmt:
     """Statement"""
@@ -951,6 +954,18 @@ class Environment:
                 return self.enclosing.get(token)
             raise self.RuntimeError(f"Undefined variable {token.lexeme}") from exc
 
+    def get_at(self, distance:int, token:Token) -> typing.Any:
+        """return a value by distance and name"""
+        return self.ancestor(distance).get(token)
+
+    def ancestor(self, distance:int) -> 'Environment':
+        """Return the ancestor environment at distance"""
+        environment = self
+        while distance > 0:
+            environment = environment.enclosing
+            distance -= 1
+        return environment
+
     def assign(self, token:Token, value:typing.Any) -> None:
         """Assign a value"""
         if token.lexeme not in self.values:
@@ -960,8 +975,162 @@ class Environment:
             raise self.RuntimeError(f"Undefined variable {token.lexeme}")
         self.values[token.lexeme] = value
 
+    def assign_at(self, distance:int, token:Token, value:typing.Any) -> None:
+        """Assign a value by distance"""
+        self.ancestor(distance).assign(token, value)
+
     def __repr__(self):
         return str(self.values)
+
+
+class Resolver:
+    """Variable resolver that walks the Scanner tree"""
+
+    class RuntimeError(RuntimeError):
+        """Resolver runtime error"""
+
+    class VariableStatus(enum.Enum):
+        """Variable status"""
+        DECLARED = enum.auto()
+        DEFINED = enum.auto()
+        USED = enum.auto()
+
+    def __init__(self, interpreter:'Interpreter'):
+        self.interpreter = interpreter
+        self.scopes = []
+        self.current_function:typing.Optional[FunctionType] = None
+
+    def error(self, token:Token, msg):
+        """error handling"""
+        raise self.RuntimeError(f"{token.lexeme}: {msg}")
+
+    def begin_scope(self):
+        """begin a scope"""
+        self.scopes.append({})
+
+    def end_scope(self):
+        """end a scope"""
+        for k, v in self.scopes[-1].items():
+            if v is not self.VariableStatus.USED:
+                print(f"Warning: unused variable {k}")
+        self.scopes.pop()
+
+    def declare(self, name:Token):
+        """declare a variable"""
+        if not self.scopes: return
+        if name.lexeme in self.scopes[-1]:
+            self.error(name, "Already a variable with this name in this scope.")
+        self.scopes[-1][name.lexeme] = self.VariableStatus.DECLARED
+
+    def define(self, name:Token):
+        """define a variable"""
+        if not self.scopes: return
+        self.scopes[-1][name.lexeme] = self.VariableStatus.DEFINED
+
+    def _resolve_local(self, expr:Expr, token:Token, used:bool = False):
+        """Resolve the scope depth of a variable"""
+        for idx, scope in enumerate(self.scopes):
+            if token.lexeme in scope:
+                self.interpreter.resolve(expr, idx)
+                if used:
+                    scope[token.lexeme] = self.VariableStatus.USED
+                return
+
+    def expression(self, expr:Expr):
+        """resolve variable use in an expression"""
+        # pylint: disable=too-many-return-statements
+        if isinstance(expr, Variable):
+            if self.scopes and self.scopes[-1].get(expr.name.lexeme) == self.VariableStatus.DECLARED:
+                self.error(expr.name, "Can't read local variable in its own initializer.")
+            self._resolve_local(expr, expr.name, True)
+            return None
+        if isinstance(expr, Assign):
+            self.expression(expr.value)
+            self._resolve_local(expr, expr.name)
+            return None
+        if isinstance(expr, (Binary, Logical)):
+            self.expression(expr.left)
+            self.expression(expr.right)
+            return None
+        if isinstance(expr, Call):
+            self.expression(expr.callee)
+            for argument in expr.arguments:
+                self.expression(argument)
+            return None
+        if isinstance(expr, Grouping):
+            self.expression(expr.expression)
+            return None
+        if isinstance(expr, Unary):
+            self.expression(expr.right)
+            return None
+        if isinstance(expr, Literal):
+            return None
+
+        return None
+
+    def statement(self, stmt:Stmt):  # noqa: C901
+        """resolve variable use in a statement"""
+        # pylint: disable=too-many-return-statements
+        if isinstance(stmt, Var):
+            self.declare(stmt.name)
+            if stmt.initializer is not None:
+                self.expression(stmt.initializer)
+            self.define(stmt.name)
+            return None
+        if isinstance(stmt, Function):
+            self.declare(stmt.name)
+            self.define(stmt.name)
+            self.function(stmt, FunctionType.FUNCTION)
+            return None
+        if isinstance(stmt, Expression):
+            self.expression(stmt.expression)
+            return None
+        if isinstance(stmt, If):
+            self.expression(stmt.condition)
+            self.statement(stmt.then_branch)
+            if stmt.else_branch:
+                self.statement(stmt.else_branch)
+            return None
+        if isinstance(stmt, Print):
+            self.expression(stmt.expression)
+            return None
+        if isinstance(stmt, Return):
+            if not self.current_function:
+                self.error(stmt.keyword, "Can't return from top-level code.")
+            self.expression(stmt.value)
+            return None
+        if isinstance(stmt, While):
+            self.expression(stmt.condition)
+            self.block(stmt.body)
+            return None
+        if isinstance(stmt, Block):
+            self.block(stmt)
+            return None
+
+        return None
+
+    def statements(self, statements:typing.List[Stmt]):
+        """resolve variable use in statements"""
+        for stmt in statements:
+            self.statement(stmt)
+
+    def function(self, func:Function, func_type:FunctionType):
+        """resolve variable use in functions"""
+        enclosing_function = self.current_function
+        self.current_function = func_type
+        self.begin_scope()
+        for param in func.params:
+            self.declare(param)
+            self.define(param)
+        self.statements(func.body)
+        self.end_scope()
+        self.current_function = enclosing_function
+
+    def block(self, block:Block):
+        """resolve block statements"""
+        self.begin_scope()
+        self.statements(block.statements)
+        self.end_scope()
 
 
 class Interpreter:
@@ -1021,6 +1190,7 @@ class Interpreter:
     def __init__(self) -> None:
         """init"""
         self.globals = Environment()
+        self.locals = {}
         self.environment = self.globals
         self.has_errors = False
 
@@ -1028,13 +1198,19 @@ class Interpreter:
         self.globals.define("clock", self.Callable("clock", arity=0, func=lambda _, *args: int(time.time())))
         self.globals.define("echo", self.Callable("echo", arity=1, func=lambda _, *args: args[0]))
 
+    def resolve(self, expr:Expr, depth:int):
+        """record the depth of an expression resolution"""
+        self.locals[expr] = depth
+
     def interpret(self, statements:typing.List[Stmt]) -> None:
         """Interpret statements"""
         self.has_errors = False
         try:
+            resolver = Resolver(self)
+            resolver.statements(statements=statements)
             for statement in statements:
                 self.eval(statement)
-        except (self.RuntimeError, Environment.RuntimeError) as exc:
+        except (self.RuntimeError, Environment.RuntimeError, Resolver.RuntimeError) as exc:
             self.has_errors = True
             print(f"Interpreter error {exc.__class__.__name__}: {exc}")
 
@@ -1068,10 +1244,21 @@ class Interpreter:
                 print(value)
             return None
         if isinstance(expression, Variable):
-            return self.environment.get(expression.name)  # passing Token
+            # Instead of using the environment, check locals for resolved distance to fix mutable scope changes
+            # return self.environment.get(expression.name)  # passing Token
+            distance = self.locals.get(expression, None)
+            if distance is not None:
+                return self.environment.get_at(distance, expression.name)
+            return self.globals.get(expression.name)
         if isinstance(expression, Assign):
             value = self.eval(expression.value)
-            self.environment.assign(expression.name, value)
+            # Instead of using the environment, check locals for resolved distance to fix mutable scope changes
+            # self.environment.assign(expression.name, value)
+            distance = self.locals.get(expression, None)
+            if distance is not None:
+                self.environment.assign_at(distance, expression.name, value)
+            else:
+                self.globals.assign(expression.name, value)
             return value
         if isinstance(expression, Logical):
             return self._eval_logical(expression)
