@@ -397,6 +397,7 @@ class FunctionType(enum.Enum):
 class ClassType(enum.Enum):
     """Class types"""
     CLASS = "class"
+    SUBCLASS = "subclass"
 
     def __str__(self):
         return self.value
@@ -475,7 +476,7 @@ class Parser:
     """
     program        → declaration* EOF ;
     declaration    → classDecl | funDecl | varDecl | statement ;
-    classDecl      → "class" IDENTIFIER "{" function* "}" ;
+    classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?  "{" function* "}" ;
     funDecl        → "fun" function ;
     function       → IDENTIFIER "(" parameters? ")" block ;
     parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
@@ -503,7 +504,7 @@ class Parser:
     unary          → ( "!" | "-" ) unary | call ;
     call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
     arguments      → expression ( "," expression )* ;
-    primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
+    primary        → "true" | "false" | "nil" | "this" | NUMBER | STRING | IDENTIFIER | "(" expression ")" | "super" "." IDENTIFIER
                    // Error productions...
                    | ( "!=" | "==" ) equality
                    | ( ">" | ">=" | "<" | "<=" ) comparison
@@ -556,6 +557,12 @@ class Parser:
     def class_declaration(self):
         """classDecl      → "class" IDENTIFIER "{" function* "}" ;"""
         name:Token = self.consume(TokenType.IDENTIFIER, "Expect class name.")
+
+        superclass:typing.Optional[Variable] = None
+        if self.match(TokenType.LESS):
+            self.consume(TokenType.IDENTIFIER, "Expect superclass name.")
+            superclass = Variable(self.previous)
+
         self.consume(TokenType.LEFT_BRACE, "Expect '{' before class body.")
 
         methods:typing.List[Function] = []
@@ -565,7 +572,7 @@ class Parser:
         self.in_method = False
 
         self.consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.")
-        return Class(name, None, methods)  # TODO ancestors  # noqa pylint: disable=fixme
+        return Class(name, superclass, methods)
 
     def function(self, kind:FunctionType) -> Stmt:
         """function       → IDENTIFIER "(" parameters? ")" block ;"""
@@ -862,9 +869,7 @@ class Parser:
         return expr
 
     def unary(self) -> Expr:
-        """ unary          → ( "!" | "-" ) unary
-                             primary ;
-        """
+        """ unary          → ( "!" | "-" ) unary primary ;"""
         if self.match(TokenType.BANG, TokenType.MINUS):
             operator:Token = self.previous
             right:Expr = self.unary()
@@ -897,9 +902,7 @@ class Parser:
         return Call(callee, paren, arguments)
 
     def primary(self) -> typing.Optional[Expr]:  # noqa:C901 # too-complex
-        """primary        → NUMBER | STRING | "true" | "false" | "nil"
-                          | "(" expression ")" ;
-        """
+        """primary        → "true" | "false" | "nil" | "this" | NUMBER | STRING | IDENTIFIER | "(" expression ")" | "super" "." IDENTIFIER"""
         # pylint: disable=too-many-return-statements
         if self.match(TokenType.FALSE): return Literal(False)
         if self.match(TokenType.TRUE): return Literal(True)
@@ -912,6 +915,14 @@ class Parser:
             expr:Expr = self.expression()
             self.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.")
             return Grouping(expr)
+
+        if self.match(TokenType.SUPER):
+            if not self.in_method:
+                self.error(self.previous, "Must be inside a method to use 'super'.")
+            keyword:Token = self.previous
+            self.consume(TokenType.DOT, "Expect '.' after 'super'.")
+            method:Token = self.consume(TokenType.IDENTIFIER, "Expect superclass method name.")
+            return Super(keyword, method)
 
         if self.match(TokenType.THIS):
             if not self.in_method:
@@ -997,7 +1008,9 @@ class Environment:
 
     def get_at(self, distance:int, token:Token) -> typing.Any:
         """return a value by distance and name"""
-        return self.ancestor(distance).get(token)
+        # return self.ancestor(distance).get(token)
+        # mini opt: take the direct route
+        return self.ancestor(distance).values.get(token.lexeme)
 
     def ancestor(self, distance:int) -> 'Environment':
         """Return the ancestor environment at distance"""
@@ -1044,7 +1057,7 @@ class Resolver:
 
     def error(self, token:Token, msg):
         """error handling"""
-        raise self.RuntimeError(f"{token.lexeme}: {msg}")
+        raise self.RuntimeError(f"Line {token.line}, column {token.column}, invalid {token.lexeme}: {msg}")
 
     def begin_scope(self):
         """begin a scope"""
@@ -1119,6 +1132,13 @@ class Resolver:
                 self.error(expr.name, "Can't use 'this' outside of a class.")
             self._resolve_local(expr, expr.keyword)
             return None
+        if isinstance(expr, Super):
+            if self.current_class is None:
+                self.error(expr.keyword, "Can't use 'super' outside of a class.")
+            if self.current_class != ClassType.SUBCLASS:
+                self.error(expr.keyword, "Can't use 'super' in a class without a superclass.")
+            self._resolve_local(expr, expr.keyword)
+            return None
 
         return None
 
@@ -1169,12 +1189,24 @@ class Resolver:
             self.declare(stmt.name)
             self.define(stmt.name)
 
+            if stmt.superclass:
+                if stmt.name.lexeme == stmt.superclass.name.lexeme:
+                    self.error(stmt.superclass.name, "A class cannot inherit from itself.")
+                self.current_class = ClassType.SUBCLASS
+                self.expression(stmt.superclass)
+
+                self.begin_scope()
+                self.scopes[-1]['super'] = self.VariableStatus.USED
+
             self.begin_scope()
             self.scopes[-1]['this'] = self.VariableStatus.USED
             for method in stmt.methods:
                 function_type = FunctionType.METHOD if method.name.lexeme != 'init' else FunctionType.INITIALIZER_METHOD
                 self.function(method, function_type)
             self.end_scope()
+
+            if stmt.superclass:
+                self.end_scope()
 
             self.current_class = enclosing_class
             return None
@@ -1305,16 +1337,17 @@ class Interpreter:
 
     class LoxClass(LoxCallable):
         """LoxClass"""
-        def __init__(self, name, methods:typing.List['Interpreter.LoxFunction']):
+        def __init__(self, name, superclass:typing.Optional['Interpreter.LoxClass'], methods:typing.Dict[str, 'Interpreter.LoxFunction']):
             super().__init__(name, arity=0, func=None)
+            self.superclass = superclass
             self.methods = methods
             init_method = self.method('init')
             if init_method:
                 self.arity = init_method.arity
 
         def method(self, name:str) -> typing.Optional['Interpreter.LoxFunction']:
-            """lookup a method on the class"""
-            return self.methods.get(name)
+            """lookup a method on the class or superclass"""
+            return self.methods.get(name) or (self.superclass.method(name) if self.superclass else None)
 
         def __str__(self):
             return f"<Class {self.name}>"
@@ -1419,6 +1452,16 @@ class Interpreter:
             if distance is not None:
                 return self.environment.get_at(distance, expression.keyword)
             return self.globals.get(expression.keyword)
+        if isinstance(expression, Super):
+            distance = self.locals.get(expression, None)
+            if distance is None:
+                raise self.RuntimeError(expression.method, "No superclass")
+            superclass = self.environment.get_at(distance, expression.keyword)
+            this = self.environment.get_at(distance - 1, Token(TokenType.THIS, 'this', None, 0, 0))  # fake token for lookup
+            method = superclass.method(expression.method.lexeme)
+            if not method:
+                raise self.RuntimeError(expression.method, "Undefined property {expression.method.lexeme}")
+            return method.bind(this)
         if isinstance(expression, Logical):
             return self._eval_logical(expression)
         if isinstance(expression, Binary):
@@ -1540,12 +1583,27 @@ class Interpreter:
                         self.eval(stmt.body.statements[-1])
             return None
         if isinstance(stmt, Class):
+            superclass = None
+            if stmt.superclass is not None:
+                superclass = self.eval(stmt.superclass)
+                if not isinstance(superclass, self.LoxClass):
+                    raise self.RuntimeError(stmt.superclass.name, "Superclass must be a class.")
+
             self.environment.define(stmt.name.lexeme, None)  # NOTE: for self reference
+
+            if superclass:
+                self.environment = Environment(self.environment)
+                self.environment.define("super", superclass)
+
             methods = {}
             for method in stmt.methods:
                 function = self.LoxFunction(method, self.environment, method.name.lexeme == 'init')
                 methods[method.name.lexeme] = function
-            lox_class = self.LoxClass(stmt.name.lexeme, methods)
+            lox_class = self.LoxClass(stmt.name.lexeme, superclass, methods)
+
+            if superclass:
+                self.environment = self.environment.enclosing
+
             self.environment.assign(stmt.name, lox_class)
             return None
 
@@ -1774,6 +1832,31 @@ var f = Foo("foo", 100);
 var age = f.getage();
 var name = f.getname();
 """)), lambda i: i.environment.values['f'] and i.environment.values['age'] == 100 and i.environment.values['name'] == 'foo'),
+        (Parser(Scanner('class Foo < Foo {}')), lambda i: i.has_errors),  # can't inherit from itself
+        (Parser(Scanner("""
+class Foo {
+    inc(value) {
+        return value + 1;
+    }
+}
+class Bar < Foo {}
+var b = Bar();
+var result = b.inc(1);
+""")), lambda i: i.environment.values['result'] == 2),
+        (Parser(Scanner("""
+class A {
+    work() {
+        return "A";
+    }
+}
+class B < A {
+    attempt() {
+        return super.work();
+    }
+}
+class C < B {}
+var r = C().attempt();
+""")), lambda i: i.environment.values['r'] == 'A'),
 
     )
     for tc_input, cb in interpret_testcases:
