@@ -10,6 +10,8 @@ sources = [
     'memory.h',
     'value.c',
     'value.h',
+    'vm.h',
+    'vm.c',
 ]
 
 executable('clox', sources)

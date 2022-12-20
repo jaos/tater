@@ -18,4 +18,8 @@ cflags = ['-Wshadow', '-Wstrict-overflow', '-fno-strict-aliasing', '-fstack-prot
 add_project_arguments(cc.get_supported_arguments(cflags), language: 'c')
 add_project_link_arguments(cc.get_supported_link_arguments(cflags), language: 'c')
 
+if get_option('debuglog').enabled()
+  add_global_arguments('-DDEBUG', language : 'c')
+endif
+
 subdir('src')
