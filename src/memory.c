@@ -25,8 +25,7 @@ static void free_object(obj_t *o)
     switch (o->type) {
         case OBJ_STRING: {
             obj_string_t *s = (obj_string_t*)o;
-            FREE_ARRAY(char, s->chars, s->length + 1);
-            FREE(obj_string_t, o);
+            reallocate(o, sizeof(obj_string_t) + s->length + 1, 0);
             break;
         }
         default: return; // unreachable

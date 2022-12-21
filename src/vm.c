@@ -7,6 +7,7 @@
 #include "compiler.h"
 #include "debug.h"
 #include "memory.h"
+#include "object.h"
 #include "vm.h"
 
 vm_t vm;
@@ -69,13 +70,14 @@ static void concatenate(void)
 {
     obj_string_t *b = AS_STRING(pop());
     obj_string_t *a = AS_STRING(pop());
+
     int length = a->length + b->length;
-    char *chars = ALLOCATE(char, length + 1);
-    memcpy(chars, a->chars, a->length);
-    memcpy(chars + a->length, b->chars, b->length);
-    chars[length] = '\0';
-    obj_string_t *r = take_string(chars, length);
-    push(OBJ_VAL(r));
+    obj_string_t *str = make_string(length);
+
+    memcpy(str->chars, a->chars, a->length);
+    memcpy(str->chars + a->length, b->chars, b->length);
+    str->chars[length] = '\0';
+    push(OBJ_VAL(str));
 }
 
 static interpret_result_t run() {

@@ -17,25 +17,19 @@ static obj_t *allocate_object(size_t size, obj_type_t type) {
     return object;
 }
 
-static obj_string_t *allocate_string(char *chars, const int length)
+obj_string_t *make_string(int length)
 {
-    obj_string_t *str = ALLOCATE_OBJ(obj_string_t, OBJ_STRING);
+    obj_string_t *str = (obj_string_t *)allocate_object(sizeof(obj_string_t) + length + 1, OBJ_STRING);
     str->length = length;
-    str->chars = chars;
     return str;
-}
-
-obj_string_t *take_string(char *chars, int length)
-{
-    return allocate_string(chars, length);
 }
 
 obj_string_t *copy_string(const char *chars, const int length)
 {
-    char *c = ALLOCATE(char, length + 1);
-    memcpy(c, chars, length);
-    c[length] = '\0';
-    return allocate_string(c, length);
+    obj_string_t *str = make_string(length);
+    memcpy(str->chars, chars, length);
+    str->chars[length] = '\0';
+    return str;
 }
 
 void print_object(value_t value)

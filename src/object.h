@@ -22,11 +22,11 @@ struct obj_t {
 struct obj_string_t {
     obj_t obj;
     int length;
-    char *chars;
+    char chars[]; // FAM
 };
 
 
-obj_string_t *take_string(char *chars, int length);
+obj_string_t *make_string(int length);
 obj_string_t *copy_string(const char *chars, const int length);
 void print_object(value_t value);
 
