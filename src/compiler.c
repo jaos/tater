@@ -47,6 +47,7 @@ static void unary(void);
 static void binary(void);
 static void number(void);
 static void literal(void);
+static void string(void);
 parse_rule_t rules[] = {
     [TOKEN_LEFT_PAREN]      = {grouping,    NULL,   PREC_NONE},
     [TOKEN_RIGHT_PAREN]     = {NULL,        NULL,   PREC_NONE},
@@ -68,7 +69,7 @@ parse_rule_t rules[] = {
     [TOKEN_LESS]            = {NULL,        binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]      = {NULL,        binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER]      = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_STRING]          = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_STRING]          = {string,      NULL,   PREC_NONE},
     [TOKEN_NUMBER]          = {number,      NULL,   PREC_NONE},
     [TOKEN_AND]             = {NULL,        NULL,   PREC_NONE},
     [TOKEN_CLASS]           = {NULL,        NULL,   PREC_NONE},
@@ -264,6 +265,11 @@ static void literal(void)
         case TOKEN_TRUE: emit_byte(OP_TRUE); break;
         default: return; // unreachable
     }
+}
+
+static void string(void)
+{
+    emit_constant(OBJ_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 bool compile(const char *source, chunk_t *chunk)
