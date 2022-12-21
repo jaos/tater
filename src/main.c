@@ -1,37 +1,71 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "common.h"
 #include "chunk.h"
 #include "debug.h"
 #include "vm.h"
 
-int main(const int argc __unused__, const char *argv[] __unused__)
+static void repl(void)
+{
+    char line[1024];
+    for (;;) {
+        printf("> ");
+        if (!fgets(line, sizeof(line), stdin)) {
+            printf("\n");
+            break;
+        }
+        interpret(line);
+    }
+}
+
+static char *read_file(const char *file_path)
+{
+    FILE *f = fopen(file_path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "Could not read source file \"%s\".\n", file_path);
+        exit(74);
+    }
+    if (fseek(f, 0L, SEEK_END) == -1) {
+        perror(file_path);
+    }
+    size_t fsize = ftell(f);
+    char *buffer = malloc(sizeof *buffer * fsize);
+    if (buffer == NULL) {
+        fprintf(stderr, "Could not allocate buffer to read \"%s\".\n", file_path);
+        exit(74);
+    }
+    size_t b_read = fread(buffer, sizeof(char), fsize, f);
+    if (b_read < fsize) {
+        fprintf(stderr, "Could not read all of \"%s\".\n", file_path);
+        exit(74);
+    }
+    buffer[fsize - 1] = '\0';
+    fclose(f);
+    return buffer;
+}
+
+static void run_file(const char *file_path)
+{
+    char *source = read_file(file_path);
+    interpret_result_t r = interpret(source);
+    free(source);
+    if (r == INTERPRET_COMPILE_ERROR) exit(65);
+    if (r == INTERPRET_RUNTRIME_ERROR) exit(70);
+}
+
+int main(const int argc, const char *argv[])
 {
     init_vm();
 
-    chunk_t chunk;
-    init_chunk(&chunk);
-
-    /*
-    int constant = add_constant(&chunk, 1.2);
-    write_chunk(&chunk, OP_CONSTANT, 123);
-    write_chunk(&chunk, constant, 123);
-    */
-    write_constant(&chunk, 1.2, 123);
-    write_constant(&chunk, 3.4, 123);
-    write_chunk(&chunk, OP_ADD, 123);
-
-    write_constant(&chunk, 5.6, 123);
-    write_chunk(&chunk, OP_DIVIDE, 123);
-    write_chunk(&chunk, OP_NEGATE, 123);
-
-
-    write_chunk(&chunk, OP_RETURN, 123);
-    //disassemble_chunk(&chunk, "test chunk");
-
-    interpret_result_t r __unused__ = interpret(&chunk);
-
+    if (argc == 1) {
+        repl();
+    } else if (argc == 2) {
+        run_file(argv[1]);
+    } else {
+        fprintf(stderr, "Usage: %s [path]\n", argv[0]);
+    }
     free_vm();
-
-    free_chunk(&chunk);
-
     return 0;
 }

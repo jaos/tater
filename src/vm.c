@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "common.h"
+#include "compiler.h"
 #include "debug.h"
 #include "vm.h"
 
@@ -76,11 +77,10 @@ static interpret_result_t run() {
 #undef BINARY_OP
 }
 
-interpret_result_t interpret(chunk_t *chunk __unused__)
+interpret_result_t interpret(const char *source)
 {
-    vm.chunk = chunk;
-    vm.ip = vm.chunk->code;
-    return run();
+    compile(source);
+    return INTERPRET_OK;
 }
 
 void push(value_t value)
