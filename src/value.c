@@ -14,7 +14,31 @@ bool values_equal(const value_t a, const value_t b)
         case VAL_NIL: return true;
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
         case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
+        case VAL_EMPTY: return true;
         default: return false; // unreachable
+    }
+}
+
+static uint32_t hash_double(const double value)
+{
+    union bitcast {
+        double value;
+        uint32_t ints[2];
+    };
+    union bitcast cast;
+    cast.value = (value) + 1.0;
+    return cast.ints[0] + cast.ints[1];
+}
+
+uint32_t hash_value(const value_t value)
+{
+    switch (value.type) {
+        case VAL_BOOL: return AS_BOOL(value) ? 3 : 5; // arbitrary hash values
+        case VAL_NIL: return 7; // arbitrary hash value
+        case VAL_NUMBER: return hash_double(AS_NUMBER(value));
+        case VAL_OBJ: return AS_STRING(value)->hash;
+        case VAL_EMPTY: return 0; // arbitrary hash value
+        default: return 0; // unreachable
     }
 }
 
@@ -50,5 +74,6 @@ void print_value(const value_t value)
         case VAL_NIL: printf("nil"); break;
         case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
         case VAL_OBJ: print_object(value); break;
+        case VAL_EMPTY: printf("<empty>"); break;
     }
 }

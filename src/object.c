@@ -48,7 +48,7 @@ obj_string_t *copy_string(const char *chars, const int length)
     memcpy(str->chars, chars, length);
     str->chars[length] = '\0';
     str->hash = hash;
-    set_table_t(&vm.strings, str, NIL_VAL);
+    set_table_t(&vm.strings, OBJ_VAL(str), NIL_VAL);
     return str;
 }
 
@@ -68,7 +68,7 @@ obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b)
         return interned;
     }
 
-    set_table_t(&vm.strings, str, NIL_VAL);
+    set_table_t(&vm.strings, OBJ_VAL(str), NIL_VAL);
     return str;
 }
 

@@ -13,6 +13,7 @@ typedef enum {
     VAL_NIL,
     VAL_NUMBER,
     VAL_OBJ,
+    VAL_EMPTY,
 } value_type_t;
 
 typedef struct {
@@ -28,6 +29,7 @@ typedef struct {
 #define IS_NIL(value)    ((value).type == VAL_NIL)
 #define IS_NUMBER(value) ((value).type == VAL_NUMBER)
 #define IS_OBJ(value)    ((value).type == VAL_OBJ)
+#define IS_EMPTY(value)  ((value).type == VAL_EMPTY)
 
 #define AS_OBJ(value)    ((value).as.obj)
 #define AS_BOOL(value)   ((value).as.boolean)
@@ -37,6 +39,7 @@ typedef struct {
 #define NIL_VAL             ((value_t){VAL_NIL, {.number = 0}})
 #define NUMBER_VAL(value)   ((value_t){VAL_NUMBER, {.number = value}})
 #define OBJ_VAL(object)     ((value_t){VAL_OBJ, {.obj = (obj_t*)object}})
+#define EMPTY_VAL           ((value_t){VAL_EMPTY, {.number = 0}})
 
 typedef struct {
     int capacity;
@@ -49,5 +52,6 @@ void init_value_array_t(value_array_t* array);
 void write_value_array_t(value_array_t* array, const value_t value);
 void free_value_array_t(value_array_t* array);
 void print_value(const value_t value);
+uint32_t hash_value(const value_t value);
 
 #endif
