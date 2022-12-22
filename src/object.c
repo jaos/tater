@@ -76,5 +76,6 @@ void print_object(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
+        default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
 }

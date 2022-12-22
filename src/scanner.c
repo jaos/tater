@@ -151,6 +151,7 @@ static token_type_t identifier_type(void)
                     case 'a': return check_keyword(2, 3, "lse", TOKEN_FALSE);
                     case 'o': return check_keyword(2, 1, "r", TOKEN_FOR);
                     case 'u': return check_keyword(2, 1, "n", TOKEN_FUN);
+                    default: ; // default returned below
                 }
             }
             break;
@@ -166,12 +167,14 @@ static token_type_t identifier_type(void)
                 switch (scanner.start[1]) {
                     case 'h': return check_keyword(2, 2, "is", TOKEN_THIS);
                     case 'r': return check_keyword(2, 2, "ue", TOKEN_TRUE);
+                    default: ;  // default returned below
                 }
             }
             break;
         }
         case 'v': return check_keyword(1, 2, "ar", TOKEN_VAR);
         case 'w': return check_keyword(1, 4, "hile", TOKEN_WHILE);
+        default: ; // default return below
     }
     return TOKEN_IDENTIFIER;
 }
@@ -210,6 +213,6 @@ token_t scan_token(void)
         case '<': return make_token(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
         case '>': return make_token(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
         case '"': return string();
+        default: return error_token("Unexpected character.");
     }
-    return error_token("Unexpected character.");
 }

@@ -187,6 +187,7 @@ static interpret_result_t run() {
             case OP_RETURN: {
                 return INTERPRET_OK;
             }
+            default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
         }
     }
 #undef READ_BYTE

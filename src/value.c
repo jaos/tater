@@ -75,5 +75,6 @@ void print_value(const value_t value)
         case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
         case VAL_OBJ: print_object(value); break;
         case VAL_EMPTY: printf("<empty>"); break;
+        default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
 }

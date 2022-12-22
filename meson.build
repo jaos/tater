@@ -14,9 +14,54 @@ project('lox', 'c',
 )
 
 cc = meson.get_compiler('c')
-cflags = ['-Wshadow', '-Wstrict-overflow', '-fno-strict-aliasing', '-fstack-protector', '-ggdb', '-fno-omit-frame-pointer']
+cflags = [
+  '-Wshadow',
+  '-Wstrict-overflow',
+  '-fno-strict-aliasing',
+  '-fstack-protector',
+  '-fstack-protector-strong',
+  '-ggdb',
+  '-D_FORTIFY_SOURCE=2',
+  '-fno-omit-frame-pointer',
+  '-ffat-lto-objects',
+  '-Warith-conversion',
+  '-Warray-bounds=2',
+  '-Wcast-align=strict',
+  '-Wduplicated-cond',
+  '-Wduplicated-branches',
+  '-Wformat-nonliteral',
+  '-Wformat-overflow=2',
+  '-Wformat-security',
+  '-Wformat=2',
+  '-Wimplicit-function-declaration',
+  '-Wimplicit-fallthrough=3',
+  '-Wincompatible-pointer-types',
+  '-Winit-self',
+  '-Wint-conversion',
+  '-Wlogical-op',
+  '-Wmaybe-uninitialized',
+  '-Wmissing-field-initializers',
+  '-Wnull-dereference',
+  '-Wold-style-definition',
+  '-Wparentheses',
+  '-Wredundant-decls',
+  '-Wshift-overflow=2',
+  '-Wstrict-prototypes',
+  '-Wstringop-overflow=4',
+  '-Wswitch-default',
+  '-Wtrampolines',
+  '-Wundef',
+]
 add_project_arguments(cc.get_supported_arguments(cflags), language: 'c')
 add_project_link_arguments(cc.get_supported_link_arguments(cflags), language: 'c')
+
+lflags = ['-Wl,-z,defs',
+  '-Wl,-z,noexecstack',
+  '-Wl,-z,now',
+  '-Wl,-z,relro',
+  '-Wl,-z,separate-code',
+]
+add_project_link_arguments(cc.get_supported_link_arguments(lflags), language: 'c')
 
 if get_option('debuglog').enabled()
   add_global_arguments('-DDEBUG', language : 'c')
