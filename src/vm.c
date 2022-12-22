@@ -20,12 +20,14 @@ static void reset_stack(void)
 void init_vm(void)
 {
     reset_stack();
+    init_table_t(&vm.globals);
     init_table_t(&vm.strings);
     vm.objects = NULL;
 }
 
 void free_vm(void)
 {
+    free_table_t(&vm.globals);
     free_table_t(&vm.strings);
     free_objects();
 }
@@ -89,6 +91,7 @@ static interpret_result_t run() {
     double a = AS_NUMBER(pop()); \
     push(value_type_wrapper(a op b)); \
     } while (false)
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
@@ -112,6 +115,32 @@ static interpret_result_t run() {
             case OP_NIL: push(NIL_VAL); break;
             case OP_TRUE: push(BOOL_VAL(true)); break;
             case OP_FALSE: push(BOOL_VAL(false)); break;
+            case OP_POP: pop(); break;
+            case OP_GET_GLOBAL: {
+                obj_string_t *name = READ_STRING();
+                value_t value;
+                if (!get_table_t(&vm.globals, OBJ_VAL(name), &value)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTRIME_ERROR;
+                }
+                push(value);
+                break;
+            }
+            case OP_DEFINE_GLOBAL: {
+                obj_string_t *name = READ_STRING();
+                set_table_t(&vm.globals, OBJ_VAL(name), peek(0));
+                pop();
+                break;
+            }
+            case OP_SET_GLOBAL: {
+                obj_string_t *name = READ_STRING();
+                if (set_table_t(&vm.globals, OBJ_VAL(name), peek(0))) {
+                    delete_table_t(&vm.globals, OBJ_VAL(name));
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTRIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = pop();
                 value_t a = pop();
@@ -154,10 +183,8 @@ static interpret_result_t run() {
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE: BINARY_OP(NUMBER_VAL, /); break;
             case OP_NOT: push(BOOL_VAL(is_falsey(pop()))); break;
+            case OP_PRINT: print_value(pop()); printf("\n"); break;
             case OP_RETURN: {
-                DEBUG_LOGGER("%shandling return op\n", "");
-                print_value(pop());
-                printf("\n");
                 return INTERPRET_OK;
             }
         }
@@ -165,6 +192,7 @@ static interpret_result_t run() {
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef BINARY_OP
+#undef READ_STRING
 }
 
 interpret_result_t interpret(const char *source)
