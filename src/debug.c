@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "debug.h"
 #include "value.h"
+#include "compiler.h"
 
 void disassemble_chunk(chunk_t *chunk, const char* name)
 {
@@ -36,6 +37,14 @@ static int long_constant_instruction(const char *name, chunk_t *chunk, const int
     return offset + 4;
 }
 
+static int byte_instruction(const char *name, chunk_t *chunk, const int offset)
+{
+    // TODO figure out how to map our chunk to the compiler locals to get the variable name
+    uint8_t slot = chunk->code[offset + 1];
+    printf("%-16s %4d\n", name, slot);
+    return offset + 2;
+}
+
 int disassemble_instruction(chunk_t *chunk, const int offset)
 {
     printf("%04d ", offset);
@@ -58,6 +67,9 @@ int disassemble_instruction(chunk_t *chunk, const int offset)
         case OP_TRUE: return simple_instruction("OP_TRUE", offset);
         case OP_FALSE: return simple_instruction("OP_FALSE", offset);
         case OP_POP: return simple_instruction("OP_POP", offset);
+        case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
+        case OP_GET_LOCAL: return byte_instruction("OP_GET_LOCAL", chunk, offset);
+        case OP_SET_LOCAL: return byte_instruction("OP_GET_LOCAL", chunk, offset);
         case OP_GET_GLOBAL: return constant_instruction("OP_GET_GLOBAL", chunk, offset);
         case OP_DEFINE_GLOBAL: return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL: return constant_instruction("OP_SET_GLOBAL", chunk, offset);
