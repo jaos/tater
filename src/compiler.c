@@ -41,6 +41,8 @@ typedef struct {
 
 parser_t parser;
 chunk_t *compiling_chunk;
+table_t string_constants;
+
 
 static uint8_t identifier_constant(token_t *name);
 static void grouping(const bool _);
@@ -357,7 +359,15 @@ static void synchronize(void)
 
 static uint8_t identifier_constant(token_t *name)
 {
-    return make_constant(OBJ_VAL(copy_string(name->start, name->length)));
+    obj_string_t *string = copy_string(name->start, name->length);
+    value_t index_value;
+    if (get_table_t(&string_constants, OBJ_VAL(string), &index_value)) {
+        return (uint8_t)AS_NUMBER(index_value);
+    }
+
+    uint8_t index = make_constant(OBJ_VAL(copy_string(name->start, name->length)));
+    set_table_t(&string_constants, OBJ_VAL(string), NUMBER_VAL((double)index));
+    return index;
 }
 
 static uint8_t parse_variable(const char *message)
@@ -401,6 +411,8 @@ bool compile(const char *source, chunk_t *chunk)
     parser.panic_mode = false;
     compiling_chunk = chunk;
 
+    init_table_t(&string_constants);
+
     advance();
 
     while (!match(TOKEN_EOF)) {
@@ -408,5 +420,6 @@ bool compile(const char *source, chunk_t *chunk)
     }
 
     end_compiler();
+    free_table_t(&string_constants);
     return !parser.had_error;
 }
