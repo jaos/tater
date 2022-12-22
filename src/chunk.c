@@ -24,7 +24,7 @@ void free_chunk(chunk_t *chunk)
     init_chunk(chunk);
 }
 
-void write_chunk(chunk_t *chunk, uint8_t byte, int line)
+void write_chunk(chunk_t *chunk, const uint8_t byte, const int line)
 {
     if (chunk->capacity < chunk->count + 1) {
         int old_capacity = chunk->capacity;
@@ -48,13 +48,13 @@ void write_chunk(chunk_t *chunk, uint8_t byte, int line)
     start->line = line;
 }
 
-uint32_t add_constant(chunk_t *chunk, value_t value)
+uint32_t add_constant(chunk_t *chunk, const value_t value)
 {
     write_value_array_t(&chunk->constants, value);
     return chunk->constants.count - 1;
 }
 
-int get_line(chunk_t *chunk, int instruction)
+int get_line(chunk_t *chunk, const int instruction)
 {
     int start = 0;
     int end = chunk->line_count - 1;
@@ -71,7 +71,7 @@ int get_line(chunk_t *chunk, int instruction)
     }
 }
 
-void write_constant(chunk_t *chunk, value_t value, int line)
+void write_constant(chunk_t *chunk, const value_t value, const int line)
 {
     int index = add_constant(chunk, value);
     if (index < 256) {

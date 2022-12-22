@@ -41,9 +41,9 @@ typedef struct {
 
 void init_chunk(chunk_t *chunk);
 void free_chunk(chunk_t *chunk);
-void write_chunk(chunk_t *chunk, uint8_t byte, int line);
-uint32_t add_constant(chunk_t *chunk, value_t value);
-int get_line(chunk_t *chunk, int instruction);
-void write_constant(chunk_t *chunk, value_t value, int line);
+void write_chunk(chunk_t *chunk, const uint8_t byte, const int line);
+uint32_t add_constant(chunk_t *chunk, const value_t value);
+int get_line(chunk_t *chunk, const int instruction);
+void write_constant(chunk_t *chunk, const value_t value, const int line);
 
 #endif

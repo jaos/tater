@@ -12,7 +12,7 @@ typedef struct {
 
 scanner_t scanner;
 
-void init_scanner(const char *source __unused__)
+void init_scanner(const char *source)
 {
     scanner.start = source;
     scanner.current = source;
@@ -188,7 +188,7 @@ token_t scan_token(void)
     scanner.start = scanner.current;
     if (is_at_end()) return make_token(TOKEN_EOF);
 
-    char c = advance();
+    const char c = advance();
     if (is_alpha(c)) return identifier();
     if (is_digit(c)) return number();
     switch (c) {

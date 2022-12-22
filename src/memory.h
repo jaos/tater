@@ -19,7 +19,7 @@
 #define FREE_ARRAY(type, pointer, oldCount) \
     reallocate(pointer, sizeof(type) * (oldCount), 0)
 
-void *reallocate(void *pointer, size_t old_size, size_t new_size);
+void *reallocate(void *pointer, const size_t old_size, const size_t new_size);
 void free_objects(void);
 
 #endif

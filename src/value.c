@@ -6,18 +6,14 @@
 #include "object.h"
 #include "value.h"
 
-bool values_equal(value_t a, value_t b)
+bool values_equal(const value_t a, const value_t b)
 {
     if (a.type != b.type) return false;
     switch (a.type) {
         case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NIL: return true;
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-        case VAL_OBJ: {
-            obj_string_t *astr = AS_STRING(a);
-            obj_string_t *bstr = AS_STRING(b);
-            return astr->length == bstr->length && memcpy(astr->chars, bstr->chars, astr->length) == 0;
-        }
+        case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
         default: return false; // unreachable
     }
 }
@@ -29,7 +25,7 @@ void init_value_array_t(value_array_t *array)
     array->count = 0;
 }
 
-void write_value_array_t(value_array_t *array, value_t value)
+void write_value_array_t(value_array_t *array, const value_t value)
 {
     if (array->capacity < array->count + 1) {
         int old_capacity = array->capacity;
@@ -47,7 +43,7 @@ void free_value_array_t(value_array_t *array)
     init_value_array_t(array);
 }
 
-void print_value(value_t value)
+void print_value(const value_t value)
 {
     switch (value.type) {
         case VAL_BOOL: printf(AS_BOOL(value) ? "true" : "false"); break;

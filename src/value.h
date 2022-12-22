@@ -44,10 +44,10 @@ typedef struct {
     value_t *values;
 } value_array_t;
 
-bool values_equal(value_t a, value_t b);
+bool values_equal(const value_t a, const value_t b);
 void init_value_array_t(value_array_t* array);
-void write_value_array_t(value_array_t* array, value_t value);
+void write_value_array_t(value_array_t* array, const value_t value);
 void free_value_array_t(value_array_t* array);
-void print_value(value_t value);
+void print_value(const value_t value);
 
 #endif

@@ -20,15 +20,17 @@ static void reset_stack(void)
 void init_vm(void)
 {
     reset_stack();
+    init_table_t(&vm.strings);
     vm.objects = NULL;
 }
 
 void free_vm(void)
 {
+    free_table_t(&vm.strings);
     free_objects();
 }
 
-void push(value_t value)
+void push(const value_t value)
 {
     assert(((uintptr_t)vm.stack_top - (uintptr_t)&vm.stack) <= (sizeof(value_t) * 256));
     *vm.stack_top = value;
@@ -70,13 +72,7 @@ static void concatenate(void)
 {
     obj_string_t *b = AS_STRING(pop());
     obj_string_t *a = AS_STRING(pop());
-
-    int length = a->length + b->length;
-    obj_string_t *str = make_string(length);
-
-    memcpy(str->chars, a->chars, a->length);
-    memcpy(str->chars + a->length, b->chars, b->length);
-    str->chars[length] = '\0';
+    obj_string_t *str = concatenate_string(a, b);
     push(OBJ_VAL(str));
 }
 

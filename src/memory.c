@@ -3,14 +3,12 @@
 #include "memory.h"
 #include "vm.h"
 
-void *reallocate(void *pointer, size_t old_size, size_t new_size)
+void *reallocate(void *pointer, const size_t old_size __unused__, const size_t new_size)
 {
     if (new_size == 0) {
         free(pointer);
         return NULL;
     }
-
-    (void)old_size;
 
     void *result = realloc(pointer, new_size);
     if (result == NULL) {

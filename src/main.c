@@ -31,13 +31,13 @@ static char *read_file(const char *file_path)
     if (fseek(f, 0L, SEEK_END) == -1) {
         perror(file_path);
     }
-    size_t fsize = ftell(f);
+    const size_t fsize = ftell(f);
     char *buffer = malloc(sizeof *buffer * fsize);
     if (buffer == NULL) {
         fprintf(stderr, "Could not allocate buffer to read \"%s\".\n", file_path);
         exit(74);
     }
-    size_t b_read = fread(buffer, sizeof(char), fsize, f);
+    const size_t b_read = fread(buffer, sizeof(char), fsize, f);
     if (b_read < fsize) {
         fprintf(stderr, "Could not read all of \"%s\".\n", file_path);
         exit(74);

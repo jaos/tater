@@ -22,15 +22,16 @@ struct obj_t {
 struct obj_string_t {
     obj_t obj;
     int length;
+    uint32_t hash;
     char chars[]; // FAM
 };
 
 
-obj_string_t *make_string(int length);
 obj_string_t *copy_string(const char *chars, const int length);
-void print_object(value_t value);
+obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b);
+void print_object(const value_t value);
 
-static inline bool is_obj_type(value_t value, obj_type_t type)
+static inline bool is_obj_type(const value_t value, const obj_type_t type)
 {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;
 }

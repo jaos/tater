@@ -143,7 +143,7 @@ static chunk_t *current_chunk(void)
     return compiling_chunk;
 }
 
-static void emit_byte(uint8_t byte)
+static void emit_byte(const uint8_t byte)
 {
     write_chunk(current_chunk(), byte, parser.previous.line);
 }
@@ -163,13 +163,13 @@ static void end_compiler(void)
     #endif
 }
 
-static void emit_bytes(uint8_t byte1, uint8_t byte2)
+static void emit_bytes(const uint8_t byte1, const uint8_t byte2)
 {
     emit_byte(byte1);
     emit_byte(byte2);
 }
 
-static uint8_t make_constant(value_t value)
+static uint8_t make_constant(const value_t value)
 {
     int constant = add_constant(current_chunk(), value);
     if (constant > UINT8_MAX) {
@@ -179,23 +179,23 @@ static uint8_t make_constant(value_t value)
     return (uint8_t)constant;
 }
 
-static void emit_constant(value_t value)
+static void emit_constant(const value_t value)
 {
     emit_bytes(OP_CONSTANT, make_constant(value));
 }
 
 void number(void)
 {
-    double value = strtod(parser.previous.start, NULL);
+    const double value = strtod(parser.previous.start, NULL);
     emit_constant(NUMBER_VAL(value));
 }
 
-static parse_rule_t *get_rule(token_type_t type)
+static parse_rule_t *get_rule(const token_type_t type)
 {
     return &rules[type];
 }
 
-static void parse_precedence(precedence_t precedence)
+static void parse_precedence(const precedence_t precedence)
 {
     advance();
     parse_fn_t prefix_rule = get_rule(parser.previous.type)->prefix;
