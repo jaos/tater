@@ -117,8 +117,15 @@ START_TEST(test_vm)
 {
     init_vm();
     const char *test_cases[] = {
-        "print 1+2;"
+        "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
+        "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",
+        "print false; print true; print nil;",
         "var foo = \"foo\"; { var bar = \"bar\"; var foobar = foo + bar; print foobar;}",
+        "var foo = 10; var result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
+        "var counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
+        "if (false or true) { print \"yep\"; }",
+        "if (!false and true) { print \"yep\"; }",
+        "for(var i = 0; i < 5; i = i + 1) { print i;}",
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
