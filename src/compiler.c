@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -462,9 +463,17 @@ static void emit_loop(const int loop_start)
     emit_byte(offset & 0xff);
 }
 
+int inner_most_loop_start = -1;
+int inner_most_loop_end = -1;
+int inner_most_loop_scope_depth = 0;
+
 static void while_statement(void)
 {
-    int loop_start = current_chunk()->count;
+    int surrounding_loop_start = inner_most_loop_start;
+    int surrounding_loop_scope_depth = inner_most_loop_scope_depth;
+
+    inner_most_loop_start = current_chunk()->count;
+    inner_most_loop_scope_depth = current->scope_depth;
 
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
     expression();
@@ -474,14 +483,21 @@ static void while_statement(void)
     emit_byte(OP_POP);
     statement();
 
-    emit_loop(loop_start);
+    emit_loop(inner_most_loop_start);
 
     patch_jump(exit_jump);
     emit_byte(OP_POP);
+
+    inner_most_loop_start = surrounding_loop_start;
+    inner_most_loop_scope_depth = surrounding_loop_scope_depth;
 }
 
 static void for_statement(void)
 {
+    int surrounding_loop_start = inner_most_loop_start;
+    //int surrounding_loop_end = inner_most_loop_end;
+    int surrounding_loop_scope_depth = inner_most_loop_scope_depth;
+
     begin_scope();
 
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
@@ -493,7 +509,9 @@ static void for_statement(void)
         expression_statement();
     }
 
-    int loop_start = current_chunk()->count;
+    inner_most_loop_start = current_chunk()->count;
+    inner_most_loop_scope_depth = current->scope_depth;
+
     int exit_jump = -1;
     if (!match(TOKEN_SEMICOLON)) { // loop condition
         expression();
@@ -503,6 +521,7 @@ static void for_statement(void)
         exit_jump = emit_jump(OP_JUMP_IF_FALSE);
         emit_byte(OP_POP); // condition
     }
+    //inner_most_loop_end = exit_jump;
 
     if (!match(TOKEN_RIGHT_PAREN)) { // increment clause
         int body_jump = emit_jump(OP_JUMP);
@@ -513,19 +532,22 @@ static void for_statement(void)
         emit_byte(OP_POP);
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
 
-        emit_loop(loop_start);
-        loop_start = increment_start;
+        emit_loop(inner_most_loop_start);
+        inner_most_loop_start = increment_start;
         patch_jump(body_jump);
     }
 
     statement();
-    emit_loop(loop_start);
+    emit_loop(inner_most_loop_start);
 
     if (exit_jump != -1) {
         patch_jump(exit_jump);
         emit_byte(OP_POP);
     }
 
+    inner_most_loop_start = surrounding_loop_start;
+    // inner_most_loop_end = surrounding_loop_end;
+    inner_most_loop_scope_depth = surrounding_loop_scope_depth;
     end_scope();
 }
 
@@ -602,6 +624,42 @@ static void switch_statement(void)
     emit_byte(OP_POP); // The switch value.
 }
 
+static void break_statement(void)
+{
+    assert("This does not work!");
+   if (inner_most_loop_end == -1) {
+        error("Can't use 'break' outside of a loop.");
+    }
+    consume(TOKEN_SEMICOLON, "Expect ';' after 'break'.");
+    for (int i = current->local_count - 1; i >=0 && current->locals[i].depth > inner_most_loop_scope_depth; i--) {
+        emit_byte(OP_POP);
+    }
+    emit_loop(inner_most_loop_end);
+}
+
+static void continue_statement(void)
+{
+    if (inner_most_loop_start == -1) {
+        error("Can't use 'continue' outside of a loop.");
+    }
+    consume(TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
+
+    /*
+    for (int i = current->local_count - 1; i >=0 && current->locals[i].depth > inner_most_loop_scope_depth; i--) {
+        emit_byte(OP_POP);
+    }
+    */
+
+    /* From sidebar: implment a OP_POPN instruction
+    */
+    uint8_t local_count = current->local_count;
+    while (local_count > 0 && current->locals[local_count].depth > inner_most_loop_scope_depth) {
+        local_count--;
+    }
+    emit_bytes(OP_POPN, current->local_count - local_count);
+    emit_loop(inner_most_loop_start);
+}
+
 static void statement(void)
 {
     if (match(TOKEN_PRINT)) {
@@ -618,6 +676,10 @@ static void statement(void)
         begin_scope();
         block();
         end_scope();
+    } else if (match(TOKEN_BREAK)) {
+        break_statement();
+    } else if (match(TOKEN_CONTINUE)) {
+        continue_statement();
     } else {
         expression_statement();
     }

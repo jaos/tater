@@ -143,11 +143,13 @@ static token_type_t identifier_type(void)
 {
     switch (scanner.start[0]) {
         case 'a': return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'b': return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c': {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'a': return check_keyword(2, 2, "se", TOKEN_CASE);
                     case 'l': return check_keyword(2, 3, "ass", TOKEN_CLASS);
+                    case 'o': return check_keyword(2, 6, "ntinue", TOKEN_CONTINUE);
                     default: ; // default returned below
                 }
             }
