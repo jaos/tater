@@ -101,10 +101,19 @@ static interpret_result_t run() {
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
         #ifdef DEBUG
-        printf("        ");
+        printf("        STACK: ");
         for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
             printf("[ ");
             print_value(*slot);
+            printf(" ]");
+        }
+        printf("\n");
+        printf("        GLOBALS: ");
+        for (int i = vm.globals.count; i > 0; i--) {
+            printf("[ ");
+            print_value(vm.globals.entries[i-1].key);
+            printf(" => ");
+            print_value(vm.globals.entries[i-1].value);
             printf(" ]");
         }
         printf("\n");

@@ -7,7 +7,6 @@ sources = [
     'compiler.h',
     'debug.c',
     'debug.h',
-    'main.c',
     'memory.c',
     'memory.h',
     'object.c',
@@ -22,4 +21,5 @@ sources = [
     'vm.c',
 ]
 
-executable('clox', sources)
+libclox = library('libclox', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')
+executable('clox', sources + ['main.c'])

@@ -5,10 +5,11 @@
 
 void disassemble_chunk(chunk_t *chunk, const char* name)
 {
-    printf("== %s ==\n", name);
+    printf("== start %s ==\n", name);
     for (int offset = 0; offset < chunk->count;) {
         offset = disassemble_instruction(chunk, offset);
     }
+    printf("==   end %s ==\n", name);
 }
 
 static int simple_instruction(const char *name, const int offset)

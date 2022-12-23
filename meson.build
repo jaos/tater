@@ -68,3 +68,4 @@ if get_option('debuglog').enabled()
 endif
 
 subdir('src')
+subdir('t')

@@ -104,7 +104,7 @@ void add_all_table_t(const table_t *from, table_t *to)
 {
     for (int i = 0; i < from->capacity; i++) {
         entry_t *entry = &from->entries[i];
-        if (IS_EMPTY(entry->key)) {
+        if (!IS_EMPTY(entry->key)) {
             set_table_t(to, entry->key, entry->value);
         }
     }
