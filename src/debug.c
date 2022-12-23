@@ -76,6 +76,7 @@ int disassemble_instruction(chunk_t *chunk, const int offset)
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
         case OP_NIL: return simple_instruction("OP_NIL", offset);
+        case OP_DUP: return simple_instruction("OP_DUP", offset);
         case OP_TRUE: return simple_instruction("OP_TRUE", offset);
         case OP_FALSE: return simple_instruction("OP_FALSE", offset);
         case OP_POP: return simple_instruction("OP_POP", offset);

@@ -126,6 +126,10 @@ START_TEST(test_vm)
         "if (false or true) { print \"yep\"; }",
         "if (!false and true) { print \"yep\"; }",
         "for(var i = 0; i < 5; i = i + 1) { print i;}",
+        "switch(3) { case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
+        "switch(3) { default: print(0); }",
+        "switch(3) { case 3: print(3); }",
+        "switch(3) { }",
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {

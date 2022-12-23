@@ -227,6 +227,7 @@ static interpret_result_t run() {
                 vm.ip -= offset;
                 break;
             }
+            case OP_DUP: push(peek(0)); break;
             case OP_RETURN: {
                 return INTERPRET_OK;
             }

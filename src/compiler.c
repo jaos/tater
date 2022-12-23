@@ -529,6 +529,79 @@ static void for_statement(void)
     end_scope();
 }
 
+#define MAX_CASES 256
+
+static void switch_statement(void)
+{
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after value.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before switch cases.");
+
+    int state = 0; // 0: before all cases, 1: before default, 2: after default.
+    int case_ends[MAX_CASES];
+    int case_count = 0;
+    int previous_case_skip = -1;
+
+    while (!match(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        if (match(TOKEN_CASE) || match(TOKEN_DEFAULT)) {
+            token_type_t case_type = parser.previous.type;
+
+            if (state == 2) {
+                error("Can't have another case or default after the default case.");
+            }
+
+            if (state == 1) {
+                // At the end of the previous case, jump over the others.
+                case_ends[case_count++] = emit_jump(OP_JUMP);
+
+                // Patch its condition to jump to the next case (this one).
+                patch_jump(previous_case_skip);
+                emit_byte(OP_POP);
+            }
+
+            if (case_type == TOKEN_CASE) {
+                state = 1;
+
+                // See if the case is equal to the value.
+                emit_byte(OP_DUP);
+                expression();
+
+                consume(TOKEN_COLON, "Expect ':' after case value.");
+
+                emit_byte(OP_EQUAL);
+                previous_case_skip = emit_jump(OP_JUMP_IF_FALSE);
+
+                // Pop the comparison result.
+                emit_byte(OP_POP);
+            } else {
+                state = 2;
+                consume(TOKEN_COLON, "Expect ':' after default.");
+                previous_case_skip = -1;
+            }
+        } else {
+            // Otherwise, it's a statement inside the current case.
+            if (state == 0) {
+                error("Can't have statements before any case.");
+            }
+            statement();
+        }
+    }
+
+    // If we ended without a default case, patch its condition jump.
+    if (state == 1) {
+        patch_jump(previous_case_skip);
+        //emit_byte(OP_POP); // book says to do this... but we pop one too many if this calls
+    }
+
+    // Patch all the case jumps to the end.
+    for (int i = 0; i < case_count; i++) {
+        patch_jump(case_ends[i]);
+    }
+
+    emit_byte(OP_POP); // The switch value.
+}
+
 static void statement(void)
 {
     if (match(TOKEN_PRINT)) {
@@ -537,6 +610,8 @@ static void statement(void)
         for_statement();
     } else if (match(TOKEN_IF)) {
         if_statement();
+    } else if (match(TOKEN_SWITCH)) {
+        switch_statement();
     } else if (match(TOKEN_WHILE)) {
         while_statement();
     } else if (match(TOKEN_LEFT_BRACE)) {

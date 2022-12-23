@@ -143,7 +143,25 @@ static token_type_t identifier_type(void)
 {
     switch (scanner.start[0]) {
         case 'a': return check_keyword(1, 2, "nd", TOKEN_AND);
-        case 'c': return check_keyword(1, 4, "lass", TOKEN_CLASS);
+        case 'c': {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'a': return check_keyword(2, 2, "se", TOKEN_CASE);
+                    case 'l': return check_keyword(2, 3, "ass", TOKEN_CLASS);
+                    default: ; // default returned below
+                }
+            }
+            break;
+        }
+        case 'd': {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'e': return check_keyword(2, 5, "fault", TOKEN_DEFAULT);
+                    default: ; // default returned below
+                }
+            }
+            break;
+        }
         case 'e': return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f': {
             if (scanner.current - scanner.start > 1) {
@@ -161,7 +179,16 @@ static token_type_t identifier_type(void)
         case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
         case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);
         case 'r': return check_keyword(1, 5, "eturn", TOKEN_RETURN);
-        case 's': return check_keyword(1, 4, "uper", TOKEN_SUPER);
+        case 's': {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'u': return check_keyword(2, 3, "per", TOKEN_SUPER);
+                    case 'w': return check_keyword(2, 4, "itch", TOKEN_SWITCH);
+                    default: ;  // default returned below
+                }
+            }
+            break;
+        }
         case 't': {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
@@ -200,6 +227,7 @@ token_t scan_token(void)
         case ')': return make_token(TOKEN_RIGHT_PAREN);
         case '{': return make_token(TOKEN_LEFT_BRACE);
         case '}': return make_token(TOKEN_RIGHT_BRACE);
+        case ':': return make_token(TOKEN_COLON);
         case ';': return make_token(TOKEN_SEMICOLON);
         case ',': return make_token(TOKEN_COMMA);
         case '.': return make_token(TOKEN_DOT);
