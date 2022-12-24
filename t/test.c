@@ -53,64 +53,120 @@ START_TEST(test_scanner)
     init_scanner(source);
     for (int idx = 0;results[idx].type != TOKEN_EOF;idx++) {
         token_t t = scan_token();
+        const char *token_type_str __unused__ = token_type_t_to_str(t.type);
         ck_assert(t.type == results[idx].type);
         ck_assert(memcmp(t.start, results[idx].start, t.length) == 0);
         ck_assert(t.length == results[idx].length);
         ck_assert(t.line == results[idx].line);
     }
+
+
+    source = "fun f() { f(\"too\", \"many\"); }";
+    init_scanner(source);
+    const token_t results2[] = {
+        {.type=TOKEN_FUN, .start="fun", .length=3, .line=1},
+        {.type=TOKEN_IDENTIFIER, .start="f", .length=1, .line=1},
+        {.type=TOKEN_LEFT_PAREN, .start="(", .length=1, .line=1},
+        {.type=TOKEN_RIGHT_PAREN, .start=")", .length=1, .line=1},
+        {.type=TOKEN_LEFT_BRACE, .start="{", .length=1, .line=1},
+        {.type=TOKEN_IDENTIFIER, .start="f", .length=1, .line=1},
+        {.type=TOKEN_LEFT_PAREN, .start="(", .length=1, .line=1},
+        {.type=TOKEN_STRING, .start="\"too\"", .length=5, .line=1},
+        {.type=TOKEN_COMMA, .start=",", .length=1, .line=1},
+        {.type=TOKEN_STRING, .start="\"many\"", .length=6, .line=1},
+        {.type=TOKEN_RIGHT_PAREN, .start=")", .length=1, .line=1},
+        {.type=TOKEN_SEMICOLON, .start=";", .length=1, .line=1},
+        {.type=TOKEN_RIGHT_BRACE, .start="}", .length=1, .line=1},
+        {.type=TOKEN_EOF, .start="", .length=0, .line=1},
+    };
+    for (int idx = 0;results2[idx].type != TOKEN_EOF;idx++) {
+        token_t t = scan_token();
+        const char *token_type_str __unused__ = token_type_t_to_str(t.type);
+
+        ck_assert(t.type == results2[idx].type);
+        ck_assert(memcmp(t.start, results2[idx].start, t.length) == 0);
+        ck_assert(t.length == results2[idx].length);
+        ck_assert(t.line == results2[idx].line);
+    }
+
+    source = "fun p() { return 1;}; for(var i = 0; i <= 3; i = i + 1) { !(true and false); false or true; if (i == 2) { print(i); } else {print(p()); continue;}}";
+    init_scanner(source);
+    token_t next = scan_token();
+    do {
+        const char *token_type_str __unused__ = token_type_t_to_str(next.type);
+        next = scan_token();
+    } while (next.type != TOKEN_EOF);
+
 }
 
 START_TEST(test_compiler)
 {
-    const char *source = "var v = 27; var foo = \"foo\"; { var bar = \"bar\"; var foobar = foo + bar; print foobar; var t = true;}";
-    chunk_t chunk;
-    init_chunk(&chunk);
-    ck_assert(compile(source, &chunk));
+    const char *source1 = "var v = 27; { var v = 1; var y = 2; var z = v + y; }";
+    obj_function_t *func1 = compile(source1);
+    ck_assert(func1->chunk.count == 18);
+    const op_code_t r1[] = {
+        OP_CONSTANT,
+        OP_CONSTANT_LONG,
+        OP_DEFINE_GLOBAL,
+        OP_CONSTANT,
+        OP_CONSTANT,
+        OP_NIL,
+        OP_CONSTANT,
+        OP_TRUE,
+        OP_GET_LOCAL,
+        OP_CONSTANT_LONG,
+        OP_GET_LOCAL,
+        OP_NIL,
+        OP_ADD,
+        OP_POP,
+        OP_POP,
+        OP_POP,
+        OP_NIL,
+        OP_RETURN,
+        OP_CONSTANT,
+    };
+    for (int i = 0; i < func1->chunk.count; i++) {
+        ck_assert(func1->chunk.code[i] == r1[i]);
+        const char *op_str __unused__ = op_code_t_to_str(func1->chunk.code[i]);
+    }
 
-    /*
-    0000    1 OP_CONSTANT      1 '27'
-    0002    | OP_DEFINE_GLOBAL 0 'v'
-    0004    | OP_CONSTANT      2 'foo'
-    0006    | OP_DEFINE_GLOBAL 0 'v'
-    0008    | OP_CONSTANT      3 'bar'
-    0010    | OP_GET_GLOBAL    0 'v'
-    0012    | OP_GET_LOCAL        0
-    0014    | OP_ADD
-    0015    | OP_GET_LOCAL        1
-    0017    | OP_PRINT
-    0018    | OP_TRUE
-    0019    | OP_POPN             3
-    0021    | OP_RETURN
-    */
-    ck_assert(chunk.count == 22);
-    ck_assert(chunk.code[ 0] == OP_CONSTANT);
-    ck_assert(chunk.code[ 2] == OP_DEFINE_GLOBAL);
-    ck_assert(chunk.code[ 4] == OP_CONSTANT);
-    ck_assert(chunk.code[ 6] == OP_DEFINE_GLOBAL);
-    ck_assert(chunk.code[ 8] == OP_CONSTANT);
-    ck_assert(chunk.code[10] == OP_GET_GLOBAL);
-    ck_assert(chunk.code[12] == OP_GET_LOCAL);
-    ck_assert(chunk.code[14] == OP_ADD);
-    ck_assert(chunk.code[15] == OP_GET_LOCAL);
-    ck_assert(chunk.code[17] == OP_PRINT);
-    ck_assert(chunk.code[18] == OP_TRUE);
-    ck_assert(chunk.code[19] == OP_POPN);
-    ck_assert(chunk.code[21] == OP_RETURN);
+    ck_assert(func1->chunk.constants.count == 4); // v, 27, 1, 2
+    ck_assert(memcmp(AS_CSTRING(func1->chunk.constants.values[0]), "v", 1) == 0);
+    ck_assert(func1->chunk.constants.values[1].type == VAL_NUMBER);
+    ck_assert(AS_NUMBER(func1->chunk.constants.values[1]) == 27);
+    ck_assert(func1->chunk.constants.values[2].type == VAL_NUMBER);
+    ck_assert(AS_NUMBER(func1->chunk.constants.values[2]) == 1);
+    ck_assert(func1->chunk.constants.values[3].type == VAL_NUMBER);
+    ck_assert(AS_NUMBER(func1->chunk.constants.values[3]) == 2);
 
-    ck_assert(chunk.constants.count == 4); // v, 27, foo, "bar"
-    ck_assert(chunk.constants.values[0].type == VAL_OBJ);
-    ck_assert(memcmp(AS_CSTRING(chunk.constants.values[0]), "v", 1) == 0);
+    const char *func_source = "fun a(x,y) { var sum = x + y; print(sum);}";
+    obj_function_t *func2 = compile(func_source);
+    ck_assert(func2->chunk.count == 6);
+    const op_code_t r2[] = {
+        OP_CONSTANT,
+        OP_CONSTANT_LONG,
+        OP_DEFINE_GLOBAL,
+        OP_CONSTANT,
+        OP_NIL,
+        OP_RETURN,
+    };
+    for (int i = 0; i < func2->chunk.count; i++) {
+        ck_assert(func2->chunk.code[i] == r2[i]);
+        const char *op_str __unused__ = op_code_t_to_str(func2->chunk.code[i]);
+    }
 
-    ck_assert(chunk.constants.values[1].type == VAL_NUMBER);
-    ck_assert(AS_NUMBER(chunk.constants.values[1]) == 27);
-
-    ck_assert(chunk.constants.values[2].type == VAL_OBJ);
-    ck_assert(memcmp(AS_CSTRING(chunk.constants.values[2]), "foo", 4) == 0);
-
-    ck_assert(chunk.constants.values[3].type == VAL_OBJ);
-    ck_assert(memcmp(AS_CSTRING(chunk.constants.values[3]), "bar", 4) == 0);
-
-    free_chunk(&chunk);
+    const char *programs[] = {
+        "for(var i = 0; i < 5; i = i + 1) { print i; var v = 1; v = v + 2; v = v / 3; v = v * 4;}",
+        "var counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
+        "var foo = 10; var result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
+        NULL,
+    };
+    for (int p = 0; programs[p] != NULL; p++) {
+        obj_function_t *program_func = compile(programs[p]);
+        for (int f = 0; f < program_func->chunk.count; f++) {
+            const char *op_str __unused__ = op_code_t_to_str(program_func->chunk.code[f]);
+        }
+    }
 }
 
 START_TEST(test_vm)
@@ -130,6 +186,8 @@ START_TEST(test_vm)
         "switch(3) { default: print(0); }",
         "switch(3) { case 3: print(3); }",
         "switch(3) { }",
+        "fun a() { print 1;}",
+        "print clock();",
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
@@ -152,7 +210,7 @@ START_TEST(test_vm)
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {
-        ck_assert(interpret(runtime_fail_cases[i]) == INTERPRET_RUNTRIME_ERROR);
+        ck_assert(interpret(runtime_fail_cases[i]) == INTERPRET_RUNTIME_ERROR);
     }
 
     free_vm();
@@ -165,6 +223,12 @@ START_TEST(test_value)
     ck_assert(hash_value(NIL_VAL) == 7);
     ck_assert(hash_value(EMPTY_VAL) == 0);
     ck_assert(hash_value(NUMBER_VAL(9)) == 1076101120);
+
+    value_type_t_to_str(VAL_BOOL);
+    value_type_t_to_str(VAL_NIL);
+    value_type_t_to_str(VAL_NUMBER);
+    value_type_t_to_str(VAL_OBJ);
+    value_type_t_to_str(VAL_EMPTY);
 
     ck_assert(values_equal(NUMBER_VAL(100), NUMBER_VAL(100)));
     ck_assert(!values_equal(NUMBER_VAL(100), NUMBER_VAL(200)));
@@ -188,11 +252,17 @@ START_TEST(test_table)
     table_t t;
     init_table_t(&t);
 
-    ck_assert(set_table_t(&t, NUMBER_VAL(1), NUMBER_VAL(10)));
-    ck_assert(set_table_t(&t, NUMBER_VAL(2), NUMBER_VAL(20)));
-    ck_assert(set_table_t(&t, NUMBER_VAL(3), NUMBER_VAL(30)));
-    ck_assert(delete_table_t(&t, NUMBER_VAL(3)));
-    ck_assert(!delete_table_t(&t, NUMBER_VAL(3)));
+    obj_string_t *key1 = copy_string("test_table1", 11);
+    obj_string_t *key2 = copy_string("test_table2", 11);
+    obj_string_t *key3 = copy_string("test_table3", 11);
+
+    ck_assert(set_table_t(&t, key1, NUMBER_VAL(10)));
+    ck_assert(set_table_t(&t, key2, NUMBER_VAL(20)));
+    ck_assert(set_table_t(&t, key3, NUMBER_VAL(30)));
+    ck_assert(delete_table_t(&t, key3));
+    ck_assert(!delete_table_t(&t, key3));
+    value_t v;
+    ck_assert(!get_table_t(&t, key3, &v));
 
     table_t tcopy;
     init_table_t(&tcopy);
@@ -201,8 +271,8 @@ START_TEST(test_table)
     for (int i = 0; i < t.count; i++) {
         value_t from_t;
         value_t from_tcopy;
-        ck_assert(get_table_t(&t, NUMBER_VAL(1), &from_t));
-        ck_assert(get_table_t(&tcopy, NUMBER_VAL(1), &from_tcopy));
+        ck_assert(get_table_t(&t, key1, &from_t));
+        ck_assert(get_table_t(&tcopy, key1, &from_tcopy));
         ck_assert(values_equal(from_t, from_tcopy));
     }
 

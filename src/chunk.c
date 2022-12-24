@@ -54,13 +54,13 @@ uint32_t add_constant(chunk_t *chunk, const value_t value)
     return chunk->constants.count - 1;
 }
 
-int get_line(chunk_t *chunk, const int instruction)
+int get_line(const chunk_t *chunk, const int instruction)
 {
     int start = 0;
     int end = chunk->line_count - 1;
     for (;;) {
         int mid = (start + end) / 2;
-        line_info_t *line = &chunk->lines[mid];
+        const line_info_t *line = &chunk->lines[mid];
         if (instruction < line->offset) {
             end = mid - 1;
         } else if (mid == chunk->line_count - 1 || instruction < chunk->lines[mid + 1].offset) {

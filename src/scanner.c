@@ -10,7 +10,7 @@ typedef struct {
     int line;
 } scanner_t;
 
-scanner_t scanner;
+static scanner_t scanner;
 
 void init_scanner(const char *source)
 {

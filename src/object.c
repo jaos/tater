@@ -10,7 +10,7 @@
 #define ALLOCATE_OBJ(type, object_type) \
     (type*)allocate_object(sizeof(type), object_type)
 
-static obj_t *allocate_object(size_t size, obj_type_t type) {
+static obj_t *allocate_object(const size_t size, const obj_type_t type) {
     obj_t *object = (obj_t*)reallocate(NULL, 0, size);
     object->type = type;
     object->next = vm.objects; // add to our vm's linked list of objects so we always have a reference to it
@@ -18,7 +18,7 @@ static obj_t *allocate_object(size_t size, obj_type_t type) {
     return object;
 }
 
-static obj_string_t *make_string(int length)
+static obj_string_t *make_string(const int length)
 {
     obj_string_t *str = (obj_string_t *)allocate_object(sizeof(obj_string_t) + length + 1, OBJ_STRING);
     str->length = length;
@@ -26,7 +26,7 @@ static obj_string_t *make_string(int length)
     return str;
 }
 
-static uint32_t hash_string(const char *key, int length)
+static uint32_t hash_string(const char *key, const int length)
 {
     uint32_t hash = 2166136261u;
     for (int i = 0; i < length; i++) {
@@ -48,7 +48,7 @@ obj_string_t *copy_string(const char *chars, const int length)
     memcpy(str->chars, chars, length);
     str->chars[length] = '\0';
     str->hash = hash;
-    set_table_t(&vm.strings, OBJ_VAL(str), NIL_VAL);
+    set_table_t(&vm.strings, str, NIL_VAL);
     return str;
 }
 
@@ -68,14 +68,41 @@ obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b)
         return interned;
     }
 
-    set_table_t(&vm.strings, OBJ_VAL(str), NIL_VAL);
+    set_table_t(&vm.strings, str, NIL_VAL);
     return str;
+}
+
+static void print_function(const obj_function_t *function)
+{
+    if (function->name == NULL) {
+        printf("<script>");
+    } else {
+        printf("<fn %s>", function->name->chars);
+    }
 }
 
 void print_object(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
+        case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
+        case OBJ_NATIVE: printf("<native fn>"); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
+}
+
+obj_function_t *new_obj_function_t(void)
+{
+    obj_function_t *function = ALLOCATE_OBJ(obj_function_t, OBJ_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    init_chunk(&function->chunk);
+    return function;
+}
+
+obj_native_t *new_obj_native_t(native_fn_t function)
+{
+    obj_native_t *native = ALLOCATE_OBJ(obj_native_t, OBJ_NATIVE);
+    native->function = function;
+    return native;
 }

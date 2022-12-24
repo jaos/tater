@@ -19,6 +19,9 @@
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 
+#define CPP_STRINGIFY_NX(s) #s
+#define CPP_STRINGIFY(s) CPP_STRINGIFY_NX(s)
+
 // #define DEBUG_TRACE_EXECUTION
 
 #endif
