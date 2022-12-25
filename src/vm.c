@@ -132,14 +132,16 @@ static bool call_value(value_t callee, const int arg_count)
 
 static interpret_result_t run() {
     call_frame_t *frame = &vm.frames[vm.frame_count - 1];
+    register uint8_t *ip = frame->ip;
 
-#define READ_BYTE() (*frame->ip++)
+#define READ_BYTE() (*ip++)
 #define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
 #define READ_SHORT() \
-    (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+    (ip += 2, (uint16_t)((ip[-2] << 8) | ip[-1]))
 #define BINARY_OP(value_type_wrapper, op) \
     do { \
     if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+        frame->ip = ip; \
         runtime_error("Operands must be numbers."); \
         return INTERPRET_RUNTIME_ERROR; \
     } \
@@ -198,6 +200,7 @@ static interpret_result_t run() {
                 const obj_string_t *name = READ_STRING();
                 value_t value;
                 if (!get_table_t(&vm.globals, name, &value)) {
+                    frame->ip = ip;
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -214,6 +217,7 @@ static interpret_result_t run() {
                 obj_string_t *name = READ_STRING();
                 if (set_table_t(&vm.globals, name, peek(0))) {
                     delete_table_t(&vm.globals, name);
+                    frame->ip = ip;
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -236,6 +240,7 @@ static interpret_result_t run() {
             }
             case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
                 if (!IS_NUMBER(peek(0))) {
+                    frame->ip = ip;
                     runtime_error("Operand must be a number.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -252,6 +257,7 @@ static interpret_result_t run() {
                     double a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
                 } else {
+                    frame->ip = ip;
                     runtime_error("Operands must be two numbers or two strings.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -264,27 +270,29 @@ static interpret_result_t run() {
             case OP_PRINT: print_value(pop()); printf("\n"); break;
             case OP_JUMP: {
                 const uint16_t offset = READ_SHORT();
-                frame->ip += offset;
+                ip += offset;
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 const uint16_t offset = READ_SHORT();
                 if (is_falsey(peek(0)))
-                    frame->ip += offset;
+                    ip += offset;
                 break;
             }
             case OP_LOOP: {
                 const uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
+                ip -= offset;
                 break;
             }
             case OP_DUP: push(peek(0)); break;
             case OP_CALL: {
                 const int arg_count = READ_BYTE();
+                frame->ip = ip;
                 if (!call_value(peek(arg_count), arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1];
+                ip = frame->ip;
                 break;
             }
             case OP_RETURN: {
@@ -297,6 +305,7 @@ static interpret_result_t run() {
                 vm.stack_top = frame->slots;
                 push(result);
                 frame = &vm.frames[vm.frame_count - 1];
+                ip = frame->ip;
                 break;
             }
             default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
