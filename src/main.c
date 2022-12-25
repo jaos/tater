@@ -1,23 +1,83 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "common.h"
 #include "chunk.h"
 #include "debug.h"
 #include "vm.h"
 
+#define CLOX_PROMPT "clox> "
+#define CLOX_HISTORY_FILE ".clox_history"
+
+static char *keywords(const char *input, const int state __unused__)
+{
+    static int list_index, len;
+    if (!state) {
+        list_index = 0;
+        len = strlen(input);
+    }
+    char *name;
+    while ((name = (char *)token_keyword_names[list_index++]) != NULL) {
+        if (strncmp(name, input, len) == 0) {
+            return strdup(name);
+        }
+    }
+    return NULL;
+}
+
+static char **completer(const char *input __unused__, const int start __unused__, const int end __unused__)
+{
+    rl_attempted_completion_over = 1;
+    return rl_completion_matches(input, keywords);
+}
+
 static void repl(void)
 {
-    char line[1024];
+    rl_attempted_completion_function = completer;
+
+    char history_path[255] = {0};
+    char *home = getenv("HOME");
+    if (home != NULL) {
+        if (snprintf(history_path, 255, "%s/%s", home, CLOX_HISTORY_FILE) == -1) {
+            exit(EXIT_FAILURE);
+        }
+        FILE *h = fopen(history_path, "a");
+        if (h == NULL) {
+            history_path[0] = '\0';
+        } else {
+            fclose(h);
+        }
+    }
+
+    if (*history_path) {
+        if (read_history(history_path)) {
+            perror("Failed to ready history file");
+        }
+    }
+
     for (;;) {
-        printf("> ");
-        if (!fgets(line, sizeof(line), stdin)) {
+        char *line = readline(CLOX_PROMPT);
+        if (line != NULL) {
+            if (line && *line)
+                add_history(line);
+            interpret(line);
             printf("\n");
+            free(line);
+        } else {
             break;
         }
-        interpret(line);
-        printf("\n");
+    }
+    if (*history_path) {
+        if (write_history(history_path)) {
+            perror("Failed to write history file");
+        }
     }
 }
 

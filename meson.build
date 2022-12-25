@@ -13,6 +13,8 @@ project('lox', 'c',
     ],
 )
 
+readline = dependency('readline')
+
 cc = meson.get_compiler('c')
 cflags = [
   '-Wshadow',
