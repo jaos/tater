@@ -18,6 +18,19 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type) {
     return object;
 }
 
+obj_closure_t *new_obj_closure_t(obj_function_t *function)
+{
+    obj_upvalue_t **upvalues = ALLOCATE(obj_upvalue_t*, function->upvalue_count);
+    for (int i = 0; i < function->upvalue_count; i++) {
+        upvalues[i] = NULL;
+    }
+    obj_closure_t *closure = ALLOCATE_OBJ(obj_closure_t, OBJ_CLOSURE);
+    closure->function = function;
+    closure->upvalues = upvalues;
+    closure->upvalue_count = function->upvalue_count;
+    return closure;
+}
+
 static obj_string_t *make_string(const int length)
 {
     obj_string_t *str = (obj_string_t *)allocate_object(sizeof(obj_string_t) + length + 1, OBJ_STRING);
@@ -84,9 +97,11 @@ static void print_function(const obj_function_t *function)
 void print_object(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
+        case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
         case OBJ_NATIVE: printf("<native fn>"); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
+        case OBJ_UPVALUE: printf("<upvalue>"); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
 }
@@ -95,6 +110,7 @@ obj_function_t *new_obj_function_t(void)
 {
     obj_function_t *function = ALLOCATE_OBJ(obj_function_t, OBJ_FUNCTION);
     function->arity = 0;
+    function->upvalue_count = 0;
     function->name = NULL;
     init_chunk(&function->chunk);
     return function;
@@ -105,4 +121,13 @@ obj_native_t *new_obj_native_t(native_fn_t function)
     obj_native_t *native = ALLOCATE_OBJ(obj_native_t, OBJ_NATIVE);
     native->function = function;
     return native;
+}
+
+obj_upvalue_t *new_obj_upvalue_t(value_t *slot)
+{
+    obj_upvalue_t *upvalue = ALLOCATE_OBJ(obj_upvalue_t, OBJ_UPVALUE);
+    upvalue->location = slot;
+    upvalue->next = NULL;
+    upvalue->closed = NIL_VAL;
+    return upvalue;
 }

@@ -13,10 +13,12 @@ typedef enum {
     OP_POP,
     OP_POPN,
     OP_GET_LOCAL,
-    OP_GET_GLOBAL,
     OP_SET_LOCAL,
-    OP_SET_GLOBAL,
+    OP_GET_GLOBAL,
     OP_DEFINE_GLOBAL,
+    OP_SET_GLOBAL,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -32,6 +34,8 @@ typedef enum {
     OP_LOOP,
     OP_DUP,
     OP_CALL,
+    OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
     OP_RETURN,
 } op_code_t;
 
@@ -55,6 +59,5 @@ void free_chunk(chunk_t *chunk);
 void write_chunk(chunk_t *chunk, const uint8_t byte, const int line);
 uint32_t add_constant(chunk_t *chunk, const value_t value);
 int get_line(const chunk_t *chunk, const int instruction);
-void write_constant(chunk_t *chunk, const value_t value, const int line);
 
 #endif

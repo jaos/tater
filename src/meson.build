@@ -22,4 +22,4 @@ sources = [
 ]
 
 libclox = library('libclox', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')
-executable('clox', sources + ['main.c'], dependencies: [readline])
+clox = executable('clox', sources + ['main.c'], dependencies: [readline])

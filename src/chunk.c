@@ -71,6 +71,7 @@ int get_line(const chunk_t *chunk, const int instruction)
     }
 }
 
+/* Used by POPN
 void write_constant(chunk_t *chunk, const value_t value, const int line)
 {
     int index = add_constant(chunk, value);
@@ -84,3 +85,4 @@ void write_constant(chunk_t *chunk, const value_t value, const int line)
         write_chunk(chunk, (uint8_t)((index >> 16) & 0xff), line);
     }
 }
+*/

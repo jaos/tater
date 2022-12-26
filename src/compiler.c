@@ -44,7 +44,13 @@ typedef struct {
 typedef struct {
     token_t name;
     int depth;
+    bool is_captured;
 } local_t;
+
+typedef struct {
+    uint8_t index;
+    bool is_local;
+} upvalue_t;
 
 typedef enum {
     TYPE_FUNCTION,
@@ -57,6 +63,7 @@ typedef struct compiler {
     function_type_t type;
     local_t locals[UINT8_COUNT];
     int local_count;
+    upvalue_t upvalues[UINT8_COUNT];
     int scope_depth;
 } compiler_t;
 
@@ -216,7 +223,8 @@ static void init_compiler(compiler_t *compiler, const function_type_t type)
 
     local_t *local = &current->locals[current->local_count++];
     local->depth = 0;
-    local->name.start = ""; // TODO or NULL?
+    local->is_captured = false;
+    local->name.start = "";
     local->name.length = 0;
 }
 
@@ -246,7 +254,11 @@ static void end_scope(void)
     /*
     */
     while (current->local_count > 0 && current->locals[current->local_count - 1].depth > current->scope_depth) {
-        emit_byte(OP_POP);
+        if (current->locals[current->local_count - 1].is_captured) {
+            emit_byte(OP_CLOSE_UPVALUE);
+        } else {
+            emit_byte(OP_POP);
+        }
         current->local_count--;
     }
 
@@ -296,6 +308,46 @@ static int resolve_local(compiler_t *compiler, const token_t *name)
     return -1;
 }
 
+static int add_upvalue(compiler_t *compiler, const uint8_t index, const bool is_local)
+{
+    int upvalue_count = compiler->function->upvalue_count;
+    for (int i = 0; i < upvalue_count; i++) {
+        upvalue_t *upvalue = &compiler->upvalues[i];
+        if (upvalue->index == index && upvalue->is_local == is_local) {
+            return i;
+        }
+    }
+    if (upvalue_count == UINT8_COUNT) {
+        error("Too many closure variables in function.");
+        return 0;
+    }
+    compiler->upvalues[upvalue_count].is_local = is_local;
+    compiler->upvalues[upvalue_count].index = index;
+    return compiler->function->upvalue_count++;
+}
+
+static int resolve_upvalue(compiler_t *compiler, const token_t *name)
+{
+    if (compiler->enclosing == NULL)
+        return -1; // must be global
+
+    // try local
+    const int local = resolve_local(compiler->enclosing, name);
+    if (local != -1) {
+        compiler->enclosing->locals[local].is_captured = true;
+        return add_upvalue(compiler, (uint8_t)local, true);
+    }
+
+    // try enclosing... in which case every enclosing scope will have
+    // it's own upvalue that the enclosed scopes then reference.
+    const int upvalue = resolve_upvalue(compiler->enclosing, name);
+    if (upvalue != -1) {
+        return add_upvalue(compiler, (uint8_t)upvalue, false);
+    }
+
+    return -1;
+}
+
 static void add_local(const token_t name)
 {
     if (current->local_count == UINT8_COUNT) {
@@ -307,6 +359,7 @@ static void add_local(const token_t name)
     // NOTE here use use a depth of -1 to indicate uninitialized, see mark_initialized and resolve_local
     // local->depth = current->scope_depth;
     local->depth = -1;
+    local->is_captured = false;
 }
 
 static void declare_variable(void)
@@ -458,6 +511,9 @@ static void named_variable(const token_t name, const bool can_assign)
     if (arg != -1) {
         get_op = OP_GET_LOCAL;
         set_op = OP_SET_LOCAL;
+    } else if ((arg = resolve_upvalue(current, &name)) != -1){
+        get_op = OP_GET_UPVALUE;
+        set_op = OP_SET_UPVALUE;
     } else {
         arg = identifier_constant(&name);
         get_op = OP_GET_GLOBAL;
@@ -596,8 +652,14 @@ static void function(function_type_t type)
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
     consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
     block();
+
     obj_function_t *function = end_compiler(); // no end_scope required here
-    emit_bytes(OP_CONSTANT, make_constant(OBJ_VAL(function)));
+    emit_bytes(OP_CLOSURE, make_constant(OBJ_VAL(function)));
+
+    for (int i = 0; i < function->upvalue_count; i++) {
+        emit_byte(compiler.upvalues[i].is_local ? 1 : 0);
+        emit_byte(compiler.upvalues[i].index);
+    }
 }
 
 static void fun_declaration(void)

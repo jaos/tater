@@ -11,7 +11,7 @@
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef struct {
-    obj_function_t *function;
+    obj_closure_t *closure;
     uint8_t *ip;
     value_t *slots;
 } call_frame_t;
@@ -23,6 +23,7 @@ typedef struct {
     value_t *stack_top;
     table_t globals;
     table_t strings;
+    obj_upvalue_t *open_upvalues;
     obj_t *objects;
 } vm_t;
 
@@ -39,5 +40,6 @@ void free_vm(void);
 interpret_result_t interpret(const char *source);
 void push(const value_t value);
 value_t pop(void);
+void define_native(const char *name, const native_fn_t function);
 
 #endif

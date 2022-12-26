@@ -1,3 +1,6 @@
+#include <unistd.h>
+#include <check.h>
+
 #include "common.h"
 
 START_TEST(test_chunk)
@@ -54,7 +57,7 @@ START_TEST(test_scanner)
     for (int idx = 0;results[idx].type != TOKEN_EOF;idx++) {
         token_t t = scan_token();
         const char *token_type_str __unused__ = token_type_t_to_str(t.type);
-        ck_assert(t.type == results[idx].type);
+        ck_assert_msg(t.type == results[idx].type, "Expected %d, got %d\n", results[idx].type, t.type);
         ck_assert(memcmp(t.start, results[idx].start, t.length) == 0);
         ck_assert(t.length == results[idx].length);
         ck_assert(t.line == results[idx].line);
@@ -83,7 +86,7 @@ START_TEST(test_scanner)
         token_t t = scan_token();
         const char *token_type_str __unused__ = token_type_t_to_str(t.type);
 
-        ck_assert(t.type == results2[idx].type);
+        ck_assert_msg(t.type == results2[idx].type, "Expected %d, got %d\n", results2[idx].type, t.type);
         ck_assert(memcmp(t.start, results2[idx].start, t.length) == 0);
         ck_assert(t.length == results2[idx].length);
         ck_assert(t.line == results2[idx].line);
@@ -97,6 +100,22 @@ START_TEST(test_scanner)
         next = scan_token();
     } while (next.type != TOKEN_EOF);
 
+    const char *invalid_sources[] = {
+        "~",
+        NULL,
+    };
+    for (int i = 0; invalid_sources[i] != NULL; i++) {
+        bool found_invalid_token = false;
+        init_scanner(invalid_sources[i]);
+        token_t maybe_next = scan_token();
+        do {
+            if (maybe_next.type == TOKEN_ERROR) {
+                found_invalid_token = true;
+            }
+            maybe_next = scan_token();
+        } while (maybe_next.type != TOKEN_EOF);
+        ck_assert_msg(found_invalid_token, "Failed to find invalid token in \"%s\"", invalid_sources[i]);
+    }
 }
 
 START_TEST(test_compiler)
@@ -126,7 +145,7 @@ START_TEST(test_compiler)
         OP_CONSTANT,
     };
     for (int i = 0; i < func1->chunk.count; i++) {
-        ck_assert(func1->chunk.code[i] == r1[i]);
+        ck_assert_msg(func1->chunk.code[i] == r1[i], "Expected %d, got %d\n", r1[i], func1->chunk.code[i]);
         const char *op_str __unused__ = op_code_t_to_str(func1->chunk.code[i]);
     }
 
@@ -143,7 +162,7 @@ START_TEST(test_compiler)
     obj_function_t *func2 = compile(func_source);
     ck_assert(func2->chunk.count == 6);
     const op_code_t r2[] = {
-        OP_CONSTANT,
+        OP_CLOSURE,
         OP_CONSTANT_LONG,
         OP_DEFINE_GLOBAL,
         OP_CONSTANT,
@@ -151,7 +170,7 @@ START_TEST(test_compiler)
         OP_RETURN,
     };
     for (int i = 0; i < func2->chunk.count; i++) {
-        ck_assert(func2->chunk.code[i] == r2[i]);
+        ck_assert_msg(func2->chunk.code[i] == r2[i], "Expected %d, got %d\n", r2[i], func2->chunk.code[i]);
         const char *op_str __unused__ = op_code_t_to_str(func2->chunk.code[i]);
     }
 
@@ -186,12 +205,42 @@ START_TEST(test_vm)
         "switch(3) { default: print(0); }",
         "switch(3) { case 3: print(3); }",
         "switch(3) { }",
-        "fun a() { print 1;}",
-        "print clock();",
+        "fun a() { print 1;} a();", // chapter 24
+        "print clock();", // chapter 24
+        "fun mk() {var l = \"local\"; fun inner() {print l;}return inner;} var closure = mk(); closure();", // chapter 25
+        "fun outer() {var x = 1; x = 2;fun inner() {print x;} inner(); } outer();", // chapter 25
+
+        "fun outer(){"
+            "var x = 1; "
+            "fun middle() { "
+                "fun inner() {"
+                    "print x;"
+                "}"
+                "print \"create inner closure\";"
+                "return inner;"
+            "}"
+            "print \"return from outer\";"
+            "return middle;"
+        "} var mid = outer(); var in = mid(); in();", // chapter 25
+
+        "var globalSet; "
+        "var globalGet; "
+        "fun main() { "
+        "    var a = 1; var b = 100;"
+        "    fun set() { a = 2; print b;} "
+        "    fun get() { print a; b = 101;} "
+        "    globalSet = set; "
+        "    globalGet = get; "
+        "} "
+        "main(); "
+        "globalSet(); "
+        "globalGet();", // chapter 25
+
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
-        ck_assert(interpret(test_cases[i]) == INTERPRET_OK);
+        ck_assert_msg(interpret(test_cases[i]) == INTERPRET_OK,
+            "test case failed for \"%s\"\n", test_cases[i]);
     }
 
     const char *compilation_fail_cases[] = {
@@ -203,15 +252,40 @@ START_TEST(test_vm)
         NULL,
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
-        ck_assert(interpret(compilation_fail_cases[i]) == INTERPRET_COMPILE_ERROR);
+        ck_assert_msg(interpret(compilation_fail_cases[i]) == INTERPRET_COMPILE_ERROR,
+            "Unexpected success for \"%s\"\n", compilation_fail_cases[i]);
     }
 
     const char *runtime_fail_cases[] = {
+        "fun no_args() {} no_args(1);", // arguments
+        "fun has_args(v) {print(v);} has_args();", // arguments
+        "var not_callable = 1; not_callable();", // cannot call
+        "print(undefined_global);", // undefined
+        "{ print(undefined_local);}",
+        "var a = \"foo\"; a = -a;", // operand not a number
+        "var a = \"foo\"; a = a + 1;", // operands must be same
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {
-        ck_assert(interpret(runtime_fail_cases[i]) == INTERPRET_RUNTIME_ERROR);
+        ck_assert_msg(interpret(runtime_fail_cases[i]) == INTERPRET_RUNTIME_ERROR,
+            "Unexpected success for \"%s\"\n", runtime_fail_cases[i]);
     }
+
+    free_vm();
+}
+
+static value_t native_getpid(int, value_t*)
+{
+    return NUMBER_VAL((double)getpid());
+}
+
+START_TEST(test_native)
+{
+    init_vm();
+
+    define_native("getpid", native_getpid);
+    ck_assert_int_gt(AS_NUMBER(native_getpid(0, NULL)), 0);
+    ck_assert(interpret("print(getpid());") == INTERPRET_OK);
 
     free_vm();
 }
@@ -252,9 +326,12 @@ START_TEST(test_table)
     table_t t;
     init_table_t(&t);
 
+
     obj_string_t *key1 = copy_string("test_table1", 11);
     obj_string_t *key2 = copy_string("test_table2", 11);
     obj_string_t *key3 = copy_string("test_table3", 11);
+
+    ck_assert(!delete_table_t(&t, key3));
 
     ck_assert(set_table_t(&t, key1, NUMBER_VAL(10)));
     ck_assert(set_table_t(&t, key2, NUMBER_VAL(20)));
@@ -298,6 +375,22 @@ START_TEST(test_object)
     //FREE(obj_string_t, combined);
 }
 
+START_TEST(test_debug)
+{
+    chunk_t chunk;
+    init_chunk(&chunk);
+    write_chunk(&chunk, OP_CLOSE_UPVALUE, 1);
+    disassemble_instruction(&chunk, 0);
+    free_chunk(&chunk);
+
+    for (op_code_t op = OP_CONSTANT; op <= OP_RETURN; op++) {
+        const char *op_str __unused__ = op_code_t_to_str(op);
+    }
+    for (token_type_t t = TOKEN_LEFT_PAREN; t <= TOKEN_EOF; t++) {
+        const char *op_str __unused__ = token_type_t_to_str(t);
+    }
+}
+
 int main(void)
 {
     int number_failed;
@@ -320,6 +413,10 @@ int main(void)
     tcase_add_test(tc, test_vm);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("native");
+    tcase_add_test(tc, test_native);
+    suite_add_tcase(s, tc);
+
     tc = tcase_create("value");
     tcase_add_test(tc, test_value);
     suite_add_tcase(s, tc);
@@ -330,6 +427,10 @@ int main(void)
 
     tc = tcase_create("object");
     tcase_add_test(tc, test_object);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("debug");
+    tcase_add_test(tc, test_debug);
     suite_add_tcase(s, tc);
 
     srunner_run_all(sr, CK_VERBOSE);

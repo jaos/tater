@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "debug.h"
+#include "object.h"
 #include "value.h"
 #include "compiler.h"
 #include "scanner.h"
@@ -57,7 +58,7 @@ static int jump_instruction(const char *name, const int sign, const chunk_t *chu
     return offset + 3;
 }
 
-int disassemble_instruction(const chunk_t *chunk, const int offset)
+int disassemble_instruction(const chunk_t *chunk, int offset)
 {
     printf("%04d ", offset);
 
@@ -77,6 +78,21 @@ int disassemble_instruction(const chunk_t *chunk, const int offset)
         case OP_JUMP_IF_FALSE: return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
         case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
         case OP_CALL: return byte_instruction("OP_CALL", chunk, offset);
+        case OP_CLOSURE: {
+            offset++;
+            uint8_t constant = chunk->code[offset++];
+            printf("%-16s %4d ", "OP_CLOSURE", constant);
+            print_value(chunk->constants.values[constant]);
+            printf("\n");
+            obj_function_t *function = AS_FUNCTION(chunk->constants.values[constant]);
+            for (int j = 0; j < function->upvalue_count; j++) {
+                int is_local = chunk->code[offset++];
+                int index = chunk->code[offset++];
+                printf("%04d      |                     %s %d\n", offset - 2, is_local ? "local" : "upvalue", index);
+            }
+            return offset;
+        }
+        case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
         case OP_NIL: return simple_instruction("OP_NIL", offset);
@@ -90,6 +106,8 @@ int disassemble_instruction(const chunk_t *chunk, const int offset)
         case OP_GET_GLOBAL: return constant_instruction("OP_GET_GLOBAL", chunk, offset);
         case OP_DEFINE_GLOBAL: return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL: return constant_instruction("OP_SET_GLOBAL", chunk, offset);
+        case OP_GET_UPVALUE: return byte_instruction("OP_GET_UPVALUE", chunk, offset);
+        case OP_SET_UPVALUE: return byte_instruction("OP_SET_UPVALUE", chunk, offset);
         case OP_EQUAL: return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER: return simple_instruction("OP_GREATER", offset);
         case OP_LESS: return simple_instruction("OP_LESS", offset);
@@ -116,10 +134,12 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_POP: return "OP_POP"; break;
         case OP_POPN: return "OP_POPN"; break;
         case OP_GET_LOCAL: return "OP_GET_LOCAL"; break;
-        case OP_GET_GLOBAL: return "OP_GET_GLOBAL"; break;
         case OP_SET_LOCAL: return "OP_SET_LOCAL"; break;
-        case OP_SET_GLOBAL: return "OP_SET_GLOBAL"; break;
+        case OP_GET_GLOBAL: return "OP_GET_GLOBAL"; break;
         case OP_DEFINE_GLOBAL: return "OP_DEFINE_GLOBAL"; break;
+        case OP_SET_GLOBAL: return "OP_SET_GLOBAL"; break;
+        case OP_GET_UPVALUE: return "OP_GET_UPVALUE"; break;
+        case OP_SET_UPVALUE: return "OP_SET_UPVALUE"; break;
         case OP_EQUAL: return "OP_EQUAL"; break;
         case OP_GREATER: return "OP_GREATER"; break;
         case OP_LESS: return "OP_LESS"; break;
@@ -135,6 +155,8 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_LOOP: return "OP_LOOP"; break;
         case OP_DUP: return "OP_DUP"; break;
         case OP_CALL: return "OP_CALL"; break;
+        case OP_CLOSURE: return "OP_CALL"; break;
+        case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE"; break;
         case OP_RETURN: return "OP_RETURN"; break;
         default: return NULL;
     }
