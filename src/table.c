@@ -37,11 +37,26 @@ static entry_t *find_entry(entry_t *entries, const int capacity, const obj_strin
                     tombstone = entry;
                 }
             }
-        } else if (key == entry->key) {
+        } else if (entry->key == key) {
             return entry;
         }
         index = (index + 1) % capacity;
     }
+}
+
+bool get_table_t(table_t *table, const obj_string_t *key, value_t *value)
+{
+    if (table->count == 0)
+        return false;
+    entry_t *entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL)
+        return false;
+    // if using an object instead of string keys
+    // if (IS_NIL(entry->key))
+    //     return false;
+    // or IS_EMPTY() if empty values
+    *value = entry->value;
+    return true;
 }
 
 static void adjust_capacity(table_t *table, const int capacity)
@@ -84,17 +99,6 @@ bool set_table_t(table_t *table, obj_string_t *key, const value_t value)
     return is_new_key;
 }
 
-bool get_table_t(table_t *table, const obj_string_t *key, value_t *value)
-{
-    if (table->count == 0)
-        return false;
-    entry_t *entry = find_entry(table->entries, table->capacity, key);
-    if (entry->key == NULL)
-        return false;
-    *value = entry->value;
-    return true;
-}
-
 bool delete_table_t(table_t *table, const obj_string_t *key)
 {
     if (table->count == 0)
@@ -129,13 +133,34 @@ obj_string_t *find_string_table_t(const table_t *table, const char *chars, const
     for (;;) {
         entry_t *entry = &table->entries[index];
 
-        if (entry->key == NULL)
-            return NULL;
-        if (entry->key->length == length && entry->key->hash == hash && memcmp(entry->key->chars, chars, length) == 0) {
+        if (entry->key == NULL) {
+            // stop if we find an empty non-tombstone entry
+            if (IS_NIL(entry->value))
+                return NULL;
+        } else if (entry->key->length == length && entry->key->hash == hash && memcmp(entry->key->chars, chars, length) == 0) {
             // we found it
             return entry->key;
         }
 
         index = (index + 1) % table->capacity;
+    }
+}
+
+void table_remove_white(table_t *table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t *entry = &table->entries[i];
+        if (entry->key != NULL && !entry->key->obj.is_marked) {
+            delete_table_t(table, entry->key);
+        }
+    }
+}
+
+void mark_table(table_t *table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t *entry = &table->entries[i];
+        mark_object((obj_t*)entry->key);
+        mark_value(entry->value);
     }
 }

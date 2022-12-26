@@ -3,6 +3,7 @@
 #include "chunk.h"
 #include "memory.h"
 #include "value.h"
+#include "vm.h"
 
 void init_chunk(chunk_t *chunk)
 {
@@ -11,15 +12,18 @@ void init_chunk(chunk_t *chunk)
     chunk->code = NULL;
     init_value_array_t(&chunk->constants);
 
+    /*
     chunk->line_count = 0;
     chunk->line_capacity = 0;
+    */
     chunk->lines = NULL;
 }
 
 void free_chunk(chunk_t *chunk)
 {
     FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
-    FREE_ARRAY(line_info_t, chunk->lines, chunk->line_capacity);
+    FREE_ARRAY(int, chunk->lines, chunk->capacity);
+    // FREE_ARRAY(line_info_t, chunk->lines, chunk->line_capacity);
     free_value_array_t(&chunk->constants);
     init_chunk(chunk);
 }
@@ -30,11 +34,14 @@ void write_chunk(chunk_t *chunk, const uint8_t byte, const int line)
         int old_capacity = chunk->capacity;
         chunk->capacity = GROW_CAPACITY(old_capacity);
         chunk->code = GROW_ARRAY(uint8_t, chunk->code, old_capacity, chunk->capacity);
+        chunk->lines = GROW_ARRAY(int, chunk->lines, old_capacity, chunk->capacity); // instead of line_info_t
     }
 
     chunk->code[chunk->count] = byte;
+    chunk->lines[chunk->count] = line; // instead of line_info_t
     chunk->count++;
 
+    /*
     if (chunk->line_count > 0 && chunk->lines[chunk->line_count - 1].line == line) {
         return;
     }
@@ -46,14 +53,18 @@ void write_chunk(chunk_t *chunk, const uint8_t byte, const int line)
     line_info_t *start = &chunk->lines[chunk->line_count++];
     start->offset = chunk->count - 1;
     start->line = line;
+    */
 }
 
-uint32_t add_constant(chunk_t *chunk, const value_t value)
+int add_constant(chunk_t *chunk, const value_t value)
 {
+    push(value); // make GC happy
     write_value_array_t(&chunk->constants, value);
+    pop(); // make GC happy
     return chunk->constants.count - 1;
 }
 
+/*
 int get_line(const chunk_t *chunk, const int instruction)
 {
     int start = 0;
@@ -70,6 +81,7 @@ int get_line(const chunk_t *chunk, const int instruction)
         }
     }
 }
+*/
 
 /* Used by POPN
 void write_constant(chunk_t *chunk, const value_t value, const int line)

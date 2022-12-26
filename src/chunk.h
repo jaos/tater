@@ -6,12 +6,10 @@
 
 typedef enum {
     OP_CONSTANT,
-    OP_CONSTANT_LONG,
     OP_NIL,
     OP_TRUE,
     OP_FALSE,
     OP_POP,
-    OP_POPN,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
     OP_GET_GLOBAL,
@@ -32,11 +30,14 @@ typedef enum {
     OP_JUMP,
     OP_JUMP_IF_FALSE,
     OP_LOOP,
-    OP_DUP,
     OP_CALL,
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
+    // not in lox
+    OP_CONSTANT_LONG,
+    OP_POPN,
+    OP_DUP,
 } op_code_t;
 
 typedef struct {
@@ -49,15 +50,18 @@ typedef struct {
     int capacity;
     uint8_t *code;
     value_array_t constants;
+    int *lines;
+    /*
     int line_count;
     int line_capacity;
     line_info_t *lines;
+    */
 } chunk_t;
 
 void init_chunk(chunk_t *chunk);
 void free_chunk(chunk_t *chunk);
 void write_chunk(chunk_t *chunk, const uint8_t byte, const int line);
-uint32_t add_constant(chunk_t *chunk, const value_t value);
-int get_line(const chunk_t *chunk, const int instruction);
+int add_constant(chunk_t *chunk, const value_t value);
+// int get_line(const chunk_t *chunk, const int instruction);
 
 #endif

@@ -15,12 +15,6 @@ void disassemble_chunk(const chunk_t *chunk, const char *name)
     printf("==   end %s ==\n", name);
 }
 
-static int simple_instruction(const char *name, const int offset)
-{
-    printf("%s\n", name);
-    return offset + 1;
-}
-
 static int constant_instruction(const char *name, const chunk_t *chunk, const int offset)
 {
     const uint8_t constant = chunk->code[offset + 1];
@@ -31,15 +25,10 @@ static int constant_instruction(const char *name, const chunk_t *chunk, const in
     return offset + 2;
 }
 
-static int long_constant_instruction(const char *name, const chunk_t *chunk, const int offset)
+static int simple_instruction(const char *name, const int offset)
 {
-    const uint32_t constant = chunk->code[offset + 1] |
-        (chunk->code[offset + 2] << 8) |
-        (chunk->code[offset + 3] << 16);
-    printf("%-16s %4d '", name, constant);
-    print_value(chunk->constants.values[constant]);
-    printf("'\n");
-    return offset + 4;
+    printf("%s\n", name);
+    return offset + 1;
 }
 
 static int byte_instruction(const char *name, const chunk_t *chunk, const int offset)
@@ -58,49 +47,43 @@ static int jump_instruction(const char *name, const int sign, const chunk_t *chu
     return offset + 3;
 }
 
+static int long_constant_instruction(const char *name, const chunk_t *chunk, const int offset)
+{
+    const uint32_t constant = chunk->code[offset + 1] |
+        (chunk->code[offset + 2] << 8) |
+        (chunk->code[offset + 3] << 16);
+    printf("%-16s %4d '", name, constant);
+    print_value(chunk->constants.values[constant]);
+    printf("'\n");
+    return offset + 4;
+}
+
 int disassemble_instruction(const chunk_t *chunk, int offset)
 {
     printf("%04d ", offset);
 
+    if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+        printf("     | ");
+    } else {
+        printf("%4d ", chunk->lines[offset]);
+    }
+
+    /* line_info_t/get_line hack
     const int line = get_line(chunk, offset);
     if (offset > 0 && line == get_line(chunk, offset - 1)) {
         printf("   | ");
     } else {
         printf("%4d ", line);
     }
+    */
 
     uint8_t instruction = chunk->code[offset];
     switch (instruction) {
         case OP_CONSTANT: return constant_instruction("OP_CONSTANT", chunk, offset);
-        case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
-        case OP_PRINT: return simple_instruction("OP_PRINT", offset);
-        case OP_JUMP: return jump_instruction("OP_JUMP", 1, chunk, offset);
-        case OP_JUMP_IF_FALSE: return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
-        case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
-        case OP_CALL: return byte_instruction("OP_CALL", chunk, offset);
-        case OP_CLOSURE: {
-            offset++;
-            uint8_t constant = chunk->code[offset++];
-            printf("%-16s %4d ", "OP_CLOSURE", constant);
-            print_value(chunk->constants.values[constant]);
-            printf("\n");
-            obj_function_t *function = AS_FUNCTION(chunk->constants.values[constant]);
-            for (int j = 0; j < function->upvalue_count; j++) {
-                int is_local = chunk->code[offset++];
-                int index = chunk->code[offset++];
-                printf("%04d      |                     %s %d\n", offset - 2, is_local ? "local" : "upvalue", index);
-            }
-            return offset;
-        }
-        case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
-        case OP_RETURN: return simple_instruction("OP_RETURN", offset);
-        case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
         case OP_NIL: return simple_instruction("OP_NIL", offset);
-        case OP_DUP: return simple_instruction("OP_DUP", offset);
         case OP_TRUE: return simple_instruction("OP_TRUE", offset);
         case OP_FALSE: return simple_instruction("OP_FALSE", offset);
         case OP_POP: return simple_instruction("OP_POP", offset);
-        case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
         case OP_GET_LOCAL: return byte_instruction("OP_GET_LOCAL", chunk, offset);
         case OP_SET_LOCAL: return byte_instruction("OP_SET_LOCAL", chunk, offset);
         case OP_GET_GLOBAL: return constant_instruction("OP_GET_GLOBAL", chunk, offset);
@@ -116,6 +99,34 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_MULTIPLY: return simple_instruction("OP_MULTIPLY", offset);
         case OP_DIVIDE: return simple_instruction("OP_DIVIDE", offset);
         case OP_NOT: return simple_instruction("OP_NOT", offset);
+        case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
+        case OP_PRINT: return simple_instruction("OP_PRINT", offset);
+        case OP_JUMP: return jump_instruction("OP_JUMP", 1, chunk, offset);
+        case OP_JUMP_IF_FALSE: return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+        case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
+        case OP_CALL: return byte_instruction("OP_CALL", chunk, offset);
+        case OP_CLOSURE: {
+            offset++;
+            uint8_t constant = chunk->code[offset++];
+            printf("%-16s %4d ", "OP_CLOSURE", constant);
+            print_value(chunk->constants.values[constant]);
+            printf("\n");
+
+            obj_function_t *function = AS_FUNCTION(chunk->constants.values[constant]);
+            for (int j = 0; j < function->upvalue_count; j++) {
+                int is_local = chunk->code[offset++];
+                int index = chunk->code[offset++];
+                printf("%04d            |                                         %s %d\n",
+                    offset - 2, is_local ? "local" : "upvalue", index);
+            }
+            return offset;
+        }
+        case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
+        case OP_RETURN: return simple_instruction("OP_RETURN", offset);
+        // not in lox
+        case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
+        case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
+        case OP_DUP: return simple_instruction("OP_DUP", offset);
         default: {
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;
@@ -127,12 +138,10 @@ const char *op_code_t_to_str(const op_code_t op)
 {
     switch (op) {
         case OP_CONSTANT: return "OP_CONSTANT"; break;
-        case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG"; break;
         case OP_NIL: return "OP_NIL"; break;
         case OP_TRUE: return "OP_TRUE"; break;
         case OP_FALSE: return "OP_FALSE"; break;
         case OP_POP: return "OP_POP"; break;
-        case OP_POPN: return "OP_POPN"; break;
         case OP_GET_LOCAL: return "OP_GET_LOCAL"; break;
         case OP_SET_LOCAL: return "OP_SET_LOCAL"; break;
         case OP_GET_GLOBAL: return "OP_GET_GLOBAL"; break;
@@ -153,11 +162,14 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_JUMP: return "OP_JUMP"; break;
         case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE"; break;
         case OP_LOOP: return "OP_LOOP"; break;
-        case OP_DUP: return "OP_DUP"; break;
         case OP_CALL: return "OP_CALL"; break;
-        case OP_CLOSURE: return "OP_CALL"; break;
+        case OP_CLOSURE: return "OP_CLOSURE"; break;
         case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE"; break;
         case OP_RETURN: return "OP_RETURN"; break;
+        // not in lox
+        case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG"; break;
+        case OP_POPN: return "OP_POPN"; break;
+        case OP_DUP: return "OP_DUP"; break;
         default: return NULL;
     }
 }
@@ -227,6 +239,17 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_WHILE: return "TOKEN_WHILE"; break;
         case TOKEN_ERROR: return "TOKEN_ERROR"; break;
         case TOKEN_EOF: return "TOKEN_EOF"; break;
+        default: return NULL;
+    }
+}
+
+const char *obj_type_t_to_str(const obj_type_t type)
+{
+    switch (type) {
+        case OBJ_CLOSURE: return "OBJ_CLOSURE";
+        case OBJ_FUNCTION: return "OBJ_FUNCTION";
+        case OBJ_NATIVE: return "OBJ_NATIVE";
+        case OBJ_STRING: return "OBJ_STRING";
         default: return NULL;
     }
 }

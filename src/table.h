@@ -21,6 +21,8 @@ bool set_table_t(table_t *table, obj_string_t *key, const value_t value);
 bool get_table_t(table_t *table, const obj_string_t *key, value_t *value);
 bool delete_table_t(table_t *table, const obj_string_t *key);
 obj_string_t *find_string_table_t(const table_t *table, const char *chars, const int length, const uint32_t hash);
+void table_remove_white(table_t *table);
+void mark_table(table_t *table);
 void add_all_table_t(const table_t *from, table_t *to);
 
 #endif

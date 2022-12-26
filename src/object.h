@@ -27,6 +27,7 @@ typedef enum {
 
 struct obj_t {
     obj_type_t type;
+    bool is_marked;
     struct obj_t *next;
 };
 
@@ -48,7 +49,8 @@ struct obj_string_t {
     obj_t obj;
     int length;
     uint32_t hash;
-    char chars[]; // FAM
+    // char chars[]; // FAM
+    char *chars;
 };
 
 typedef struct obj_upvalue {
@@ -70,8 +72,9 @@ obj_native_t *new_obj_native_t(native_fn_t function);
 obj_closure_t *new_obj_closure_t(obj_function_t *function);
 obj_upvalue_t *new_obj_upvalue_t(value_t *slot);
 
+obj_string_t *take_string(char *chars, const int length);
 obj_string_t *copy_string(const char *chars, const int length);
-obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b);
+//FAM obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b);
 void print_object(const value_t value);
 
 static inline bool is_obj_type(const value_t value, const obj_type_t type)

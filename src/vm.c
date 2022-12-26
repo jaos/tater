@@ -25,6 +25,63 @@ static void reset_stack(void)
     vm.open_upvalues = NULL;
 }
 
+static void runtime_error(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wformat"
+# pragma GCC diagnostic ignored "-Wformat-security"
+    vfprintf(stderr, format, args); // Flawfinder: disable
+# pragma GCC diagnostic pop
+    va_end(args);
+    fputs("\n", stderr);
+
+    for (int i = vm.frame_count - 1; i >= 0; i--) {
+        const call_frame_t *frame = &vm.frames[i];
+        const obj_function_t *function = frame->closure->function;
+        const size_t instruction = frame->ip - function->chunk.code - 1; // previous failed instruction
+        fprintf(stderr, "[line %d] in %s\n",
+            function->chunk.lines[instruction],
+            function->name == NULL ? "script" : function->name->chars
+        );
+    }
+    reset_stack();
+}
+
+void define_native(const char *name, const native_fn_t function)
+{
+    push(OBJ_VAL(copy_string(name, (int)strlen(name))));
+    push(OBJ_VAL(new_obj_native_t(function)));
+    set_table_t(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    pop();
+    pop();
+}
+
+void init_vm(void)
+{
+    reset_stack();
+    vm.objects = NULL;
+    vm.bytes_allocated = 0;
+    vm.next_garbage_collect = 1024 * 1024;
+
+    vm.gray_count = 0;
+    vm.gray_capacity = 0;
+    vm.gray_stack = NULL;
+
+    init_table_t(&vm.globals);
+    init_table_t(&vm.strings);
+    define_native("clock", clock_native);
+}
+
+void free_vm(void)
+{
+    free_table_t(&vm.globals);
+    free_table_t(&vm.strings);
+    free_objects();
+    free(vm.gray_stack);
+}
+
 void push(const value_t value)
 {
     assert(((uintptr_t)vm.stack_top - (uintptr_t)&vm.stack) <= (sizeof(value_t) * 256));
@@ -47,52 +104,6 @@ static void popn(const uint8_t count)
 static value_t peek(int distance)
 {
     return vm.stack_top[-1 - distance];
-}
-
-static void runtime_error(const char *format, ...)
-{
-    va_list args;
-    va_start(args, format);
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wformat"
-# pragma GCC diagnostic ignored "-Wformat-security"
-    vfprintf(stderr, format, args); // Flawfinder: disable
-# pragma GCC diagnostic pop
-    va_end(args);
-    fputs("\n", stderr);
-
-    for (int i = vm.frame_count - 1; i >= 0; i--) {
-        const call_frame_t *frame = &vm.frames[i];
-        const obj_function_t *function = frame->closure->function;
-        const size_t instruction = frame->ip - function->chunk.code - 1; // previous failed instruction
-        fprintf(stderr, "[line %d] in %s\n",
-            function->chunk.lines[instruction].line,
-            function->name == NULL ? "script" : function->name->chars
-        );
-    }
-    reset_stack();
-}
-
-void define_native(const char *name, const native_fn_t function)
-{
-    push(OBJ_VAL(copy_string(name, (int)strlen(name))));
-    push(OBJ_VAL(new_obj_native_t(function)));
-    set_table_t(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
-    pop();
-    pop();
-}
-
-static bool is_falsey(const value_t value)
-{
-    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
-}
-
-static void concatenate(void)
-{
-    obj_string_t *b = AS_STRING(pop());
-    obj_string_t *a = AS_STRING(pop());
-    const obj_string_t *str = concatenate_string(a, b);
-    push(OBJ_VAL(str));
 }
 
 static bool call(obj_closure_t *closure, const int arg_count)
@@ -164,28 +175,51 @@ static void close_upvalues(value_t *last)
     }
 }
 
+static bool is_falsey(const value_t value)
+{
+    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+static void concatenate(void)
+{
+    obj_string_t *b = AS_STRING(peek(0));
+    obj_string_t *a = AS_STRING(peek(1));
+
+    // FAM const obj_string_t *str = concatenate_string(a, b);
+    const int length = a->length + b->length;
+    char *chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    obj_string_t *result = take_string(chars, length);
+    pop(); // make GC happy
+    pop(); // make GC happy
+    push(OBJ_VAL(result));
+}
+
 static interpret_result_t run() {
     call_frame_t *frame = &vm.frames[vm.frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
-#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type_wrapper, op) \
     do { \
-    if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-        runtime_error("Operands must be numbers."); \
-        return INTERPRET_RUNTIME_ERROR; \
-    } \
-    const double b = AS_NUMBER(pop()); \
-    const double a = AS_NUMBER(pop()); \
-    push(value_type_wrapper(a op b)); \
+        if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+            runtime_error("Operands must be numbers."); \
+            return INTERPRET_RUNTIME_ERROR; \
+        } \
+        const double b = AS_NUMBER(pop()); \
+        const double a = AS_NUMBER(pop()); \
+        push(value_type_wrapper(a op b)); \
     } while (false)
-#define READ_STRING() AS_STRING(READ_CONSTANT())
 
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
-        #ifdef DEBUG
+        #ifdef DEBUG_TRACE_EXECUTION
         printf("        STACK: ");
         for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
             printf("[ ");
@@ -193,6 +227,7 @@ static interpret_result_t run() {
             printf(" ]");
         }
         printf("\n");
+        disassemble_instruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
         /*
         printf("        GLOBALS: ");
         for (int i = vm.globals.count; i > 0; i--) {
@@ -204,7 +239,6 @@ static interpret_result_t run() {
         }
         printf("\n");
         */
-        disassemble_instruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
         #endif
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
@@ -217,7 +251,6 @@ static interpret_result_t run() {
             case OP_TRUE: push(BOOL_VAL(true)); break;
             case OP_FALSE: push(BOOL_VAL(false)); break;
             case OP_POP: pop(); break;
-            case OP_POPN: { uint8_t pop_count = READ_BYTE(); popn(pop_count); break;}
             case OP_GET_LOCAL: {
                 const uint8_t slot = READ_BYTE();
                 push(frame->slots[slot]);
@@ -254,12 +287,12 @@ static interpret_result_t run() {
                 break;
             }
             case OP_GET_UPVALUE: {
-                uint8_t slot = READ_BYTE();
+                const uint8_t slot = READ_BYTE();
                 push(*frame->closure->upvalues[slot]->location);
                 break;
             }
             case OP_SET_UPVALUE: {
-                uint8_t slot = READ_BYTE();
+                const uint8_t slot = READ_BYTE();
                 *frame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
@@ -269,31 +302,14 @@ static interpret_result_t run() {
                 push(BOOL_VAL(values_equal(a,b)));
                 break;
             }
-            case OP_CONSTANT_LONG: {
-                const uint8_t p1 = READ_BYTE();
-                const uint8_t p2 = READ_BYTE();
-                const uint8_t p3 = READ_BYTE();
-                const uint32_t idx = p1 | (p2 << 8) | (p3 << 16);
-                const value_t v = frame->closure->function->chunk.constants.values[idx];
-                push(v);
-                break;
-            }
-            case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
-                if (!IS_NUMBER(peek(0))) {
-                    runtime_error("Operand must be a number.");
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-                push(NUMBER_VAL(-AS_NUMBER(pop())));
-                break;
-            }
             case OP_GREATER: BINARY_OP(BOOL_VAL, >); break;
             case OP_LESS: BINARY_OP(BOOL_VAL, <); break;
             case OP_ADD: {
                 if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
                     concatenate();
                 } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
-                    double b = AS_NUMBER(pop());
-                    double a = AS_NUMBER(pop());
+                    const double b = AS_NUMBER(pop());
+                    const double a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
                 } else {
                     runtime_error("Operands must be two numbers or two strings.");
@@ -305,6 +321,14 @@ static interpret_result_t run() {
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE: BINARY_OP(NUMBER_VAL, /); break;
             case OP_NOT: push(BOOL_VAL(is_falsey(pop()))); break;
+            case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
+                if (!IS_NUMBER(peek(0))) {
+                    runtime_error("Operand must be a number.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(NUMBER_VAL(-AS_NUMBER(pop())));
+                break;
+            }
             case OP_PRINT: print_value(pop()); printf("\n"); break;
             case OP_JUMP: {
                 const uint16_t offset = READ_SHORT();
@@ -322,7 +346,6 @@ static interpret_result_t run() {
                 frame->ip -= offset;
                 break;
             }
-            case OP_DUP: push(peek(0)); break;
             case OP_CALL: {
                 const int arg_count = READ_BYTE();
                 if (!call_value(peek(arg_count), arg_count)) {
@@ -335,8 +358,8 @@ static interpret_result_t run() {
                 obj_closure_t *closure = new_obj_closure_t(AS_FUNCTION(READ_CONSTANT()));
                 push(OBJ_VAL(closure));
                 for (int i = 0; i < closure->upvalue_count; i++) {
-                    uint8_t is_local = READ_BYTE();
-                    uint8_t index = READ_BYTE();
+                    const uint8_t is_local = READ_BYTE();
+                    const uint8_t index = READ_BYTE();
                     if (is_local) {
                         closure->upvalues[i] = capture_upvalue(frame->slots + index);
                     } else {
@@ -363,6 +386,18 @@ static interpret_result_t run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            // not in lox
+            case OP_CONSTANT_LONG: {
+                const uint8_t p1 = READ_BYTE();
+                const uint8_t p2 = READ_BYTE();
+                const uint8_t p3 = READ_BYTE();
+                const uint32_t idx = p1 | (p2 << 8) | (p3 << 16);
+                const value_t v = frame->closure->function->chunk.constants.values[idx];
+                push(v);
+                break;
+            }
+            case OP_POPN: { uint8_t pop_count = READ_BYTE(); popn(pop_count); break;}
+            case OP_DUP: push(peek(0)); break;
             default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
         }
     }
@@ -373,22 +408,6 @@ static interpret_result_t run() {
 #undef READ_STRING
 }
 
-void init_vm(void)
-{
-    reset_stack();
-    init_table_t(&vm.globals);
-    init_table_t(&vm.strings);
-    define_native("clock", clock_native);
-    vm.objects = NULL;
-}
-
-void free_vm(void)
-{
-    free_table_t(&vm.globals);
-    free_table_t(&vm.strings);
-    free_objects();
-}
-
 interpret_result_t interpret(const char *source)
 {
     obj_function_t *function = compile(source);
@@ -397,7 +416,7 @@ interpret_result_t interpret(const char *source)
 
     push(OBJ_VAL(function));
     obj_closure_t *closure = new_obj_closure_t(function);
-    pop(); // yep, for GC later
+    pop();
     push(OBJ_VAL(closure));
     call(closure, 0);
 

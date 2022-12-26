@@ -10,6 +10,7 @@
 #ifdef DEBUG
 #include "debug.h"
 #endif
+#include "memory.h"
 #include "scanner.h"
 
 typedef struct {
@@ -68,7 +69,7 @@ typedef struct compiler {
 } compiler_t;
 
 static parser_t parser;
-static table_t string_constants;
+// static table_t string_constants; // chapter 21 challenge
 static compiler_t *current = NULL;
 static int compiler_count = 0;
 
@@ -272,6 +273,12 @@ static void end_scope(void)
     */
 }
 
+static void expression(void);
+static void statement(void);
+static void declaration(void);
+static const parse_rule_t *get_rule(const token_type_t type);
+static void parse_precedence(const precedence_t precedence);
+
 static uint8_t identifier_constant(const token_t *name)
 {
     /* NOTE: chapter 21 challenge
@@ -406,12 +413,6 @@ static void define_variable(const uint8_t variable)
     }
     emit_bytes(OP_DEFINE_GLOBAL, variable);
 }
-
-static void statement(void); // TODO move up
-static void declaration(void); // TODO move up
-static void expression(void); // TODO move up
-static void parse_precedence(const precedence_t precedence); // TODO move up
-static const parse_rule_t *get_rule(const token_type_t type); // TODO move up
 
 static uint8_t argument_list(void)
 {
@@ -859,6 +860,7 @@ static void declaration(void)
 
 #define MAX_CASES 256
 
+// NOT IN LOX
 static void switch_statement(void)
 {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
@@ -930,6 +932,7 @@ static void switch_statement(void)
     emit_byte(OP_POP); // The switch value.
 }
 
+// NOT IN LOX
 static void break_statement(void)
 {
     assert("This does not work!");
@@ -943,6 +946,7 @@ static void break_statement(void)
     emit_loop(inner_most_loop_end);
 }
 
+// NOT IN LOX
 static void continue_statement(void)
 {
     if (inner_most_loop_start == -1) {
@@ -976,14 +980,15 @@ static void statement(void)
         if_statement();
     } else if (match(TOKEN_RETURN)) {
         return_statement();
-    } else if (match(TOKEN_SWITCH)) {
-        switch_statement();
     } else if (match(TOKEN_WHILE)) {
         while_statement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block();
         end_scope();
+    // not in lox
+    } else if (match(TOKEN_SWITCH)) {
+        switch_statement();
     } else if (match(TOKEN_BREAK)) {
         break_statement();
     } else if (match(TOKEN_CONTINUE)) {
@@ -1003,7 +1008,7 @@ obj_function_t *compile(const char *source)
     parser.had_error = false;
     parser.panic_mode = false;
 
-    init_table_t(&string_constants);
+    // init_table_t(&string_constants); // chapter 21 challenge
 
     advance();
 
@@ -1013,4 +1018,13 @@ obj_function_t *compile(const char *source)
 
     obj_function_t *function = end_compiler();
     return parser.had_error ? NULL : function;
+}
+
+void mark_compiler_roots(void)
+{
+    compiler_t *compiler = current;
+    while (compiler != NULL) {
+        mark_object((obj_t*)compiler->function);
+        compiler = compiler->enclosing;
+    }
 }

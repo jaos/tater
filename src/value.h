@@ -48,9 +48,9 @@ typedef struct {
 } value_array_t;
 
 bool values_equal(const value_t a, const value_t b);
-void init_value_array_t(value_array_t* array);
-void write_value_array_t(value_array_t* array, const value_t value);
-void free_value_array_t(value_array_t* array);
+void init_value_array_t(value_array_t *array);
+void write_value_array_t(value_array_t *array, const value_t value);
+void free_value_array_t(value_array_t *array);
 void print_value(const value_t value);
 uint32_t hash_value(const value_t value);
 
