@@ -106,7 +106,8 @@ static token_t string(void)
         if (peek() == '\n') scanner.line++;
         advance();
     }
-    if (is_at_end()) return error_token("Unterminated string.");
+    if (is_at_end())
+        return error_token(gettext("Unterminated string."));
     advance();
 
     return make_token(TOKEN_STRING);
@@ -243,6 +244,6 @@ token_t scan_token(void)
         case '<': return make_token(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
         case '>': return make_token(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
         case '"': return string();
-        default: return error_token("Unexpected character.");
+        default: return error_token(gettext("Unexpected character."));
     }
 }

@@ -8,11 +8,11 @@
 
 void disassemble_chunk(const chunk_t *chunk, const char *name)
 {
-    printf("== start %s ==\n", name);
+    printf(gettext("== start %s ==\n"), name);
     for (int offset = 0; offset < chunk->count;) {
         offset = disassemble_instruction(chunk, offset);
     }
-    printf("==   end %s ==\n", name);
+    printf(gettext("==   end %s ==\n"), name);
 }
 
 static int constant_instruction(const char *name, const chunk_t *chunk, const int offset)
@@ -149,7 +149,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
         case OP_DUP: return simple_instruction("OP_DUP", offset);
         default: {
-            printf("Unknown opcode %d\n", instruction);
+            printf(gettext("Unknown opcode %d\n"), instruction);
             return offset + 1;
         }
     }

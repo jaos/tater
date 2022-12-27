@@ -1,0 +1,234 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the clox package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: clox\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-27 17:59-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#, c-format
+msgid " at '%.*s'"
+msgstr ""
+
+#, c-format
+msgid " at end"
+msgstr ""
+
+#, c-format
+msgid "==   end %s ==\n"
+msgstr ""
+
+#, c-format
+msgid "== start %s ==\n"
+msgstr ""
+
+msgid "Already a variable with this name in this scope."
+msgstr ""
+
+msgid "Can only call functions and classes."
+msgstr ""
+
+msgid "Can't have another case or default after the default case."
+msgstr ""
+
+msgid "Can't have more than "
+msgstr ""
+
+msgid "Can't have statements before any case."
+msgstr ""
+
+msgid "Can't read local variable in its own initializer."
+msgstr ""
+
+msgid "Can't return a value from an initializer."
+msgstr ""
+
+msgid "Can't return from top-level code."
+msgstr ""
+
+msgid "Can't use 'break' outside of a loop."
+msgstr ""
+
+msgid "Can't use 'continue' outside of a loop."
+msgstr ""
+
+msgid "Can't use 'this' outside of a class."
+msgstr ""
+
+msgid "Expect '(' after 'for'."
+msgstr ""
+
+msgid "Expect '(' after 'if'."
+msgstr ""
+
+msgid "Expect '(' after 'switch'."
+msgstr ""
+
+msgid "Expect '(' after 'while'."
+msgstr ""
+
+msgid "Expect '(' after function name."
+msgstr ""
+
+msgid "Expect ')' after arguments."
+msgstr ""
+
+msgid "Expect ')' after condition."
+msgstr ""
+
+msgid "Expect ')' after expression."
+msgstr ""
+
+msgid "Expect ')' after for clauses."
+msgstr ""
+
+msgid "Expect ')' after parameters."
+msgstr ""
+
+msgid "Expect ')' after value."
+msgstr ""
+
+msgid "Expect ':' after case value."
+msgstr ""
+
+msgid "Expect ':' after default."
+msgstr ""
+
+msgid "Expect ';' after 'break'."
+msgstr ""
+
+msgid "Expect ';' after 'continue'."
+msgstr ""
+
+msgid "Expect ';' after expression."
+msgstr ""
+
+msgid "Expect ';' after loop condition."
+msgstr ""
+
+msgid "Expect ';' after return value."
+msgstr ""
+
+msgid "Expect ';' after value."
+msgstr ""
+
+msgid "Expect ';' after variable declaration."
+msgstr ""
+
+#. get this back on the stack as a named variable before we compile methods
+msgid "Expect '{' before class body."
+msgstr ""
+
+msgid "Expect '{' before function body."
+msgstr ""
+
+msgid "Expect '{' before switch cases."
+msgstr ""
+
+msgid "Expect '}' after block."
+msgstr ""
+
+msgid "Expect '}' after class body."
+msgstr ""
+
+msgid "Expect class name."
+msgstr ""
+
+msgid "Expect expression."
+msgstr ""
+
+msgid "Expect method name."
+msgstr ""
+
+msgid "Expect property name after '.'."
+msgstr ""
+
+#, c-format
+msgid "Expected %d arguments but got %d."
+msgstr ""
+
+#, c-format
+msgid "Expected 0 arguments but got %d to initialize %s."
+msgstr ""
+
+msgid "Failed to ready history file"
+msgstr ""
+
+msgid "Failed to write history file"
+msgstr ""
+
+msgid "Invalid assignment target."
+msgstr ""
+
+msgid "Loop body too large."
+msgstr ""
+
+msgid "Only instances have fields."
+msgstr ""
+
+msgid "Only instances have methods."
+msgstr ""
+
+msgid "Only instances have properties."
+msgstr ""
+
+msgid "Operand must be a number."
+msgstr ""
+
+msgid "Operands must be numbers."
+msgstr ""
+
+msgid "Operands must be two numbers or two strings."
+msgstr ""
+
+msgid "Stack overflow."
+msgstr ""
+
+msgid "Too many closure variables in function."
+msgstr ""
+
+#, c-format
+msgid "Too many compilers."
+msgstr ""
+
+msgid "Too many constants in one chunk."
+msgstr ""
+
+msgid "Too many local variables in function."
+msgstr ""
+
+msgid "Too much code to jump over."
+msgstr ""
+
+#, c-format
+msgid "Undefined property '%s'."
+msgstr ""
+
+#, c-format
+msgid "Undefined variable '%s'."
+msgstr ""
+
+msgid "Unexpected character."
+msgstr ""
+
+#, c-format
+msgid "Unknown opcode %d\n"
+msgstr ""
+
+msgid "Unterminated string."
+msgstr ""
+
+#, c-format
+msgid "[line %d] Error"
+msgstr ""

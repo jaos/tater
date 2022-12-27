@@ -13,6 +13,7 @@ project('lox', 'c',
     ],
 )
 
+i18n = import('i18n')
 readline = dependency('readline')
 
 cc = meson.get_compiler('c')
@@ -70,5 +71,6 @@ if get_option('debuglog').enabled()
 endif
 add_project_arguments('-DVERSION="' + meson.project_version() + '"', language: 'c')
 
+subdir('po')
 subdir('src')
 subdir('t')

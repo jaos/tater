@@ -58,7 +58,7 @@ static void repl(void)
 
     if (*history_path) {
         if (read_history(history_path)) {
-            perror("Failed to ready history file");
+            perror(gettext("Failed to ready history file"));
         }
     }
 
@@ -76,7 +76,7 @@ static void repl(void)
     }
     if (*history_path) {
         if (write_history(history_path)) {
-            perror("Failed to write history file");
+            perror(gettext("Failed to write history file"));
         }
     }
 }

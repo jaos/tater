@@ -189,11 +189,11 @@ static value_t peek(const int distance)
 static bool call(obj_closure_t *closure, const int arg_count)
 {
     if (arg_count != closure->function->arity) {
-        runtime_error("Expected %d arguments but got %d.", closure->function->arity, arg_count);
+        runtime_error(gettext("Expected %d arguments but got %d."), closure->function->arity, arg_count);
         return false;
     }
     if (vm.frame_count == FRAMES_MAX) {
-        runtime_error("Stack overflow.");
+        runtime_error(gettext("Stack overflow."));
         return false;
     }
     call_frame_t *frame = &vm.frames[vm.frame_count++];
@@ -219,7 +219,7 @@ static bool call_value(const value_t callee, const int arg_count)
                 if (get_table_t(&cls->methods, vm.init_string, &initializer)) {
                     return call(AS_CLOSURE(initializer), arg_count);
                 } else if (arg_count != 0) {
-                    runtime_error("Expected 0 arguments but got %d to initialize %s.", arg_count, cls->name->chars);
+                    runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), arg_count, cls->name->chars);
                     return false;
                 }
                 return true;
@@ -235,7 +235,7 @@ static bool call_value(const value_t callee, const int arg_count)
             default: break; // non-callable
         }
     }
-    runtime_error("Can only call functions and classes.");
+    runtime_error(gettext("Can only call functions and classes."));
     return false;
 }
 
@@ -243,7 +243,7 @@ static bool invoke_from_class(obj_class_t *cls, const obj_string_t *name, const 
 {
     value_t method;
     if (!get_table_t(&cls->methods, name, &method)) {
-        runtime_error("Undefined property '%s'.", name->chars);
+        runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
     return call(AS_CLOSURE(method), arg_count);
@@ -253,7 +253,7 @@ static bool invoke(const obj_string_t *name, const int arg_count)
 {
     const value_t receiver = peek(arg_count); // instance is already on the stack for us
     if (!IS_INSTANCE(receiver)) {
-        runtime_error("Only instances have methods.");
+        runtime_error(gettext("Only instances have methods."));
         return false;
     }
 
@@ -272,7 +272,7 @@ static bool bind_method(obj_class_t *cls, const obj_string_t *name)
 {
     value_t method;
     if (!get_table_t(&cls->methods, name, &method)) {
-        runtime_error("Undefined property '%s'.", name->chars);
+        runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
     obj_bound_method_t *bound_method = new_obj_bound_method_t(peek(0), AS_CLOSURE(method));
@@ -359,7 +359,7 @@ static interpret_result_t run(void)
 #define BINARY_OP(value_type_wrapper, op) \
     do { \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-            runtime_error("Operands must be numbers."); \
+            runtime_error(gettext("Operands must be numbers.")); \
             return INTERPRET_RUNTIME_ERROR; \
         } \
         const double b = AS_NUMBER(pop()); \
@@ -370,7 +370,7 @@ static interpret_result_t run(void)
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
         #ifdef DEBUG_TRACE_EXECUTION
-        printf("        STACK: ");
+        printf("                    ");
         for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
             printf("[ ");
             print_value(*slot);
@@ -413,7 +413,7 @@ static interpret_result_t run(void)
                 const obj_string_t *name = READ_STRING();
                 value_t value;
                 if (!get_table_t(&vm.globals, name, &value)) {
-                    runtime_error("Undefined variable '%s'.", name->chars);
+                    runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 push(value);
@@ -429,7 +429,7 @@ static interpret_result_t run(void)
                 obj_string_t *name = READ_STRING();
                 if (set_table_t(&vm.globals, name, peek(0))) {
                     delete_table_t(&vm.globals, name);
-                    runtime_error("Undefined variable '%s'.", name->chars);
+                    runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -446,7 +446,7 @@ static interpret_result_t run(void)
             }
             case OP_GET_PROPERTY: {
                 if (!IS_INSTANCE(peek(0))) {
-                    runtime_error("Only instances have properties.");
+                    runtime_error(gettext("Only instances have properties."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 obj_instance_t *instance = AS_INSTANCE(peek(0));
@@ -468,7 +468,7 @@ static interpret_result_t run(void)
             }
             case OP_SET_PROPERTY: {
                 if (!IS_INSTANCE(peek(1))) {
-                    runtime_error("Only instances have fields.");
+                    runtime_error(gettext("Only instances have fields."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 obj_instance_t *instance = AS_INSTANCE(peek(1));
@@ -494,7 +494,7 @@ static interpret_result_t run(void)
                     const double a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
                 } else {
-                    runtime_error("Operands must be two numbers or two strings.");
+                    runtime_error(gettext("Operands must be two numbers or two strings."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -505,7 +505,7 @@ static interpret_result_t run(void)
             case OP_NOT: push(BOOL_VAL(is_falsey(pop()))); break;
             case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
                 if (!IS_NUMBER(peek(0))) {
-                    runtime_error("Operand must be a number.");
+                    runtime_error(gettext("Operand must be a number."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));

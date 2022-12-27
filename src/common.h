@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <libintl.h> // translations
+
 #ifndef __unused__
     #define __unused__ __attribute__((unused))
 #endif
