@@ -215,6 +215,8 @@ START_TEST(test_vm)
         "class Foo {} class Bar {} var f = Foo(); print(is_instance(f, Foo)); print(is_instance(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\")); has_field(f, 2); is_instance(f, \"not a type\");",
         "is_instance(2, \"not a type\"); is_instance(); has_field(); has_field(2, \"not a type\");",
         "print(sys_version());",
+        "class Foo {} var f = Foo(); get_field(f, \"name\"); set_field(f, \"name\", \"foo\"); get_field(f, \"name\");"
+        "set_field(f, 2); get_field(f, 2); set_field(f); get_field(f); set_field(); get_field();",
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
         "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",

@@ -96,6 +96,33 @@ static value_t is_instance_native(const int arg_count, const value_t *args)
     }
 }
 
+static value_t get_field_native(const int arg_count, const value_t *args)
+{
+    if (arg_count != 2)
+        return NIL_VAL;
+    if (!IS_INSTANCE(args[0]))
+        return NIL_VAL;
+    if (!IS_STRING(args[1]))
+        return NIL_VAL;
+
+    obj_instance_t *instance = AS_INSTANCE(args[0]);
+    value_t v = NIL_VAL;
+    get_table_t(&instance->fields, AS_STRING(args[1]), &v);
+    return v;
+}
+
+static value_t set_field_native(const int arg_count, const value_t *args)
+{
+    if (arg_count != 3)
+        return FALSE_VAL;
+    if (!IS_INSTANCE(args[0]))
+        return FALSE_VAL;
+
+    obj_instance_t *instance = AS_INSTANCE(args[0]);
+    set_table_t(&instance->fields, AS_STRING(args[1]), args[2]);
+    return args[2];
+}
+
 static value_t sys_version_native(const int, const value_t *)
 {
     push(OBJ_VAL(copy_string(VERSION, strlen(VERSION))));
@@ -119,6 +146,8 @@ void init_vm(void)
     define_native("has_field", has_field_native);
     define_native("is_instance", is_instance_native);
     define_native("sys_version", sys_version_native);
+    define_native("get_field", get_field_native);
+    define_native("set_field", set_field_native);
 }
 
 void free_vm(void)
