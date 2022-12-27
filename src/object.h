@@ -46,7 +46,7 @@ typedef struct {
     obj_string_t *name;
 } obj_function_t;
 
-typedef value_t (*native_fn_t)(int arg_count, value_t *args);
+typedef value_t (*native_fn_t)(const int arg_count, const value_t *args);
 typedef struct {
     obj_t obj;
     native_fn_t function;

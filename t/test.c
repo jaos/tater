@@ -212,6 +212,9 @@ START_TEST(test_vm)
         "switch(3) { }",
         // "var counter = 0; while (counter < 10) { break; print counter; counter = counter + 1;}", // DOES NOT YET WORK
         "var counter = 0; while (counter < 10) { counter = counter + 1; continue; print \"never reached\";}",
+        "class Foo {} class Bar {} var f = Foo(); print(is_instance(f, Foo)); print(is_instance(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\")); has_field(f, 2); is_instance(f, \"not a type\");",
+        "is_instance(2, \"not a type\"); is_instance(); has_field(); has_field(2, \"not a type\");",
+        "print(sys_version());",
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
         "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",
@@ -276,8 +279,9 @@ START_TEST(test_vm)
         "var f1; var f2; { var i = 1; fun f() { print i; } f1 = f; } { var j = 2; fun f() { print j; } f2 = f; } f1(); f2();",
 
         // trigger gc
-        "fun lots_of_stuff() { var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; var b = \"asdfsdfasdfasfdafsdfas\"; }"
-        "for (var i = 0; i < 100; i = i + 1) { lots_of_stuff();}",
+        "var x = 1; var y = 2; var z = x + y;"
+        "fun lots_of_stuff() { var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; var b = \"asdfsdfasdfasfdafsdfas\"; return a+b;}"
+        "for (var i = 0; i < 1000; i = i + 1) { var r = lots_of_stuff(); print(r); print(x+y+z);}",
 
         "class Brioche {} print Brioche; print Brioche();", // chapter 27
         "class Pair {} var pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
@@ -330,7 +334,7 @@ START_TEST(test_vm)
     }
 }
 
-static value_t native_getpid(int, value_t*)
+static value_t native_getpid(const int, const value_t*)
 {
     return NUMBER_VAL((double)getpid());
 }

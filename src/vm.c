@@ -13,7 +13,7 @@
 
 vm_t vm;
 
-static value_t clock_native(int, value_t*)
+static value_t clock_native(const int, const value_t*)
 {
     return NUMBER_VAL((double)clock());
 }
@@ -58,6 +58,50 @@ void define_native(const char *name, const native_fn_t function)
     pop();
 }
 
+static value_t has_field_native(const int arg_count, const value_t *args)
+{
+    if (arg_count != 2) {
+        return FALSE_VAL;
+    }
+
+    if (!IS_INSTANCE(args[0]))
+        return FALSE_VAL;
+
+    if (!IS_STRING(args[1]))
+        return FALSE_VAL;
+
+    obj_instance_t *instance = AS_INSTANCE(args[0]);
+    value_t v;
+    return BOOL_VAL(get_table_t(&instance->fields, AS_STRING(args[1]), &v));
+}
+
+static value_t is_instance_native(const int arg_count, const value_t *args)
+{
+    if (arg_count != 2) {
+        return FALSE_VAL;
+    }
+
+    if (!IS_INSTANCE(args[0]))
+        return FALSE_VAL;
+
+    if (!IS_CLASS(args[1]))
+        return FALSE_VAL;
+
+    obj_instance_t *instance = AS_INSTANCE(args[0]);
+    obj_class_t *cls = AS_CLASS(args[1]);
+    if (instance->cls == cls) {
+        return TRUE_VAL;
+    } else {
+        return FALSE_VAL;
+    }
+}
+
+static value_t sys_version_native(const int, const value_t *)
+{
+    push(OBJ_VAL(copy_string(VERSION, strlen(VERSION))));
+    return pop();
+}
+
 void init_vm(void)
 {
     reset_stack();
@@ -72,6 +116,9 @@ void init_vm(void)
     init_table_t(&vm.globals);
     init_table_t(&vm.strings);
     define_native("clock", clock_native);
+    define_native("has_field", has_field_native);
+    define_native("is_instance", is_instance_native);
+    define_native("sys_version", sys_version_native);
 }
 
 void free_vm(void)
@@ -253,8 +300,8 @@ static interpret_result_t run() {
                 break;
             }
             case OP_NIL: push(NIL_VAL); break;
-            case OP_TRUE: push(BOOL_VAL(true)); break;
-            case OP_FALSE: push(BOOL_VAL(false)); break;
+            case OP_TRUE: push(TRUE_VAL); break;
+            case OP_FALSE: push(FALSE_VAL); break;
             case OP_POP: pop(); break;
             case OP_GET_LOCAL: {
                 const uint8_t slot = READ_BYTE();

@@ -41,6 +41,9 @@ typedef struct {
 #define OBJ_VAL(object)     ((value_t){VAL_OBJ, {.obj = (obj_t*)object}})
 #define EMPTY_VAL           ((value_t){VAL_EMPTY, {.number = 0}})
 
+#define FALSE_VAL (BOOL_VAL(false))
+#define TRUE_VAL (BOOL_VAL(true))
+
 typedef struct {
     int capacity;
     int count;

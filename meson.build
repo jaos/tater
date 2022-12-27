@@ -68,6 +68,7 @@ add_project_link_arguments(cc.get_supported_link_arguments(lflags), language: 'c
 if get_option('debuglog').enabled()
   add_global_arguments('-DDEBUG', language : 'c')
 endif
+add_project_arguments('-DVERSION="' + meson.project_version() + '"', language: 'c')
 
 subdir('src')
 subdir('t')

@@ -110,7 +110,7 @@ bool delete_table_t(table_t *table, const obj_string_t *key)
 
     // place a tombstone entry
     entry->key = NULL;
-    entry->value = BOOL_VAL(true);
+    entry->value = TRUE_VAL;
     return true;
 }
 
