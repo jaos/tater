@@ -279,6 +279,9 @@ START_TEST(test_vm)
         "fun lots_of_stuff() { var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; var b = \"asdfsdfasdfasfdafsdfas\"; }"
         "for (var i = 0; i < 100; i = i + 1) { lots_of_stuff();}",
 
+        "class Brioche {} print Brioche; print Brioche();", // chapter 27
+        "class Pair {} var pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
+
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
@@ -339,6 +342,10 @@ START_TEST(test_native)
     define_native("getpid", native_getpid);
     ck_assert_int_gt(AS_NUMBER(native_getpid(0, NULL)), 0);
     ck_assert(interpret("print(getpid());") == INTERPRET_OK);
+
+    obj_native_t *native_fn = new_obj_native_t(native_getpid);
+    push(OBJ_VAL(native_fn));
+    obj_type_t_to_str(((obj_t*)native_fn)->type); // debugging
 
     free_vm();
 }
@@ -451,6 +458,25 @@ START_TEST(test_object)
     push(OBJ_VAL(p1));
     obj_string_t *p2 = copy_string("bar", 3);
     push(OBJ_VAL(p2));
+
+    obj_function_t *function = new_obj_function_t();
+    push(OBJ_VAL(function));
+    obj_closure_t *closure = new_obj_closure_t(function);
+    push(OBJ_VAL(closure));
+
+    obj_string_t *cls_name = copy_string("TestObjectTestCase", 18);
+    push(OBJ_VAL(cls_name));
+    obj_class_t *cls = new_obj_class_t(cls_name);
+    push(OBJ_VAL(cls));
+    obj_instance_t *instance = new_obj_instance_t(cls);
+    push(OBJ_VAL(instance));
+
+    // debugging
+    obj_type_t_to_str(((obj_t*)cls_name)->type);
+    obj_type_t_to_str(((obj_t*)cls)->type);
+    obj_type_t_to_str(((obj_t*)instance)->type);
+    obj_type_t_to_str(((obj_t*)function)->type);
+    obj_type_t_to_str(((obj_t*)closure)->type);
 
     // FAM
     // obj_string_t *combined = concatenate_string(p1, p2);

@@ -24,6 +24,21 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type)
     return object;
 }
 
+obj_class_t *new_obj_class_t(obj_string_t *name)
+{
+    obj_class_t *cls = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
+    cls->name = name;
+    return cls;
+}
+
+obj_instance_t *new_obj_instance_t(obj_class_t *cls)
+{
+    obj_instance_t *instance = ALLOCATE_OBJ(obj_instance_t, OBJ_INSTANCE);
+    instance->cls = cls;
+    init_table_t(&instance->fields);
+    return instance;
+}
+
 obj_closure_t *new_obj_closure_t(obj_function_t *function)
 {
     obj_upvalue_t **upvalues = ALLOCATE(obj_upvalue_t*, function->upvalue_count);
@@ -170,8 +185,10 @@ static void print_function(const obj_function_t *function)
 void print_object(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
+        case OBJ_CLASS: printf("<cls %s>", AS_CLASS(value)->name->chars); break;
         case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
+        case OBJ_INSTANCE: printf("<cls %s instance>", AS_INSTANCE(value)->cls->name->chars); break;
         case OBJ_NATIVE: printf("<native fn>"); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
         case OBJ_UPVALUE: printf("<upvalue>"); break;

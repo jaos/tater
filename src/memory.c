@@ -86,6 +86,11 @@ static void blacken_object(obj_t *object)
     #endif
 
     switch (object->type) {
+        case OBJ_CLASS: {
+            obj_class_t *cls = (obj_class_t*)object;
+            mark_object((obj_t*)cls->name);
+            break;
+        }
         case OBJ_CLOSURE: {
             obj_closure_t *closure = (obj_closure_t*)object;
             mark_object((obj_t*)closure->function);
@@ -98,6 +103,12 @@ static void blacken_object(obj_t *object)
             obj_function_t *function = (obj_function_t*)object;
             mark_object((obj_t*)function->name);
             mark_array(&function->chunk.constants);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            obj_instance_t *instance = (obj_instance_t*)object;
+            mark_object((obj_t*)instance->cls);
+            mark_table(&instance->fields);
             break;
         }
         case OBJ_UPVALUE: mark_value(((obj_upvalue_t*)object)->closed); break;
@@ -114,6 +125,10 @@ static void free_object(obj_t *o)
     printf("%p free type %s\n", (void*)o, obj_type_t_to_str(o->type));
     #endif
     switch (o->type) {
+        case OBJ_CLASS: {
+            FREE(obj_class_t, o); // TODO obj_string_t ?
+            break;
+        }
         case OBJ_CLOSURE: {
             obj_closure_t *closure = (obj_closure_t*)o;
             // free the containing array, not the actual upvalues themselves
@@ -125,6 +140,12 @@ static void free_object(obj_t *o)
             obj_function_t *function = (obj_function_t*)o;
             free_chunk(&function->chunk);
             FREE(obj_function_t, o);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            obj_instance_t *instance = (obj_instance_t*)o;
+            free_table_t(&instance->fields);
+            FREE(obj_instance_t, o);
             break;
         }
         case OBJ_NATIVE: {

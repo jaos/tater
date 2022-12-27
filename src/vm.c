@@ -127,6 +127,11 @@ static bool call_value(value_t callee, const int arg_count)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_CLASS: {
+                obj_class_t *cls = AS_CLASS(callee);
+                vm.stack_top[-arg_count - 1] = OBJ_VAL(new_obj_instance_t(cls));
+                return true;
+            }
             case OBJ_CLOSURE: return call(AS_CLOSURE(callee), arg_count);
             case OBJ_NATIVE: {
                 const native_fn_t native = AS_NATIVE(callee);
@@ -296,6 +301,35 @@ static interpret_result_t run() {
                 *frame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(peek(0))) {
+                    runtime_error("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                obj_instance_t *instance = AS_INSTANCE(peek(0));
+                const obj_string_t *name = READ_STRING();
+
+                value_t value;
+                if (get_table_t(&instance->fields, name, &value)) {
+                    pop(); // instance
+                    push(value);
+                    break;
+                }
+                runtime_error("Undefined property '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(peek(1))) {
+                    runtime_error("Only instances have fields.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                obj_instance_t *instance = AS_INSTANCE(peek(1));
+                set_table_t(&instance->fields, READ_STRING(), peek(0)); // read name, peek the value to set
+                const value_t value = pop(); // pop the value
+                pop(); // pop the instance
+                push(value); // push the value so we leave the value as the return
+                break;
+            }
             case OP_EQUAL: {
                 const value_t b = pop();
                 const value_t a = pop();
@@ -384,6 +418,10 @@ static interpret_result_t run() {
                 vm.stack_top = frame->slots;
                 push(result);
                 frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
+            case OP_CLASS: {
+                push(OBJ_VAL(new_obj_class_t(READ_STRING())));
                 break;
             }
             // not in lox

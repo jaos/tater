@@ -466,6 +466,19 @@ static void call(const bool)
     emit_bytes(OP_CALL, arg_count);
 }
 
+static void dot(const bool can_assign)
+{
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    const uint8_t name = identifier_constant(&parser.previous);
+
+    if (can_assign && match(TOKEN_EQUAL)) {
+        expression();
+        emit_bytes(OP_SET_PROPERTY, name);
+    } else {
+        emit_bytes(OP_GET_PROPERTY, name);
+    }
+}
+
 static void literal(const bool)
 {
     switch (parser.previous.type) {
@@ -555,7 +568,7 @@ const parse_rule_t rules[] = {
     [TOKEN_LEFT_BRACE]      = {NULL,        NULL,   PREC_NONE},
     [TOKEN_RIGHT_BRACE]     = {NULL,        NULL,   PREC_NONE},
     [TOKEN_COMMA]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_DOT]             = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_DOT]             = {NULL,        dot,    PREC_CALL},
     [TOKEN_MINUS]           = {unary,       binary, PREC_TERM},
     [TOKEN_PLUS]            = {NULL,        binary, PREC_TERM},
     [TOKEN_SEMICOLON]       = {NULL,        NULL,   PREC_NONE},
@@ -661,6 +674,20 @@ static void function(function_type_t type)
         emit_byte(compiler.upvalues[i].is_local ? 1 : 0);
         emit_byte(compiler.upvalues[i].index);
     }
+}
+
+static void class_declaration(void)
+{
+    consume(TOKEN_IDENTIFIER, "Expect class name.");
+    const uint8_t name_constant = identifier_constant(&parser.previous);
+    declare_variable();
+
+    emit_bytes(OP_CLASS, name_constant);
+    define_variable(name_constant);
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    // TODO ? block();
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 static void fun_declaration(void)
@@ -848,7 +875,9 @@ static void synchronize(void)
 
 static void declaration(void)
 {
-    if (match(TOKEN_FUN)) {
+    if (match(TOKEN_CLASS)) {
+        class_declaration();
+    } else if (match(TOKEN_FUN)) {
         fun_declaration();
     } else if (match(TOKEN_VAR)) {
         var_declaration();

@@ -91,6 +91,8 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_SET_GLOBAL: return constant_instruction("OP_SET_GLOBAL", chunk, offset);
         case OP_GET_UPVALUE: return byte_instruction("OP_GET_UPVALUE", chunk, offset);
         case OP_SET_UPVALUE: return byte_instruction("OP_SET_UPVALUE", chunk, offset);
+        case OP_GET_PROPERTY: return constant_instruction("OP_GET_PROPERTY", chunk, offset);
+        case OP_SET_PROPERTY: return constant_instruction("OP_SET_PROPERTY", chunk, offset);
         case OP_EQUAL: return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER: return simple_instruction("OP_GREATER", offset);
         case OP_LESS: return simple_instruction("OP_LESS", offset);
@@ -123,6 +125,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         }
         case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
+        case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
         // not in lox
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
         case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
@@ -149,6 +152,8 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_SET_GLOBAL: return "OP_SET_GLOBAL"; break;
         case OP_GET_UPVALUE: return "OP_GET_UPVALUE"; break;
         case OP_SET_UPVALUE: return "OP_SET_UPVALUE"; break;
+        case OP_GET_PROPERTY: return "OP_GET_PROPERTY"; break;
+        case OP_SET_PROPERTY: return "OP_SET_PROPERTY"; break;
         case OP_EQUAL: return "OP_EQUAL"; break;
         case OP_GREATER: return "OP_GREATER"; break;
         case OP_LESS: return "OP_LESS"; break;
@@ -166,6 +171,7 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_CLOSURE: return "OP_CLOSURE"; break;
         case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE"; break;
         case OP_RETURN: return "OP_RETURN"; break;
+        case OP_CLASS: return "OP_CLASS"; break;
         // not in lox
         case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG"; break;
         case OP_POPN: return "OP_POPN"; break;
@@ -246,8 +252,10 @@ const char *token_type_t_to_str(const token_type_t type)
 const char *obj_type_t_to_str(const obj_type_t type)
 {
     switch (type) {
+        case OBJ_CLASS: return "OBJ_CLASS";
         case OBJ_CLOSURE: return "OBJ_CLOSURE";
         case OBJ_FUNCTION: return "OBJ_FUNCTION";
+        case OBJ_INSTANCE: return "OBJ_INSTANCE";
         case OBJ_NATIVE: return "OBJ_NATIVE";
         case OBJ_STRING: return "OBJ_STRING";
         default: return NULL;
