@@ -17,12 +17,25 @@ void disassemble_chunk(const chunk_t *chunk, const char *name)
 
 static int constant_instruction(const char *name, const chunk_t *chunk, const int offset)
 {
+    assert(chunk->count > 0);
     const uint8_t constant = chunk->code[offset + 1];
     printf("%-16s %4d '", name, constant);
     assert(chunk->constants.count >= constant);
     print_value(chunk->constants.values[constant]);
     printf("'\n");
     return offset + 2;
+}
+
+static int invoke_instruction(const char *name, const chunk_t *chunk, const int offset)
+{
+    assert(chunk->count > 0);
+    const uint8_t constant = chunk->code[offset + 1];
+    const uint8_t arg_count = chunk->code[offset + 2];
+    printf("%-16s (%d args) %4d '", name, arg_count, constant);
+    assert(chunk->constants.count >= constant);
+    value_t_print(chunk->constants.values[constant]);
+    printf("'\n");
+    return offset + 3;
 }
 
 static int simple_instruction(const char *name, const int offset)
@@ -34,6 +47,7 @@ static int simple_instruction(const char *name, const int offset)
 static int byte_instruction(const char *name, const chunk_t *chunk, const int offset)
 {
     // TODO figure out how to map our chunk to the compiler locals to get the variable name
+    assert(chunk->count > 0);
     const uint8_t slot = chunk->code[offset + 1];
     printf("%-16s %4d\n", name, slot);
     return offset + 2;
@@ -41,6 +55,7 @@ static int byte_instruction(const char *name, const chunk_t *chunk, const int of
 
 static int jump_instruction(const char *name, const int sign, const chunk_t *chunk, const int offset)
 {
+    assert(chunk->count > 0);
     uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
     jump |= chunk->code[offset + 2];
     printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
@@ -49,6 +64,7 @@ static int jump_instruction(const char *name, const int sign, const chunk_t *chu
 
 static int long_constant_instruction(const char *name, const chunk_t *chunk, const int offset)
 {
+    assert(chunk->count > 0);
     const uint32_t constant = chunk->code[offset + 1] |
         (chunk->code[offset + 2] << 8) |
         (chunk->code[offset + 3] << 16);
@@ -107,6 +123,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_JUMP_IF_FALSE: return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
         case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
         case OP_CALL: return byte_instruction("OP_CALL", chunk, offset);
+        case OP_INVOKE: return invoke_instruction("OP_INVOKE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             uint8_t constant = chunk->code[offset++];
@@ -126,6 +143,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
+        case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
         // not in lox
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
         case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
@@ -168,10 +186,12 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE"; break;
         case OP_LOOP: return "OP_LOOP"; break;
         case OP_CALL: return "OP_CALL"; break;
+        case OP_INVOKE: return "OP_INVOKE"; break;
         case OP_CLOSURE: return "OP_CLOSURE"; break;
         case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE"; break;
         case OP_RETURN: return "OP_RETURN"; break;
         case OP_CLASS: return "OP_CLASS"; break;
+        case OP_METHOD: return "OP_METHOD"; break;
         // not in lox
         case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG"; break;
         case OP_POPN: return "OP_POPN"; break;
@@ -252,6 +272,7 @@ const char *token_type_t_to_str(const token_type_t type)
 const char *obj_type_t_to_str(const obj_type_t type)
 {
     switch (type) {
+        case OBJ_BOUND_METHOD: return "OBJ_BOUND_METHOD";
         case OBJ_CLASS: return "OBJ_CLASS";
         case OBJ_CLOSURE: return "OBJ_CLOSURE";
         case OBJ_FUNCTION: return "OBJ_FUNCTION";

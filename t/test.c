@@ -288,6 +288,27 @@ START_TEST(test_vm)
         "class Brioche {} print Brioche; print Brioche();", // chapter 27
         "class Pair {} var pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
 
+        "class Brunch { bacon() {} eggs() {} } var brunch = Brunch(); var eggs = brunch.eggs; eggs();", // chapter 28
+
+        "class Scone { topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
+        "var scone = Scone(); scone.topping(\"berries\", \"cream\");", // chapter 28
+
+        "class Person { say_name() {print this.name;} }"
+        "var me = Person(); me.name = \"test\"; var method = me.say_name; method();", // chapter 28
+
+        "class Nested { method() { fun function() { print this; } function(); } } Nested().method();", // chapter 28
+
+        "class Brunch { init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
+
+        "class CoffeeMaker { "
+            "init(coffee) { this.coffee = coffee; }"
+            "brew() { print \"enjoy \" + this.coffee; this.coffee = nil; }"
+        "}"
+        "var maker = CoffeeMaker(\"coffee and chicory\");"
+        "maker.brew();", // chapter 28
+
+        "class Oops { init() { fun f() { print \"not a method\"; } this.field = f; } } var oops = Oops(); oops.field();", // chapter 28
+
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
@@ -308,6 +329,9 @@ START_TEST(test_vm)
         "if true ){}",
         " 1 = 3;",
         "{ var a = 1; var a = 2;}",
+        "print this;", // chapter 28
+        "fun not_a_method() { print this;}", // chapter 28
+        "class CannotReturnFromInitializer { init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
         NULL,
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
@@ -326,6 +350,8 @@ START_TEST(test_vm)
         "var a = \"foo\"; a = -a;", // operand not a number
         "var a = \"foo\"; a = a + 1;", // operands must be same
         "a = 1;", // set global undefined variable
+        "class OnlyOneArgInit { init(one) {} } var i = OnlyOneArgInit(1, 2);", // chapter 28
+        "class NoArgInit {} var i = NoArgInit(1, 2);", // chapter 28
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {

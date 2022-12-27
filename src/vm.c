@@ -142,6 +142,9 @@ void init_vm(void)
 
     init_table_t(&vm.globals);
     init_table_t(&vm.strings);
+    vm.init_string = NULL; // in case of GC race inside copy_string that allocates
+    vm.init_string = copy_string(CLOX_CLS_INIT_METH_NAME, CLOX_CLS_INIT_METH_NAME_LEN);
+
     define_native("clock", clock_native);
     define_native("has_field", has_field_native);
     define_native("is_instance", is_instance_native);
@@ -154,6 +157,7 @@ void free_vm(void)
 {
     free_table_t(&vm.globals);
     free_table_t(&vm.strings);
+    vm.init_string = NULL; // before free_objects so it cleans it up for us
     free_objects();
     free(vm.gray_stack);
 }
@@ -177,7 +181,7 @@ static void popn(const uint8_t count)
     vm.stack_top -= count;
 }
 
-static value_t peek(int distance)
+static value_t peek(const int distance)
 {
     return vm.stack_top[-1 - distance];
 }
@@ -199,13 +203,25 @@ static bool call(obj_closure_t *closure, const int arg_count)
     return true;
 }
 
-static bool call_value(value_t callee, const int arg_count)
+static bool call_value(const value_t callee, const int arg_count)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_BOUND_METHOD: {
+                obj_bound_method_t *bound_method = AS_BOUND_METHOD(callee);
+                vm.stack_top[-arg_count - 1] = bound_method->receiver; // swap out our instance for "this" referencing
+                return call(bound_method->method, arg_count);
+            }
             case OBJ_CLASS: {
                 obj_class_t *cls = AS_CLASS(callee);
                 vm.stack_top[-arg_count - 1] = OBJ_VAL(new_obj_instance_t(cls));
+                value_t initializer;
+                if (get_table_t(&cls->methods, vm.init_string, &initializer)) {
+                    return call(AS_CLOSURE(initializer), arg_count);
+                } else if (arg_count != 0) {
+                    runtime_error("Expected 0 arguments but got %d to initialize %s.", arg_count, cls->name->chars);
+                    return false;
+                }
                 return true;
             }
             case OBJ_CLOSURE: return call(AS_CLOSURE(callee), arg_count);
@@ -221,6 +237,50 @@ static bool call_value(value_t callee, const int arg_count)
     }
     runtime_error("Can only call functions and classes.");
     return false;
+}
+
+static bool invoke_from_class(obj_class_t *cls, const obj_string_t *name, const int arg_count)
+{
+    value_t method;
+    if (!get_table_t(&cls->methods, name, &method)) {
+        runtime_error("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    return call(AS_CLOSURE(method), arg_count);
+}
+
+static bool invoke(const obj_string_t *name, const int arg_count)
+{
+    const value_t receiver = peek(arg_count); // instance is already on the stack for us
+    if (!IS_INSTANCE(receiver)) {
+        runtime_error("Only instances have methods.");
+        return false;
+    }
+
+    obj_instance_t *instance = AS_INSTANCE(receiver);
+
+    // priority... do not invoke a field that is a function like a method
+    value_t function_value;
+    if (get_table_t(&instance->fields, name, &function_value)) {
+        vm.stack_top[-arg_count - 1] = function_value; // swap receiver for our function
+        return call_value(function_value, arg_count);
+    }
+    return invoke_from_class(instance->cls, name, arg_count);
+}
+
+static bool bind_method(obj_class_t *cls, const obj_string_t *name)
+{
+    value_t method;
+    if (!get_table_t(&cls->methods, name, &method)) {
+        runtime_error("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    obj_bound_method_t *bound_method = new_obj_bound_method_t(peek(0), AS_CLOSURE(method));
+
+    // pop the instance and replace with the bound method
+    pop();
+    push(OBJ_VAL(bound_method));
+    return true;
 }
 
 static obj_upvalue_t *capture_upvalue(value_t *local)
@@ -246,7 +306,7 @@ static obj_upvalue_t *capture_upvalue(value_t *local)
     return created_upvalue;
 }
 
-static void close_upvalues(value_t *last)
+static void close_upvalues(const value_t *last)
 {
     while(vm.open_upvalues != NULL && vm.open_upvalues->location >= last) {
         obj_upvalue_t *upvalue = vm.open_upvalues;
@@ -254,6 +314,14 @@ static void close_upvalues(value_t *last)
         upvalue->location = &upvalue->closed;
         vm.open_upvalues = upvalue->next;
     }
+}
+
+static void define_method(obj_string_t *name)
+{
+    value_t method = peek(0);
+    obj_class_t *cls = AS_CLASS(peek(1)); // left on the stack for us by class_declaration
+    set_table_t(&cls->methods, name, method);
+    pop();
 }
 
 static bool is_falsey(const value_t value)
@@ -279,7 +347,8 @@ static void concatenate(void)
     push(OBJ_VAL(result));
 }
 
-static interpret_result_t run() {
+static interpret_result_t run(void)
+{
     call_frame_t *frame = &vm.frames[vm.frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -308,19 +377,17 @@ static interpret_result_t run() {
             printf(" ]");
         }
         printf("\n");
-        disassemble_instruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
-        /*
-        printf("        GLOBALS: ");
-        for (int i = vm.globals.count; i > 0; i--) {
-            printf("[ ");
-            print_value(vm.globals.entries[i-1].key);
-            printf(" => ");
-            print_value(vm.globals.entries[i-1].value);
-            printf(" ]");
+
+        // TODO on errors we might end up with nothing here and blow up, including the instruction READ_BYTE below...
+        if (!frame->ip) {
+            fprintf(stderr, "FIXME I am a work in progress!\n");
+            exit(EXIT_FAILURE);
         }
-        printf("\n");
-        */
+        disassemble_instruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
         #endif
+        assert(frame);
+        assert(frame->ip);
+
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
             case OP_CONSTANT: {
@@ -385,14 +452,19 @@ static interpret_result_t run() {
                 obj_instance_t *instance = AS_INSTANCE(peek(0));
                 const obj_string_t *name = READ_STRING();
 
+                // fields (priority, may shadow methods)
                 value_t value;
                 if (get_table_t(&instance->fields, name, &value)) {
                     pop(); // instance
                     push(value);
                     break;
                 }
-                runtime_error("Undefined property '%s'.", name->chars);
-                return INTERPRET_RUNTIME_ERROR;
+
+                // otherwise methods
+                if (!bind_method(instance->cls, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
             }
             case OP_SET_PROPERTY: {
                 if (!IS_INSTANCE(peek(1))) {
@@ -461,7 +533,16 @@ static interpret_result_t run() {
                 if (!call_value(peek(arg_count), arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = &vm.frames[vm.frame_count - 1];
+                frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                break;
+            }
+            case OP_INVOKE: { // combined OP_GET_PROPERTY and OP_CALL
+                const obj_string_t *method_name = READ_STRING();
+                const int arg_count = READ_BYTE();
+                if (!invoke(method_name, arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 break;
             }
             case OP_CLOSURE: {
@@ -493,11 +574,15 @@ static interpret_result_t run() {
                 }
                 vm.stack_top = frame->slots;
                 push(result);
-                frame = &vm.frames[vm.frame_count - 1];
+                frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 break;
             }
             case OP_CLASS: {
                 push(OBJ_VAL(new_obj_class_t(READ_STRING())));
+                break;
+            }
+            case OP_METHOD: {
+                define_method(READ_STRING());
                 break;
             }
             // not in lox
@@ -512,14 +597,19 @@ static interpret_result_t run() {
             }
             case OP_POPN: { uint8_t pop_count = READ_BYTE(); popn(pop_count); break;}
             case OP_DUP: push(peek(0)); break;
-            default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
+            default:
+                DEBUG_LOGGER("Unhandled default for instruction %d, %s\n",
+                    instruction,
+                    op_code_t_to_str(instruction)
+                );
+                exit(EXIT_FAILURE);
         }
     }
 #undef READ_BYTE
-#undef READ_CONSTANT
 #undef READ_SHORT
-#undef BINARY_OP
+#undef READ_CONSTANT
 #undef READ_STRING
+#undef BINARY_OP
 }
 
 interpret_result_t interpret(const char *source)

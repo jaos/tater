@@ -24,10 +24,19 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type)
     return object;
 }
 
+obj_bound_method_t *new_obj_bound_method_t(value_t receiver, obj_closure_t *method)
+{
+    obj_bound_method_t *bound_method = ALLOCATE_OBJ(obj_bound_method_t, OBJ_BOUND_METHOD);
+    bound_method->receiver = receiver;
+    bound_method->method = method;
+    return bound_method;
+}
+
 obj_class_t *new_obj_class_t(obj_string_t *name)
 {
     obj_class_t *cls = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
     cls->name = name;
+    init_table_t(&cls->methods);
     return cls;
 }
 
@@ -176,7 +185,7 @@ obj_upvalue_t *new_obj_upvalue_t(value_t *slot)
 static void print_function(const obj_function_t *function)
 {
     if (function->name == NULL) {
-        printf("<script>");
+        printf("<script>"); // or main ?
     } else {
         printf("<fn %s>", function->name->chars);
     }
@@ -185,6 +194,7 @@ static void print_function(const obj_function_t *function)
 void print_object(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
+        case OBJ_BOUND_METHOD: print_function(AS_BOUND_METHOD(value)->method->function); break;
         case OBJ_CLASS: printf("<cls %s>", AS_CLASS(value)->name->chars); break;
         case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;

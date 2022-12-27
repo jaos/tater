@@ -86,9 +86,16 @@ static void blacken_object(obj_t *object)
     #endif
 
     switch (object->type) {
+        case OBJ_BOUND_METHOD: {
+            obj_bound_method_t *bound_method = (obj_bound_method_t*)object;
+            mark_value(bound_method->receiver); // should be an obj_instance_t that is already marked... but insurance here
+            mark_object((obj_t*)bound_method->method);
+            break;
+        }
         case OBJ_CLASS: {
             obj_class_t *cls = (obj_class_t*)object;
             mark_object((obj_t*)cls->name);
+            mark_table(&cls->methods);
             break;
         }
         case OBJ_CLOSURE: {
@@ -125,7 +132,13 @@ static void free_object(obj_t *o)
     printf("%p free type %s\n", (void*)o, obj_type_t_to_str(o->type));
     #endif
     switch (o->type) {
+        case OBJ_BOUND_METHOD: {
+            FREE(obj_bound_method_t, o);
+            break;
+        }
         case OBJ_CLASS: {
+            obj_class_t *cls = (obj_class_t*)o;
+            free_table_t(&cls->methods);
             FREE(obj_class_t, o); // TODO obj_string_t ?
             break;
         }
@@ -183,6 +196,7 @@ static void mark_roots(void)
 
     mark_table(&vm.globals);
     mark_compiler_roots();
+    mark_object((obj_t*)vm.init_string);
 }
 
 static void trace_references(void)
@@ -195,7 +209,6 @@ static void trace_references(void)
 
 static void sweep(void)
 {
-    // TODO XXX something bad is happening with this running
     obj_t *previous = NULL;
     obj_t *object = vm.objects;
     while (object != NULL) {

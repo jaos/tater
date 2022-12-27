@@ -11,6 +11,7 @@
 #include "debug.h"
 #endif
 #include "memory.h"
+#include "object.h"
 #include "scanner.h"
 
 typedef struct {
@@ -55,6 +56,8 @@ typedef struct {
 
 typedef enum {
     TYPE_FUNCTION,
+    TYPE_INITIALIZER,
+    TYPE_METHOD,
     TYPE_SCRIPT,
 } function_type_t;
 
@@ -68,9 +71,14 @@ typedef struct compiler {
     int scope_depth;
 } compiler_t;
 
+typedef struct class_compiler {
+    struct class_compiler *enclosing;
+} class_compiler_t;
+
 static parser_t parser;
 // static table_t string_constants; // chapter 21 challenge
 static compiler_t *current = NULL;
+static class_compiler_t *current_class = NULL;
 static int compiler_count = 0;
 
 #define MAX_COMPILERS 1024
@@ -174,7 +182,11 @@ static int emit_jump(const uint8_t instruction)
 
 static void emit_return(void)
 {
-    emit_byte(OP_NIL);
+    if (current->type == TYPE_INITIALIZER) {
+        emit_bytes(OP_GET_LOCAL, 0); // make sure the instance from slot zero is left on the stack
+    } else {
+        emit_byte(OP_NIL);
+    }
     emit_byte(OP_RETURN);
 }
 
@@ -225,8 +237,13 @@ static void init_compiler(compiler_t *compiler, const function_type_t type)
     local_t *local = &current->locals[current->local_count++];
     local->depth = 0;
     local->is_captured = false;
-    local->name.start = "";
-    local->name.length = 0;
+    if (type != TYPE_FUNCTION) {
+        local->name.start = CLOX_INST_SELF_REF_NAME;
+        local->name.length = CLOX_INST_SELF_REF_NAME_LEN;
+    } else {
+        local->name.start = "";
+        local->name.length = 0;
+    }
 }
 
 static obj_function_t *end_compiler(void)
@@ -430,7 +447,7 @@ static uint8_t argument_list(void)
     return arg_count;
 }
 
-static void and_(const bool) // can_assign
+static void and_expr(const bool) // can_assign
 {
     const int end_jump = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
@@ -474,6 +491,10 @@ static void dot(const bool can_assign)
     if (can_assign && match(TOKEN_EQUAL)) {
         expression();
         emit_bytes(OP_SET_PROPERTY, name);
+    } else if (match(TOKEN_LEFT_PAREN)) { // optimization here since we are immediately calling the method
+        const uint8_t arg_count = argument_list();
+        emit_bytes(OP_INVOKE, name);
+        emit_byte(arg_count);
     } else {
         emit_bytes(OP_GET_PROPERTY, name);
     }
@@ -501,7 +522,7 @@ static void number(const bool)
     emit_constant(NUMBER_VAL(value));
 }
 
-static void or_(const bool) // can_assign
+static void or_expr(const bool) // can_assign
 {
     const int else_jump = emit_jump(OP_JUMP_IF_FALSE);
     const int end_jump = emit_jump(OP_JUMP);
@@ -547,6 +568,16 @@ static void variable(const bool can_assign)
     named_variable(parser.previous, can_assign);
 }
 
+static void this_expr(const bool)
+{
+    // check we have a setup from class_declaration
+    if (current_class == NULL) {
+        error("Can't use 'this' outside of a class.");
+        return;
+    }
+    variable(false);
+}
+
 static void unary(const bool)
 {
     const token_type_t operator_type = parser.previous.type;
@@ -585,7 +616,7 @@ const parse_rule_t rules[] = {
     [TOKEN_IDENTIFIER]      = {variable,    NULL,   PREC_NONE},
     [TOKEN_STRING]          = {string,      NULL,   PREC_NONE},
     [TOKEN_NUMBER]          = {number,      NULL,   PREC_NONE},
-    [TOKEN_AND]             = {NULL,        and_,   PREC_AND},
+    [TOKEN_AND]             = {NULL,        and_expr,PREC_AND},
     [TOKEN_CLASS]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_ELSE]            = {NULL,        NULL,   PREC_NONE},
     [TOKEN_FALSE]           = {literal,     NULL,   PREC_NONE},
@@ -593,11 +624,11 @@ const parse_rule_t rules[] = {
     [TOKEN_FUN]             = {NULL,        NULL,   PREC_NONE},
     [TOKEN_IF]              = {NULL,        NULL,   PREC_NONE},
     [TOKEN_NIL]             = {literal,     NULL,   PREC_NONE},
-    [TOKEN_OR]              = {NULL,        or_,    PREC_OR},
+    [TOKEN_OR]              = {NULL,        or_expr,PREC_OR},
     [TOKEN_PRINT]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_RETURN]          = {NULL,        NULL,   PREC_NONE},
     [TOKEN_SUPER]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_THIS]            = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_THIS]            = {this_expr,   NULL,   PREC_NONE},
     [TOKEN_TRUE]            = {literal,     NULL,   PREC_NONE},
     [TOKEN_VAR]             = {NULL,        NULL,   PREC_NONE},
     [TOKEN_WHILE]           = {NULL,        NULL,   PREC_NONE},
@@ -676,18 +707,49 @@ static void function(function_type_t type)
     }
 }
 
+static void method(void)
+{
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    const uint8_t constant = identifier_constant(&parser.previous);
+
+    function_type_t type = TYPE_METHOD;
+    if (parser.previous.length == CLOX_CLS_INIT_METH_NAME_LEN &&
+    memcmp(parser.previous.start, CLOX_CLS_INIT_METH_NAME, CLOX_CLS_INIT_METH_NAME_LEN) == 0) {
+        type = TYPE_INITIALIZER;
+    }
+    function(type);
+
+    emit_bytes(OP_METHOD, constant);
+}
+
 static void class_declaration(void)
 {
     consume(TOKEN_IDENTIFIER, "Expect class name.");
+    const token_t class_name = parser.previous;
     const uint8_t name_constant = identifier_constant(&parser.previous);
     declare_variable();
 
     emit_bytes(OP_CLASS, name_constant);
     define_variable(name_constant);
 
+    // setup a class compiler instance while we do the work
+    class_compiler_t class_compiler;
+    class_compiler.enclosing = current_class;
+    current_class = &class_compiler;
+
+    named_variable(class_name, false); // get this back on the stack as a named variable before we compile methods
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
-    // TODO ? block();
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        // could add fields and other things here besides methods
+        method();
+    }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+
+    emit_byte(OP_POP); // done with our class, pop it off the stack
+
+    // pop off the class compiler
+    current_class = current_class->enclosing;
 }
 
 static void fun_declaration(void)
@@ -819,6 +881,10 @@ static void return_statement(void)
     if (match(TOKEN_SEMICOLON)) {
         emit_return();
     } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Can't return a value from an initializer.");
+            // let it continue from here so that the compiler can synchronize
+        }
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         emit_byte(OP_RETURN);
