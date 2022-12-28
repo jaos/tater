@@ -73,6 +73,7 @@ typedef struct compiler {
 
 typedef struct class_compiler {
     struct class_compiler *enclosing;
+    bool has_superclass;
 } class_compiler_t;
 
 static parser_t parser;
@@ -238,9 +239,9 @@ static void init_compiler(compiler_t *compiler, const function_type_t type)
     local->depth = 0;
     local->is_captured = false;
     if (type != TYPE_FUNCTION) {
-        local->name.start = CLOX_INST_SELF_REF_NAME;
-        local->name.length = CLOX_INST_SELF_REF_NAME_LEN;
-    } else {
+        local->name.start = token_keyword_names[TOKEN_THIS];
+        local->name.length = TOKEN_THIS_LEN;
+      } else {
         local->name.start = "";
         local->name.length = 0;
     }
@@ -568,6 +569,41 @@ static void variable(const bool can_assign)
     named_variable(parser.previous, can_assign);
 }
 
+static token_t synthetic_token(const char *text)
+{
+    token_t token;
+    token.start = text;
+    token.length = strlen(text);
+    return token;
+}
+
+static void super_expr(const bool)
+{
+    if (current_class == NULL) {
+        error(gettext("Can't use 'super' outside of a class."));
+    } else if (!current_class->has_superclass) {
+        error(gettext("Can't use 'super' in a class with no superclass."));
+    }
+
+    consume(TOKEN_DOT, gettext("Expect '.' after 'super'."));
+    consume(TOKEN_IDENTIFIER, gettext("Expect superclass method name."));
+    const uint8_t method_name = identifier_constant(&parser.previous);
+
+    // capture this and super in case we are in a closure
+    named_variable(synthetic_token(token_keyword_names[TOKEN_THIS]), false);
+
+    // try a fast path
+    if (match(TOKEN_LEFT_PAREN)) {
+        const uint8_t arg_count = argument_list();
+        named_variable(synthetic_token(token_keyword_names[TOKEN_SUPER]), false);
+        emit_bytes(OP_SUPER_INVOKE, method_name);
+        emit_byte(arg_count);
+    } else { // slow path
+        named_variable(synthetic_token(token_keyword_names[TOKEN_SUPER]), false);
+        emit_bytes(OP_GET_SUPER, method_name);
+    }
+}
+
 static void this_expr(const bool)
 {
     // check we have a setup from class_declaration
@@ -627,7 +663,7 @@ const parse_rule_t rules[] = {
     [TOKEN_OR]              = {NULL,        or_expr,PREC_OR},
     [TOKEN_PRINT]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_RETURN]          = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_SUPER]           = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_SUPER]           = {super_expr,  NULL,   PREC_NONE},
     [TOKEN_THIS]            = {this_expr,   NULL,   PREC_NONE},
     [TOKEN_TRUE]            = {literal,     NULL,   PREC_NONE},
     [TOKEN_VAR]             = {NULL,        NULL,   PREC_NONE},
@@ -713,8 +749,8 @@ static void method(void)
     const uint8_t constant = identifier_constant(&parser.previous);
 
     function_type_t type = TYPE_METHOD;
-    if (parser.previous.length == CLOX_CLS_INIT_METH_NAME_LEN &&
-    memcmp(parser.previous.start, CLOX_CLS_INIT_METH_NAME, CLOX_CLS_INIT_METH_NAME_LEN) == 0) {
+    if (parser.previous.length == KEYWORD_INIT_LEN &&
+    memcmp(parser.previous.start, token_keyword_names[KEYWORD_INIT], KEYWORD_INIT_LEN) == 0) {
         type = TYPE_INITIALIZER;
     }
     function(type);
@@ -735,7 +771,26 @@ static void class_declaration(void)
     // setup a class compiler instance while we do the work
     class_compiler_t class_compiler;
     class_compiler.enclosing = current_class;
+    class_compiler.has_superclass = false;
     current_class = &class_compiler;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, gettext("Expect superclass name."));
+        variable(false);
+
+        if (identifiers_equal(&class_name, &parser.previous)) {
+            error(gettext("A class can't inherit from itself."));
+        }
+
+        // setup super... make a new scope so each class gets local slot for super, preventing collisions
+        begin_scope();
+        add_local(synthetic_token(token_keyword_names[TOKEN_SUPER]));
+        define_variable(0);
+
+        named_variable(class_name, false);
+        emit_byte(OP_INHERIT);
+        class_compiler.has_superclass = true;
+    }
 
     named_variable(class_name, false); // get this back on the stack as a named variable before we compile methods
 
@@ -747,6 +802,10 @@ static void class_declaration(void)
     consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after class body."));
 
     emit_byte(OP_POP); // done with our class, pop it off the stack
+
+    if (class_compiler.has_superclass) {
+        end_scope();
+    }
 
     // pop off the class compiler
     current_class = current_class->enclosing;

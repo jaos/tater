@@ -77,11 +77,6 @@ typedef struct {
     int upvalue_count;
 } obj_closure_t;
 
-#define CLOX_CLS_INIT_METH_NAME "init"
-#define CLOX_CLS_INIT_METH_NAME_LEN 4
-#define CLOX_INST_SELF_REF_NAME "this"
-#define CLOX_INST_SELF_REF_NAME_LEN 4
-
 typedef struct {
     obj_t obj;
     obj_string_t *name;

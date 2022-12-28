@@ -309,6 +309,30 @@ START_TEST(test_vm)
 
         "class Oops { init() { fun f() { print \"not a method\"; } this.field = f; } } var oops = Oops(); oops.field();", // chapter 28
 
+        "class Doughnut { cook() { print(\"Dunk in the fryer.\"); } }"
+        "class Cruller < Doughnut { finish() { print(\"Glaze with icing.\"); } }"
+        "var c = Cruller(); c.cook(); c.finish();", // chapter 29
+
+        "class A { method() { print(\"A method\");}}"
+        "class B < A { method() { print(\"B method\");} test() { super.method(); }}"
+        "class C < B {}"
+        "C().test();", // chapter 29
+
+        "class A { method() { print \"A\"; } }"
+        "class B < A { method() { var closure = super.method; closure(); } }" // prints "A"
+        "B().method();", // chapter 29
+
+        "class Doughnut {"
+            "cook() { print(\"Dunk in the fryer.\"); this.finish(\"sprinkles\"); }"
+            "finish(ingredient) { print(\"Finish with \" + ingredient); }"
+        "}"
+        "class Cruller < Doughnut {"
+            "finish(ingredient) {"
+                // no sprinkles, always icing
+                "super.finish(\"icing\");"
+            "}"
+        "}", // chapter 29
+
         NULL,
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
@@ -332,6 +356,9 @@ START_TEST(test_vm)
         "print this;", // chapter 28
         "fun not_a_method() { print this;}", // chapter 28
         "class CannotReturnFromInitializer { init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
+        "class Foo < Foo {}", // chapter 29
+        "class NoSuperClass { method() { super.method();}}", // chapter 29
+        "fun NotClass() { super.NotClass(); }", // chapter 29
         NULL,
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
@@ -352,6 +379,7 @@ START_TEST(test_vm)
         "a = 1;", // set global undefined variable
         "class OnlyOneArgInit { init(one) {} } var i = OnlyOneArgInit(1, 2);", // chapter 28
         "class NoArgInit {} var i = NoArgInit(1, 2);", // chapter 28
+        "var NotClass = \"so not a class\"; class OhNo < NotClass {}", // chapter 29
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {

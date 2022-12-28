@@ -109,6 +109,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_SET_UPVALUE: return byte_instruction("OP_SET_UPVALUE", chunk, offset);
         case OP_GET_PROPERTY: return constant_instruction("OP_GET_PROPERTY", chunk, offset);
         case OP_SET_PROPERTY: return constant_instruction("OP_SET_PROPERTY", chunk, offset);
+        case OP_GET_SUPER: return constant_instruction("OP_GET_SUPER", chunk, offset);
         case OP_EQUAL: return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER: return simple_instruction("OP_GREATER", offset);
         case OP_LESS: return simple_instruction("OP_LESS", offset);
@@ -124,6 +125,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
         case OP_CALL: return byte_instruction("OP_CALL", chunk, offset);
         case OP_INVOKE: return invoke_instruction("OP_INVOKE", chunk, offset);
+        case OP_SUPER_INVOKE: return invoke_instruction("OP_SUPER_INVOKE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             uint8_t constant = chunk->code[offset++];
@@ -143,6 +145,7 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
+        case OP_INHERIT: return simple_instruction("OP_INHERIT", offset);
         case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
         // not in lox
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
@@ -158,44 +161,47 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
 const char *op_code_t_to_str(const op_code_t op)
 {
     switch (op) {
-        case OP_CONSTANT: return "OP_CONSTANT"; break;
-        case OP_NIL: return "OP_NIL"; break;
-        case OP_TRUE: return "OP_TRUE"; break;
-        case OP_FALSE: return "OP_FALSE"; break;
-        case OP_POP: return "OP_POP"; break;
-        case OP_GET_LOCAL: return "OP_GET_LOCAL"; break;
-        case OP_SET_LOCAL: return "OP_SET_LOCAL"; break;
-        case OP_GET_GLOBAL: return "OP_GET_GLOBAL"; break;
-        case OP_DEFINE_GLOBAL: return "OP_DEFINE_GLOBAL"; break;
-        case OP_SET_GLOBAL: return "OP_SET_GLOBAL"; break;
-        case OP_GET_UPVALUE: return "OP_GET_UPVALUE"; break;
-        case OP_SET_UPVALUE: return "OP_SET_UPVALUE"; break;
-        case OP_GET_PROPERTY: return "OP_GET_PROPERTY"; break;
-        case OP_SET_PROPERTY: return "OP_SET_PROPERTY"; break;
-        case OP_EQUAL: return "OP_EQUAL"; break;
-        case OP_GREATER: return "OP_GREATER"; break;
-        case OP_LESS: return "OP_LESS"; break;
-        case OP_ADD: return "OP_ADD"; break;
-        case OP_SUBTRACT: return "OP_SUBTRACT"; break;
-        case OP_MULTIPLY: return "OP_MULTIPLY"; break;
-        case OP_DIVIDE: return "OP_DIVIDE"; break;
-        case OP_NOT: return "OP_NOT"; break;
-        case OP_NEGATE: return "OP_NEGATE"; break;
-        case OP_PRINT: return "OP_PRINT"; break;
-        case OP_JUMP: return "OP_JUMP"; break;
-        case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE"; break;
-        case OP_LOOP: return "OP_LOOP"; break;
-        case OP_CALL: return "OP_CALL"; break;
-        case OP_INVOKE: return "OP_INVOKE"; break;
-        case OP_CLOSURE: return "OP_CLOSURE"; break;
-        case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE"; break;
-        case OP_RETURN: return "OP_RETURN"; break;
-        case OP_CLASS: return "OP_CLASS"; break;
-        case OP_METHOD: return "OP_METHOD"; break;
+        case OP_CONSTANT: return "OP_CONSTANT";
+        case OP_NIL: return "OP_NIL";
+        case OP_TRUE: return "OP_TRUE";
+        case OP_FALSE: return "OP_FALSE";
+        case OP_POP: return "OP_POP";
+        case OP_GET_LOCAL: return "OP_GET_LOCAL";
+        case OP_SET_LOCAL: return "OP_SET_LOCAL";
+        case OP_GET_GLOBAL: return "OP_GET_GLOBAL";
+        case OP_DEFINE_GLOBAL: return "OP_DEFINE_GLOBAL";
+        case OP_SET_GLOBAL: return "OP_SET_GLOBAL";
+        case OP_GET_UPVALUE: return "OP_GET_UPVALUE";
+        case OP_SET_UPVALUE: return "OP_SET_UPVALUE";
+        case OP_GET_PROPERTY: return "OP_GET_PROPERTY";
+        case OP_SET_PROPERTY: return "OP_SET_PROPERTY";
+        case OP_GET_SUPER: return "OP_GET_SUPER";
+        case OP_EQUAL: return "OP_EQUAL";
+        case OP_GREATER: return "OP_GREATER";
+        case OP_LESS: return "OP_LESS";
+        case OP_ADD: return "OP_ADD";
+        case OP_SUBTRACT: return "OP_SUBTRACT";
+        case OP_MULTIPLY: return "OP_MULTIPLY";
+        case OP_DIVIDE: return "OP_DIVIDE";
+        case OP_NOT: return "OP_NOT";
+        case OP_NEGATE: return "OP_NEGATE";
+        case OP_PRINT: return "OP_PRINT";
+        case OP_JUMP: return "OP_JUMP";
+        case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE";
+        case OP_LOOP: return "OP_LOOP";
+        case OP_CALL: return "OP_CALL";
+        case OP_INVOKE: return "OP_INVOKE";
+        case OP_SUPER_INVOKE: return "OP_SUPER_INVOKE";
+        case OP_CLOSURE: return "OP_CLOSURE";
+        case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE";
+        case OP_RETURN: return "OP_RETURN";
+        case OP_CLASS: return "OP_CLASS";
+        case OP_INHERIT: return "OP_INHERIT";
+        case OP_METHOD: return "OP_METHOD";
         // not in lox
-        case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG"; break;
-        case OP_POPN: return "OP_POPN"; break;
-        case OP_DUP: return "OP_DUP"; break;
+        case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG";
+        case OP_POPN: return "OP_POPN";
+        case OP_DUP: return "OP_DUP";
         default: return NULL;
     }
 }
@@ -203,11 +209,11 @@ const char *op_code_t_to_str(const op_code_t op)
 const char *value_type_t_to_str(const value_type_t type)
 {
     switch (type) {
-        case VAL_BOOL: return "VAL_BOOL"; break;
-        case VAL_NIL: return "VAL_NIL"; break;
-        case VAL_NUMBER: return "VAL_NUMBER"; break;
-        case VAL_OBJ: return "VAL_OBJ"; break;
-        case VAL_EMPTY: return "VAL_EMPTY"; break;
+        case VAL_BOOL: return "VAL_BOOL";
+        case VAL_NIL: return "VAL_NIL";
+        case VAL_NUMBER: return "VAL_NUMBER";
+        case VAL_OBJ: return "VAL_OBJ";
+        case VAL_EMPTY: return "VAL_EMPTY";
         default: return NULL;
     }
 }
@@ -216,55 +222,56 @@ const char *token_type_t_to_str(const token_type_t type)
 {
     switch (type) {
         // single character
-        case TOKEN_LEFT_PAREN: return "TOKEN_LEFT_PAREN"; break;
-        case TOKEN_RIGHT_PAREN: return "TOKEN_RIGHT_PAREN"; break;
-        case TOKEN_LEFT_BRACE: return "TOKEN_LEFT_BRACE"; break;
-        case TOKEN_RIGHT_BRACE: return "TOKEN_RIGHT_BRACE"; break;
-        case TOKEN_COLON: return "TOKEN_COLON"; break;
-        case TOKEN_COMMA: return "TOKEN_COMMA"; break;
-        case TOKEN_DOT: return "TOKEN_DOT"; break;
-        case TOKEN_MINUS: return "TOKEN_MINUS"; break;
-        case TOKEN_PLUS: return "TOKEN_PLUS"; break;
-        case TOKEN_SEMICOLON: return "TOKEN_SEMICOLON"; break;
-        case TOKEN_SLASH: return "TOKEN_SLASH"; break;
-        case TOKEN_STAR: return "TOKEN_STAR"; break;
+        case TOKEN_LEFT_PAREN: return "TOKEN_LEFT_PAREN";
+        case TOKEN_RIGHT_PAREN: return "TOKEN_RIGHT_PAREN";
+        case TOKEN_LEFT_BRACE: return "TOKEN_LEFT_BRACE";
+        case TOKEN_RIGHT_BRACE: return "TOKEN_RIGHT_BRACE";
+        case TOKEN_COLON: return "TOKEN_COLON";
+        case TOKEN_COMMA: return "TOKEN_COMMA";
+        case TOKEN_DOT: return "TOKEN_DOT";
+        case TOKEN_MINUS: return "TOKEN_MINUS";
+        case TOKEN_PLUS: return "TOKEN_PLUS";
+        case TOKEN_SEMICOLON: return "TOKEN_SEMICOLON";
+        case TOKEN_SLASH: return "TOKEN_SLASH";
+        case TOKEN_STAR: return "TOKEN_STAR";
         // one or two characters
-        case TOKEN_BANG: return "TOKEN_BANG"; break;
-        case TOKEN_BANG_EQUAL: return "TOKEN_BANG_EQUAL"; break;
-        case TOKEN_EQUAL: return "TOKEN_EQUAL"; break;
-        case TOKEN_EQUAL_EQUAL: return "TOKEN_EQUAL_EQUAL"; break;
-        case TOKEN_GREATER: return "TOKEN_GREATER"; break;
-        case TOKEN_GREATER_EQUAL: return "TOKEN_GREATER_EQUAL"; break;
-        case TOKEN_LESS: return "TOKEN_LESS"; break;
-        case TOKEN_LESS_EQUAL: return "TOKEN_LESS_EQUAL"; break;
+        case TOKEN_BANG: return "TOKEN_BANG";
+        case TOKEN_BANG_EQUAL: return "TOKEN_BANG_EQUAL";
+        case TOKEN_EQUAL: return "TOKEN_EQUAL";
+        case TOKEN_EQUAL_EQUAL: return "TOKEN_EQUAL_EQUAL";
+        case TOKEN_GREATER: return "TOKEN_GREATER";
+        case TOKEN_GREATER_EQUAL: return "TOKEN_GREATER_EQUAL";
+        case TOKEN_LESS: return "TOKEN_LESS";
+        case TOKEN_LESS_EQUAL: return "TOKEN_LESS_EQUAL";
         // literals
-        case TOKEN_IDENTIFIER: return "TOKEN_IDENTIFIER"; break;
-        case TOKEN_STRING: return "TOKEN_STRING"; break;
-        case TOKEN_NUMBER: return "TOKEN_NUMBER"; break;
+        case TOKEN_IDENTIFIER: return "TOKEN_IDENTIFIER";
+        case TOKEN_STRING: return "TOKEN_STRING";
+        case TOKEN_NUMBER: return "TOKEN_NUMBER";
         // keywords
-        case TOKEN_AND: return "TOKEN_AND"; break;
-        case TOKEN_BREAK: return "TOKEN_BREAK"; break;
-        case TOKEN_CASE: return "TOKEN_CASE"; break;
-        case TOKEN_CLASS: return "TOKEN_CLASS"; break;
-        case TOKEN_CONTINUE: return "TOKEN_CONTINUE"; break;
-        case TOKEN_DEFAULT: return "TOKEN_DEFAULT"; break;
-        case TOKEN_ELSE: return "TOKEN_ELSE"; break;
-        case TOKEN_FALSE: return "TOKEN_FALSE"; break;
-        case TOKEN_FOR: return "TOKEN_FOR"; break;
-        case TOKEN_FUN: return "TOKEN_FUN"; break;
-        case TOKEN_IF: return "TOKEN_IF"; break;
-        case TOKEN_NIL: return "TOKEN_NIL"; break;
-        case TOKEN_OR: return "TOKEN_OR"; break;
-        case TOKEN_PRINT: return "TOKEN_PRINT"; break;
-        case TOKEN_RETURN: return "TOKEN_RETURN"; break;
-        case TOKEN_SUPER: return "TOKEN_SUPER"; break;
-        case TOKEN_SWITCH: return "TOKEN_SWITCH"; break;
-        case TOKEN_THIS: return "TOKEN_THIS"; break;
-        case TOKEN_TRUE: return "TOKEN_TRUE"; break;
-        case TOKEN_VAR: return "TOKEN_VAR"; break;
-        case TOKEN_WHILE: return "TOKEN_WHILE"; break;
-        case TOKEN_ERROR: return "TOKEN_ERROR"; break;
-        case TOKEN_EOF: return "TOKEN_EOF"; break;
+        case TOKEN_AND: return "TOKEN_AND";
+        case TOKEN_BREAK: return "TOKEN_BREAK";
+        case TOKEN_CASE: return "TOKEN_CASE";
+        case TOKEN_CLASS: return "TOKEN_CLASS";
+        case TOKEN_CONTINUE: return "TOKEN_CONTINUE";
+        case TOKEN_DEFAULT: return "TOKEN_DEFAULT";
+        case TOKEN_ELSE: return "TOKEN_ELSE";
+        case TOKEN_FALSE: return "TOKEN_FALSE";
+        case TOKEN_FOR: return "TOKEN_FOR";
+        case TOKEN_FUN: return "TOKEN_FUN";
+        case TOKEN_IF: return "TOKEN_IF";
+        case TOKEN_NIL: return "TOKEN_NIL";
+        case TOKEN_OR: return "TOKEN_OR";
+        case TOKEN_PRINT: return "TOKEN_PRINT";
+        case TOKEN_RETURN: return "TOKEN_RETURN";
+        case TOKEN_SUPER: return "TOKEN_SUPER";
+        case TOKEN_SWITCH: return "TOKEN_SWITCH";
+        case TOKEN_THIS: return "TOKEN_THIS";
+        case TOKEN_TRUE: return "TOKEN_TRUE";
+        case TOKEN_VAR: return "TOKEN_VAR";
+        case TOKEN_WHILE: return "TOKEN_WHILE";
+        case TOKEN_ERROR: return "TOKEN_ERROR";
+        case TOKEN_EOF: return "TOKEN_EOF";
+        case KEYWORD_SELF: return "KEYWORD_SELF"; 
         default: return NULL;
     }
 }

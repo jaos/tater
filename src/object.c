@@ -198,7 +198,7 @@ void print_object(const value_t value)
         case OBJ_CLASS: printf("<cls %s>", AS_CLASS(value)->name->chars); break;
         case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
-        case OBJ_INSTANCE: printf("<cls %s instance>", AS_INSTANCE(value)->cls->name->chars); break;
+        case OBJ_INSTANCE: printf("<cls %s instance %p>", AS_INSTANCE(value)->cls->name->chars, (void*)AS_OBJ(value)); break;
         case OBJ_NATIVE: printf("<native fn>"); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
         case OBJ_UPVALUE: printf("<upvalue>"); break;

@@ -143,7 +143,7 @@ void init_vm(void)
     init_table_t(&vm.globals);
     init_table_t(&vm.strings);
     vm.init_string = NULL; // in case of GC race inside copy_string that allocates
-    vm.init_string = copy_string(CLOX_CLS_INIT_METH_NAME, CLOX_CLS_INIT_METH_NAME_LEN);
+    vm.init_string = copy_string(token_keyword_names[KEYWORD_INIT], KEYWORD_INIT_LEN);
 
     define_native("clock", clock_native);
     define_native("has_field", has_field_native);
@@ -478,6 +478,15 @@ static interpret_result_t run(void)
                 push(value); // push the value so we leave the value as the return
                 break;
             }
+            case OP_GET_SUPER: {
+                const obj_string_t *method_name = READ_STRING();
+                obj_class_t *superclass = AS_CLASS(pop());
+                // NOTE this is only for methods, not fields
+                if (!bind_method(superclass, method_name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 const value_t b = pop();
                 const value_t a = pop();
@@ -545,6 +554,16 @@ static interpret_result_t run(void)
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 break;
             }
+            case OP_SUPER_INVOKE: { // combined OP_GET_SUPER and OP_CALL
+                const obj_string_t *method_name = READ_STRING();
+                const int arg_count = READ_BYTE();
+                obj_class_t *superclass = AS_CLASS(pop());
+                if (!invoke_from_class(superclass, method_name, arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                break;
+            }
             case OP_CLOSURE: {
                 obj_closure_t *closure = new_obj_closure_t(AS_FUNCTION(READ_CONSTANT()));
                 push(OBJ_VAL(closure));
@@ -579,6 +598,18 @@ static interpret_result_t run(void)
             }
             case OP_CLASS: {
                 push(OBJ_VAL(new_obj_class_t(READ_STRING())));
+                break;
+            }
+            case OP_INHERIT: {
+                const value_t superclass = peek(1);
+                if (!IS_CLASS(superclass)) {
+                    runtime_error(gettext("Superclass must be a class."));
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                obj_class_t *subclass = AS_CLASS(peek(0));
+                // initialize the new subclass with copies of the superclass methods, to be optionally overridden later
+                add_all_table_t(&AS_CLASS(superclass)->methods, &subclass->methods);
+                pop();
                 break;
             }
             case OP_METHOD: {

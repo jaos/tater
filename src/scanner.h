@@ -23,6 +23,8 @@ typedef enum {
     TOKEN_SWITCH, TOKEN_THIS, TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
 
     TOKEN_ERROR, TOKEN_EOF,
+
+    KEYWORD_INIT, KEYWORD_SELF,
 } token_type_t;
 
 static const char *const token_keyword_names[] = {
@@ -76,8 +78,14 @@ static const char *const token_keyword_names[] = {
     [TOKEN_WHILE] = "while",
     [TOKEN_ERROR] = "error",
     [TOKEN_EOF] = "<EOF>",
+    [KEYWORD_INIT] = "init",
+    [KEYWORD_SELF] = "self",
     NULL,
 };
+
+#define KEYWORD_INIT_LEN 4
+#define KEYWORD_SELF_LEN 4
+#define TOKEN_THIS_LEN 4
 
 typedef struct {
     token_type_t type;
