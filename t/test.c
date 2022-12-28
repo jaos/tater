@@ -229,6 +229,15 @@ START_TEST(test_vm)
             "x = x + 1;"
             "return middle;"
         "} var mid = outer(); var in = mid(); assert(in() == 106); assert(s1 == 1); assert(s2 == 2); assert(s3 == 3);",
+        "for(var i = 0; i < 5; i++) { print i;}",
+        "var a = 1; a++; assert(a == 2);"
+        "a += 10; assert(a == 12);"
+        "a /= 6; assert(a == 2);"
+        "a *= 6; assert(a == 12);"
+        "a -= 0; assert(a == 12);"
+        "a += 0; assert(a == 12);"
+        "a *= 0; assert(a == 0);",
+        "var foo = \"one\"; foo += \" bar\";",
 
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
@@ -420,6 +429,7 @@ START_TEST(test_vm)
         "class OnlyOneArgInit { init(one) {} } var i = OnlyOneArgInit(1, 2);", // chapter 28
         "class NoArgInit {} var i = NoArgInit(1, 2);", // chapter 28
         "var NotClass = \"so not a class\"; class OhNo < NotClass {}", // chapter 29
+        "var a = 1; a = a / 0;", // divbyzero
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {

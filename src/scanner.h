@@ -14,6 +14,8 @@ typedef enum {
     TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
     TOKEN_GREATER, TOKEN_GREATER_EQUAL,
     TOKEN_LESS, TOKEN_LESS_EQUAL,
+    TOKEN_PLUS_EQUAL, TOKEN_MINUS_EQUAL, TOKEN_STAR_EQUAL, TOKEN_SLASH_EQUAL,
+    TOKEN_MINUS_MINUS, TOKEN_PLUS_PLUS,
     // literals
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
     // keywords
@@ -48,6 +50,12 @@ static const char *const token_keyword_names[] = {
     [TOKEN_GREATER_EQUAL] = ">=",
     [TOKEN_LESS] = "<",
     [TOKEN_LESS_EQUAL] = "<=",
+    [TOKEN_PLUS_EQUAL] = "+=",
+    [TOKEN_MINUS_EQUAL] = "-=",
+    [TOKEN_STAR_EQUAL] = "*=",
+    [TOKEN_SLASH_EQUAL] = "/=",
+    [TOKEN_MINUS_MINUS] = "--",
+    [TOKEN_PLUS_PLUS] = "++",
     // literals
     [TOKEN_IDENTIFIER] = "<identifier>",
     [TOKEN_STRING] = "<string>",

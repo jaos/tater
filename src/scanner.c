@@ -252,10 +252,36 @@ token_t scan_token(void)
         case ';': return make_token(TOKEN_SEMICOLON);
         case ',': return make_token(TOKEN_COMMA);
         case '.': return make_token(TOKEN_DOT);
-        case '-': return make_token(TOKEN_MINUS);
-        case '+': return make_token(TOKEN_PLUS);
-        case '/': return make_token(TOKEN_SLASH);
-        case '*': return make_token(TOKEN_STAR);
+        case '-': {
+            const char next = peek();
+            switch (next) {
+                case '=': advance(); return make_token(TOKEN_MINUS_EQUAL);
+                case '-': advance(); return make_token(TOKEN_MINUS_MINUS);
+                default: return make_token(TOKEN_MINUS);
+            }
+        }
+        case '+':  {
+            const char next = peek();
+            switch (next) {
+                case '=': advance(); return make_token(TOKEN_PLUS_EQUAL);
+                case '+': advance(); return make_token(TOKEN_PLUS_PLUS);
+                default: return make_token(TOKEN_PLUS);
+            }
+        }
+        case '/':  {
+            const char next = peek();
+            switch (next) {
+                case '=': advance(); return make_token(TOKEN_SLASH_EQUAL);
+                default: return make_token(TOKEN_SLASH);
+            }
+        }
+        case '*':  {
+            const char next = peek();
+            switch (next) {
+                case '=': advance(); return make_token(TOKEN_STAR_EQUAL);
+                default: return make_token(TOKEN_STAR);
+            }
+        }
         // one or two characters
         case '!': return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '=': return make_token(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);

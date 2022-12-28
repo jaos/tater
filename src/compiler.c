@@ -559,6 +559,23 @@ static void named_variable(const token_t name, const bool can_assign)
     if (can_assign && match(TOKEN_EQUAL)) {
         expression();
         emit_bytes(set_op, (uint8_t)arg);
+    } else if (can_assign && (match(TOKEN_PLUS_EQUAL) || match(TOKEN_MINUS_EQUAL) || match(TOKEN_STAR_EQUAL) || match(TOKEN_SLASH_EQUAL))) {
+        token_type_t match = parser.previous.type;
+        emit_bytes(get_op, (uint8_t)arg);
+        expression();
+        switch (match) {
+            case TOKEN_PLUS_EQUAL: emit_byte(OP_ADD); break;
+            case TOKEN_MINUS_EQUAL: emit_byte(OP_SUBTRACT); break;
+            case TOKEN_STAR_EQUAL: emit_byte(OP_MULTIPLY); break;
+            case TOKEN_SLASH_EQUAL: emit_byte(OP_DIVIDE); break;
+            default: ;
+        }
+        emit_bytes(set_op, (uint8_t)arg);
+    } else if (can_assign && (match(TOKEN_PLUS_PLUS) || match(TOKEN_MINUS_MINUS))) {
+        emit_bytes(get_op, (uint8_t)arg);
+        emit_constant(NUMBER_VAL(parser.previous.type == TOKEN_PLUS_PLUS ? 1 : -1));
+        emit_byte(OP_ADD);
+        emit_bytes(set_op, (uint8_t)arg);
     } else {
         emit_bytes(get_op, (uint8_t)arg);
     }
@@ -637,7 +654,9 @@ const parse_rule_t rules[] = {
     [TOKEN_COMMA]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_DOT]             = {NULL,        dot,    PREC_CALL},
     [TOKEN_MINUS]           = {unary,       binary, PREC_TERM},
+    [TOKEN_MINUS_MINUS]     = {NULL,        NULL,   PREC_TERM},
     [TOKEN_PLUS]            = {NULL,        binary, PREC_TERM},
+    [TOKEN_PLUS_PLUS]       = {NULL,        NULL,   PREC_TERM},
     [TOKEN_SEMICOLON]       = {NULL,        NULL,   PREC_NONE},
     [TOKEN_SLASH]           = {NULL,        binary, PREC_FACTOR},
     [TOKEN_STAR]            = {NULL,        binary, PREC_FACTOR},

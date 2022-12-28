@@ -511,7 +511,13 @@ static interpret_result_t run(void)
             }
             case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
-            case OP_DIVIDE: BINARY_OP(NUMBER_VAL, /); break;
+            case OP_DIVIDE: {
+                if (IS_NUMBER(peek(0)) && AS_NUMBER(peek(0)) == 0) {
+                    runtime_error(gettext("Illegal divide by zero."));
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                BINARY_OP(NUMBER_VAL, /); break;
+            }
             case OP_NOT: push(BOOL_VAL(is_falsey(pop()))); break;
             case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
                 if (!IS_NUMBER(peek(0))) {
