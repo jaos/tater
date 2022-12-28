@@ -17,14 +17,12 @@ typedef enum {
     // literals
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
     // keywords
-    TOKEN_AND, TOKEN_BREAK, TOKEN_CASE, TOKEN_CLASS, TOKEN_CONTINUE,
-    TOKEN_DEFAULT, TOKEN_ELSE, TOKEN_FALSE, TOKEN_FOR, TOKEN_FUN,
+    TOKEN_AND, TOKEN_ASSERT, TOKEN_BREAK, TOKEN_CASE, TOKEN_CLASS, TOKEN_CONTINUE,
+    TOKEN_DEFAULT, TOKEN_ELSE, TOKEN_EXIT, TOKEN_FALSE, TOKEN_FOR, TOKEN_FUN,
     TOKEN_IF, TOKEN_NIL, TOKEN_OR, TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER,
     TOKEN_SWITCH, TOKEN_THIS, TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
 
     TOKEN_ERROR, TOKEN_EOF,
-
-    KEYWORD_INIT, KEYWORD_SELF,
 } token_type_t;
 
 static const char *const token_keyword_names[] = {
@@ -56,12 +54,14 @@ static const char *const token_keyword_names[] = {
     [TOKEN_NUMBER] = "<number>",
     // keywords
     [TOKEN_AND] = "and",
+    [TOKEN_ASSERT] = "assert",
     [TOKEN_BREAK] = "break",
     [TOKEN_CASE] = "case",
     [TOKEN_CLASS] = "class",
     [TOKEN_CONTINUE] = "continue",
     [TOKEN_DEFAULT] = "default",
     [TOKEN_ELSE] = "else",
+    [TOKEN_EXIT] = "exit",
     [TOKEN_FALSE] = "false",
     [TOKEN_FOR] = "for",
     [TOKEN_FUN] = "fun",
@@ -78,13 +78,12 @@ static const char *const token_keyword_names[] = {
     [TOKEN_WHILE] = "while",
     [TOKEN_ERROR] = "error",
     [TOKEN_EOF] = "<EOF>",
-    [KEYWORD_INIT] = "init",
-    [KEYWORD_SELF] = "self",
     NULL,
 };
 
+
+#define KEYWORD_INIT "init"
 #define KEYWORD_INIT_LEN 4
-#define KEYWORD_SELF_LEN 4
 #define TOKEN_THIS_LEN 4
 
 typedef struct {

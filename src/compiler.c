@@ -669,6 +669,8 @@ const parse_rule_t rules[] = {
     [TOKEN_VAR]             = {NULL,        NULL,   PREC_NONE},
     [TOKEN_WHILE]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_ERROR]           = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_EXIT]            = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_ASSERT]          = {NULL,        NULL,   PREC_NONE},
     [TOKEN_EOF]             = {NULL,        NULL,   PREC_NONE},
 };
 
@@ -749,8 +751,7 @@ static void method(void)
     const uint8_t constant = identifier_constant(&parser.previous);
 
     function_type_t type = TYPE_METHOD;
-    if (parser.previous.length == KEYWORD_INIT_LEN &&
-    memcmp(parser.previous.start, token_keyword_names[KEYWORD_INIT], KEYWORD_INIT_LEN) == 0) {
+    if (parser.previous.length == KEYWORD_INIT_LEN && memcmp(parser.previous.start, KEYWORD_INIT, KEYWORD_INIT_LEN) == 0) {
         type = TYPE_INITIALIZER;
     }
     function(type);
@@ -1124,6 +1125,42 @@ static void continue_statement(void)
     */
 }
 
+static void exit_statement(void)
+{
+    const double exit_value = 0;
+    if (match(TOKEN_LEFT_PAREN)) {
+        expression();
+        consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after exit expression."));
+        consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'exit'."));
+    } else {
+        consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'exit'."));
+        emit_constant(NUMBER_VAL(exit_value));
+    }
+    emit_byte(OP_EXIT);
+}
+
+static void assert_statement(void)
+{
+    consume(TOKEN_LEFT_PAREN, gettext("Expect '(' after 'assert'."));
+    expression();
+    consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after condition."));
+    consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'assert'."));
+
+    const int fail_jump = emit_jump(OP_JUMP_IF_FALSE);
+    const int succeed_jump = emit_jump(OP_JUMP);
+    patch_jump(fail_jump);
+
+    char errbuf[255];
+    snprintf(errbuf, 255, "[line %d] Assertion failed", parser.current.line);
+    obj_string_t *constant_str = obj_string_t_copy_from(errbuf, strlen(errbuf));
+    emit_bytes(OP_CONSTANT, make_constant(OBJ_VAL(constant_str)));
+    emit_byte(OP_PRINT);
+
+    emit_constant(NUMBER_VAL(-1));
+    emit_byte(OP_EXIT);
+    patch_jump(succeed_jump);
+}
+
 static void statement(void)
 {
     if (match(TOKEN_PRINT)) {
@@ -1141,6 +1178,10 @@ static void statement(void)
         block();
         end_scope();
     // not in lox
+    } else if (match(TOKEN_ASSERT)) {
+        assert_statement();
+    } else if (match(TOKEN_EXIT)) {
+        exit_statement();
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
     } else if (match(TOKEN_BREAK)) {

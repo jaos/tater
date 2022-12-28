@@ -6,10 +6,13 @@
 
 typedef enum {
     OP_CONSTANT,
+    OP_CONSTANT_LONG,
     OP_NIL,
     OP_TRUE,
     OP_FALSE,
     OP_POP,
+    OP_POPN,
+    OP_DUP,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
     OP_GET_GLOBAL,
@@ -39,13 +42,11 @@ typedef enum {
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
+    OP_ASSERT,
+    OP_EXIT,
     OP_CLASS,
     OP_INHERIT,
     OP_METHOD,
-    // not in lox
-    OP_CONSTANT_LONG,
-    OP_POPN,
-    OP_DUP,
 } op_code_t;
 
 typedef struct {

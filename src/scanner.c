@@ -143,7 +143,16 @@ static token_type_t check_keyword(int start, int length, const char *rest, token
 static token_type_t identifier_type(void)
 {
     switch (scanner.start[0]) {
-        case 'a': return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'a': {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'n': return check_keyword(2, 1, "d", TOKEN_AND);
+                    case 's': return check_keyword(2, 4, "sert", TOKEN_ASSERT);
+                    default: ; // default returned below
+                }
+            }
+            break;
+        }
         case 'b': return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c': {
             if (scanner.current - scanner.start > 1) {
@@ -165,7 +174,16 @@ static token_type_t identifier_type(void)
             }
             break;
         }
-        case 'e': return check_keyword(1, 3, "lse", TOKEN_ELSE);
+        case 'e': {
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'l': return check_keyword(2, 2, "se", TOKEN_ELSE);
+                    case 'x': return check_keyword(2, 2, "it", TOKEN_EXIT);
+                    default: ; // default returned below
+                }
+            }
+            break;
+        }
         case 'f': {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {

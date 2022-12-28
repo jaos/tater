@@ -144,6 +144,8 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         }
         case OP_CLOSE_UPVALUE: return simple_instruction("OP_CLOSE_UPVALUE", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
+        case OP_EXIT: return simple_instruction("OP_EXIT", offset);
+        case OP_ASSERT: return jump_instruction("OP_ASSERT", 1, chunk, offset);
         case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
         case OP_INHERIT: return simple_instruction("OP_INHERIT", offset);
         case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
@@ -195,6 +197,8 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_CLOSURE: return "OP_CLOSURE";
         case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE";
         case OP_RETURN: return "OP_RETURN";
+        case OP_EXIT: return "OP_EXIT";
+        case OP_ASSERT: return "OP_ASSERT";
         case OP_CLASS: return "OP_CLASS";
         case OP_INHERIT: return "OP_INHERIT";
         case OP_METHOD: return "OP_METHOD";
@@ -271,7 +275,6 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_WHILE: return "TOKEN_WHILE";
         case TOKEN_ERROR: return "TOKEN_ERROR";
         case TOKEN_EOF: return "TOKEN_EOF";
-        case KEYWORD_SELF: return "KEYWORD_SELF"; 
         default: return NULL;
     }
 }

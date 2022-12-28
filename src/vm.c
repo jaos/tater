@@ -135,6 +135,7 @@ void init_vm(void)
     vm.objects = NULL;
     vm.bytes_allocated = 0;
     vm.next_garbage_collect = 1024 * 1024;
+    vm.exit_status = 0;
 
     vm.gray_count = 0;
     vm.gray_capacity = 0;
@@ -143,7 +144,7 @@ void init_vm(void)
     init_table_t(&vm.globals);
     init_table_t(&vm.strings);
     vm.init_string = NULL; // in case of GC race inside copy_string that allocates
-    vm.init_string = copy_string(token_keyword_names[KEYWORD_INIT], KEYWORD_INIT_LEN);
+    vm.init_string = copy_string(KEYWORD_INIT, KEYWORD_INIT_LEN);
 
     define_native("clock", clock_native);
     define_native("has_field", has_field_native);
@@ -596,6 +597,17 @@ static interpret_result_t run(void)
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 break;
             }
+            case OP_EXIT: {
+                const value_t exit_code = pop();
+                if (!IS_NUMBER(exit_code)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm.exit_status = AS_NUMBER(exit_code);
+                if (AS_NUMBER(exit_code)) {
+                    return INTERPRET_EXIT;
+                }
+                return INTERPRET_EXIT_OK;
+            }
             case OP_CLASS: {
                 push(OBJ_VAL(new_obj_class_t(READ_STRING())));
                 break;
@@ -618,6 +630,7 @@ static interpret_result_t run(void)
             }
             // not in lox
             case OP_CONSTANT_LONG: {
+                assert(false);
                 const uint8_t p1 = READ_BYTE();
                 const uint8_t p2 = READ_BYTE();
                 const uint8_t p3 = READ_BYTE();

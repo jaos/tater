@@ -130,32 +130,18 @@ START_TEST(test_compiler)
     const char *source1 = "var v = 27; { var v = 1; var y = 2; var z = v + y; }";
     obj_function_t *func1 = compile(source1);
     ck_assert(func1->chunk.count == 18);
-    const op_code_t r1[] = {
-        OP_CONSTANT,
-        OP_NIL,
-        OP_DEFINE_GLOBAL,
-        OP_CONSTANT,
-        OP_CONSTANT,
-        OP_TRUE,
-        OP_CONSTANT,
-        OP_FALSE,
-        OP_GET_LOCAL,
-        OP_NIL,
-        OP_GET_LOCAL,
-        OP_TRUE,
-        OP_ADD,
-        OP_POP,
-        OP_POP,
-        OP_POP,
-        OP_NIL,
-        OP_RETURN,
-        OP_CONSTANT,
-    };
-    for (int i = 0; i < func1->chunk.count; i++) {
-        ck_assert_msg(func1->chunk.code[i] == r1[i], "Expected %d, got %d\n", r1[i], func1->chunk.code[i]);
-        const char *op_str __unused__ = op_code_t_to_str(func1->chunk.code[i]);
-    }
-
+    ck_assert(func1->chunk.code[0] == OP_CONSTANT);
+    ck_assert(func1->chunk.code[2] == OP_DEFINE_GLOBAL);
+    ck_assert(func1->chunk.code[4] == OP_CONSTANT);
+    ck_assert(func1->chunk.code[6] == OP_CONSTANT);
+    ck_assert(func1->chunk.code[8] == OP_GET_LOCAL);
+    ck_assert(func1->chunk.code[10] == OP_GET_LOCAL);
+    ck_assert(func1->chunk.code[12] == OP_ADD);
+    ck_assert(func1->chunk.code[13] == OP_POP);
+    ck_assert(func1->chunk.code[14] == OP_POP);
+    ck_assert(func1->chunk.code[15] == OP_POP);
+    ck_assert(func1->chunk.code[16] == OP_NIL);
+    ck_assert(func1->chunk.code[17] == OP_RETURN);
     ck_assert(func1->chunk.constants.count == 4); // v, 27, 1, 2
     ck_assert(memcmp(AS_CSTRING(func1->chunk.constants.values[0]), "v", 1) == 0);
     ck_assert(func1->chunk.constants.values[1].type == VAL_NUMBER);
@@ -164,26 +150,27 @@ START_TEST(test_compiler)
     ck_assert(AS_NUMBER(func1->chunk.constants.values[2]) == 1);
     ck_assert(func1->chunk.constants.values[3].type == VAL_NUMBER);
     ck_assert(AS_NUMBER(func1->chunk.constants.values[3]) == 2);
-
     free_vm();
-
 
     init_vm();
     const char *func_source = "fun a(x,y) { var sum = x + y; print(sum);}";
     obj_function_t *func2 = compile(func_source);
     ck_assert(func2->chunk.count == 6);
-    const op_code_t r2[] = {
-        OP_CLOSURE,
-        OP_NIL,
-        OP_DEFINE_GLOBAL,
-        OP_CONSTANT,
-        OP_NIL,
-        OP_RETURN,
-    };
-    for (int i = 0; i < func2->chunk.count; i++) {
-        ck_assert_msg(func2->chunk.code[i] == r2[i], "Expected %d, got %d\n", r2[i], func2->chunk.code[i]);
-        const char *op_str __unused__ = op_code_t_to_str(func2->chunk.code[i]);
-    }
+    ck_assert(func2->chunk.code[0] == OP_CLOSURE);
+    ck_assert(func2->chunk.code[2] == OP_DEFINE_GLOBAL);
+    ck_assert(func2->chunk.code[4] == OP_NIL);
+    ck_assert(func2->chunk.code[5] == OP_RETURN);
+
+    ck_assert(memcmp(AS_CSTRING(func2->chunk.constants.values[0]), "a", 1) == 0);
+    obj_function_t *inner = AS_FUNCTION(func2->chunk.constants.values[1]);
+    ck_assert(inner->chunk.count == 10);
+    ck_assert(inner->chunk.code[0] == OP_GET_LOCAL);
+    ck_assert(inner->chunk.code[2] == OP_GET_LOCAL);
+    ck_assert(inner->chunk.code[4] == OP_ADD);
+    ck_assert(inner->chunk.code[5] == OP_GET_LOCAL);
+    ck_assert(inner->chunk.code[7] == OP_PRINT);
+    ck_assert(inner->chunk.code[8] == OP_NIL);
+    ck_assert(inner->chunk.code[9] == OP_RETURN);
     free_vm();
 
     const char *programs[] = {
@@ -194,10 +181,7 @@ START_TEST(test_compiler)
     };
     for (int p = 0; programs[p] != NULL; p++) {
         init_vm();
-        obj_function_t *program_func = compile(programs[p]);
-        for (int f = 0; f < program_func->chunk.count; f++) {
-            const char *op_str __unused__ = op_code_t_to_str(program_func->chunk.code[f]);
-        }
+        obj_function_t *program_func __unused__ = compile(programs[p]);
         free_vm();
     }
 }
@@ -214,9 +198,38 @@ START_TEST(test_vm)
         "var counter = 0; while (counter < 10) { counter = counter + 1; continue; print \"never reached\";}",
         "class Foo {} class Bar {} var f = Foo(); print(is_instance(f, Foo)); print(is_instance(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\")); has_field(f, 2); is_instance(f, \"not a type\");",
         "is_instance(2, \"not a type\"); is_instance(); has_field(); has_field(2, \"not a type\");",
+
         "print(sys_version());",
-        "class Foo {} var f = Foo(); get_field(f, \"name\"); set_field(f, \"name\", \"foo\"); get_field(f, \"name\");"
-        "set_field(f, 2); get_field(f, 2); set_field(f); get_field(f); set_field(); get_field();",
+
+        "class Foo {} var f = Foo();"
+        "assert(!get_field(f, \"name\"));"
+        "assert(set_field(f, \"name\", \"foo\"));"
+        "assert(get_field(f, \"name\"));"
+        "assert(!set_field(f, 2));"
+        "assert(!get_field(f, 2));"
+        "assert(!set_field(f));"
+        "assert(!get_field(f));"
+        "assert(!set_field());"
+        "assert(!get_field());",
+        "var counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
+
+        "var s1 = 0; var s2 = 0; var s3 = 0;"
+        "fun outer(){"
+            "var x = 100; "
+            "fun middle() { "
+                "fun inner() {"
+                    "s3 = 3;"
+                    "return x + 3;"
+                "}"
+                "s2 = 2;"
+                "x = x + 2;"
+                "return inner;"
+            "}"
+            "s1 = 1;"
+            "x = x + 1;"
+            "return middle;"
+        "} var mid = outer(); var in = mid(); assert(in() == 106); assert(s1 == 1); assert(s2 == 2); assert(s3 == 3);",
+
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
         "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",
@@ -337,8 +350,35 @@ START_TEST(test_vm)
     };
     for (int i = 0; test_cases[i] != NULL; i++) {
         init_vm();
-        ck_assert_msg(interpret(test_cases[i]) == INTERPRET_OK,
-            "test case failed for \"%s\"\n", test_cases[i]);
+        ck_assert_msg(interpret(test_cases[i]) == INTERPRET_OK, "test case failed for \"%s\"\n", test_cases[i]);
+        free_vm();
+    }
+
+
+    const char *exit_ok_tests[] = {
+        "exit;",
+        "exit(0);",
+        "fun finish_and_quit() { print(\"working\"); exit(0); } finish_and_quit();",
+        NULL,
+    };
+    for (int i = 0; exit_ok_tests[i] != NULL; i++) {
+        init_vm();
+        const interpret_result_t rv = interpret(exit_ok_tests[i]);
+        ck_assert_msg(rv == INTERPRET_EXIT_OK, "test case failed for \"%s\"\n", exit_ok_tests[i]);
+        free_vm();
+    }
+
+    const char *exit_tests[] = {
+        "exit(1);",
+        "exit(-1);",
+        "assert(1 == 2);",
+        "fun finish_and_fail() { print(\"working\"); exit(-1); } finish_and_fail();",
+        NULL,
+    };
+    for (int i = 0; exit_tests[i] != NULL; i++) {
+        init_vm();
+        const interpret_result_t rv = interpret(exit_tests[i]);
+        ck_assert_msg(rv == INTERPRET_EXIT, "test case failed for \"%s\"\n", exit_tests[i]);
         free_vm();
     }
 
@@ -363,8 +403,8 @@ START_TEST(test_vm)
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
         init_vm();
-        ck_assert_msg(interpret(compilation_fail_cases[i]) == INTERPRET_COMPILE_ERROR,
-            "Unexpected success for \"%s\"\n", compilation_fail_cases[i]);
+        const interpret_result_t rv = interpret(compilation_fail_cases[i]);
+        ck_assert_msg(rv == INTERPRET_COMPILE_ERROR, "Unexpected success for \"%s\"\n", compilation_fail_cases[i]);
         free_vm();
     }
 
@@ -567,10 +607,12 @@ START_TEST(test_debug)
     }
 }
 
-int main(void)
+int main(const int argc, const char *argv[])
 {
+    const char *suite_name = "clox";
+
     int number_failed;
-    Suite *s = suite_create("clox");
+    Suite *s = suite_create(suite_name);
     SRunner *sr = srunner_create(s);
 
     TCase *tc = tcase_create("chunk");
@@ -609,7 +651,17 @@ int main(void)
     tcase_add_test(tc, test_debug);
     suite_add_tcase(s, tc);
 
-    srunner_run_all(sr, CK_VERBOSE);
+    if (argc > 1) {
+        for (int i = 1; i < argc; i++) {
+            if (suite_tcase(s, argv[i])) {
+                srunner_run(sr, suite_name, argv[i], CK_VERBOSE);
+            } else {
+                fprintf(stderr, "No such test case %s, ignoring.\n", argv[i]);
+            }
+        }
+    } else {
+        srunner_run_all(sr, CK_VERBOSE);
+    }
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);
     return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;

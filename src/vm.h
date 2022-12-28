@@ -31,12 +31,15 @@ typedef struct {
     int gray_count;
     int gray_capacity;
     obj_t **gray_stack;
+    int exit_status;
 } vm_t;
 
 typedef enum {
     INTERPRET_OK,
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
+    INTERPRET_EXIT_OK,
+    INTERPRET_EXIT,
 } interpret_result_t;
 
 extern vm_t vm;

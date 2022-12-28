@@ -62,14 +62,22 @@ static void repl(void)
         }
     }
 
+    int status = EXIT_SUCCESS;
+
     for (;;) {
         char *line = readline(CLOX_PROMPT);
         if (line != NULL) {
             if (line && *line)
                 add_history(line);
-            interpret(line);
+            const interpret_result_t rv = interpret(line);
             printf("\n");
             free(line);
+            if (rv == INTERPRET_EXIT) {
+                status = vm.exit_status;
+                break;
+            } else if (rv == INTERPRET_EXIT_OK) {
+                break;
+            }
         } else {
             break;
         }
@@ -79,6 +87,7 @@ static void repl(void)
             perror(gettext("Failed to write history file"));
         }
     }
+    exit(status);
 }
 
 static char *read_file(const char *file_path)
@@ -86,23 +95,23 @@ static char *read_file(const char *file_path)
     FILE *f = fopen(file_path, "rb");
     if (f == NULL) {
         fprintf(stderr, "Could not read source file \"%s\".\n", file_path);
-        exit(74);
+        exit(EXIT_FAILURE);
     }
     if (fseek(f, 0L, SEEK_END) == -1) {
         perror(file_path);
-        exit(74);
+        exit(EXIT_FAILURE);
     }
     const size_t fsize = ftell(f);
     char *buffer = malloc(sizeof *buffer * fsize);
     if (buffer == NULL) {
         fprintf(stderr, "Could not allocate buffer to read \"%s\".\n", file_path);
-        exit(74);
+        exit(EXIT_FAILURE);
     }
     rewind(f);
     const size_t b_read = fread(buffer, sizeof(char), fsize, f);
     if (b_read < fsize) {
         fprintf(stderr, "Could not read all of \"%s\" (expected %ld, got %ld).\n", file_path, fsize, b_read);
-        exit(74);
+        exit(EXIT_FAILURE);
     }
     buffer[fsize - 1] = '\0';
     fclose(f);
@@ -114,8 +123,14 @@ static void run_file(const char *file_path)
     char *source = read_file(file_path);
     interpret_result_t r = interpret(source);
     free(source);
-    if (r == INTERPRET_COMPILE_ERROR) exit(65);
-    if (r == INTERPRET_RUNTIME_ERROR) exit(70);
+    switch (r) {
+        case INTERPRET_OK:
+        case INTERPRET_EXIT_OK:
+            exit(EXIT_SUCCESS);
+            break;
+        default:
+            exit(EXIT_FAILURE);
+    }
 }
 
 int main(const int argc, const char *argv[])
