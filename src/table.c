@@ -24,7 +24,7 @@ void free_table_t(table_t *table)
 
 static entry_t *find_entry(entry_t *entries, const int capacity, const obj_string_t *key)
 {
-    uint32_t index = key->hash % capacity;
+    uint32_t index = key->hash & (capacity - 1);
     entry_t *tombstone = NULL;
 
     for (;;) {
@@ -40,7 +40,7 @@ static entry_t *find_entry(entry_t *entries, const int capacity, const obj_strin
         } else if (entry->key == key) {
             return entry;
         }
-        index = (index + 1) % capacity;
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -129,7 +129,7 @@ obj_string_t *find_string_table_t(const table_t *table, const char *chars, const
     if (table->count == 0)
         return NULL;
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         entry_t *entry = &table->entries[index];
 
@@ -142,7 +142,7 @@ obj_string_t *find_string_table_t(const table_t *table, const char *chars, const
             return entry->key;
         }
 
-        index = (index + 1) % table->capacity;
+        index = (index + 1) & (table->capacity - 1);
     }
 }
 

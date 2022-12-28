@@ -20,7 +20,9 @@ START_TEST(test_chunk)
     write_chunk(&chunk, (uint8_t)((index >> 8) & 0xff), line);
     write_chunk(&chunk, (uint8_t)((index >> 16) & 0xff), line);
 
+    #ifndef NAN_BOXING
     add_constant(&chunk, (value_t){.type=VAL_NUMBER, .as={.number=9}});
+    #endif
 
     /*
     int rline = get_line(&chunk, 2);
@@ -156,6 +158,7 @@ START_TEST(test_compiler)
         const char *op_str __unused__ = op_code_t_to_str(func1->chunk.code[i]);
     }
 
+    #ifndef NAN_BOXING
     ck_assert(func1->chunk.constants.count == 4); // v, 27, 1, 2
     ck_assert(memcmp(AS_CSTRING(func1->chunk.constants.values[0]), "v", 1) == 0);
     ck_assert(func1->chunk.constants.values[1].type == VAL_NUMBER);
@@ -164,6 +167,7 @@ START_TEST(test_compiler)
     ck_assert(AS_NUMBER(func1->chunk.constants.values[2]) == 1);
     ck_assert(func1->chunk.constants.values[3].type == VAL_NUMBER);
     ck_assert(AS_NUMBER(func1->chunk.constants.values[3]) == 2);
+    #endif
 
     free_vm();
 
@@ -414,29 +418,26 @@ START_TEST(test_value)
 {
     init_vm();
 
-    ck_assert(hash_value(BOOL_VAL(true)) == 3);
-    ck_assert(hash_value(BOOL_VAL(false)) == 5);
-    ck_assert(hash_value(NIL_VAL) == 7);
-    ck_assert(hash_value(EMPTY_VAL) == 0);
-    ck_assert(hash_value(NUMBER_VAL(9)) == 1076101120);
-
+    #ifndef NAN_BOXING
     value_type_t_to_str(VAL_BOOL);
     value_type_t_to_str(VAL_NIL);
     value_type_t_to_str(VAL_NUMBER);
     value_type_t_to_str(VAL_OBJ);
     value_type_t_to_str(VAL_EMPTY);
+    #endif
 
     ck_assert(values_equal(NUMBER_VAL(100), NUMBER_VAL(100)));
     ck_assert(!values_equal(NUMBER_VAL(100), NUMBER_VAL(200)));
     ck_assert(values_equal(BOOL_VAL(true), BOOL_VAL(true)));
     ck_assert(!values_equal(BOOL_VAL(true), BOOL_VAL(false)));
     ck_assert(values_equal(NIL_VAL, NIL_VAL));
+    #ifndef NAN_BOXING
     ck_assert(values_equal(EMPTY_VAL, EMPTY_VAL));
+    #endif
 
     value_t o = OBJ_VAL(copy_string("test_value", 10));
     push(OBJ_VAL(&o));
     ck_assert(values_equal(o, o));
-    ck_assert(hash_value(o));
     pop();
 
     value_array_t a;
@@ -444,7 +445,9 @@ START_TEST(test_value)
     write_value_array_t(&a, NUMBER_VAL(9));
     write_value_array_t(&a, BOOL_VAL(false));
     write_value_array_t(&a, NIL_VAL);
+    #ifndef NAN_BOXING
     write_value_array_t(&a, EMPTY_VAL);
+    #endif
     for (int i = 0; i < a.count; i++) {
         print_value(a.values[i]);
     }

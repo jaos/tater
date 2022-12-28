@@ -13,6 +13,8 @@
     #define __unused__ __attribute__((unused))
 #endif
 
+#define NAN_BOXING
+
 #ifndef DEBUG
 #define DEBUG_LOGGER(fmt, ...)  ((void)0)
 #else
@@ -20,7 +22,7 @@
 
 // #define DEBUG_STRESS_GC
 // #define DEBUG_LOG_GC
-#define DEBUG_TRACE_EXECUTION
+//#define DEBUG_TRACE_EXECUTION
 
 #endif
 
