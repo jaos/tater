@@ -208,10 +208,6 @@ const char *op_code_t_to_str(const op_code_t op)
 
 const char *value_type_t_to_str(const value_type_t type)
 {
-    #ifdef NAN_BOXING
-    (void)type;
-    return "UNKNOWN";
-    #else
     switch (type) {
         case VAL_BOOL: return "VAL_BOOL";
         case VAL_NIL: return "VAL_NIL";
@@ -220,7 +216,6 @@ const char *value_type_t_to_str(const value_type_t type)
         case VAL_EMPTY: return "VAL_EMPTY";
         default: return NULL;
     }
-    #endif
 }
 
 const char *token_type_t_to_str(const token_type_t type)
