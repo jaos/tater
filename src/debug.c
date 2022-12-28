@@ -6,11 +6,11 @@
 #include "compiler.h"
 #include "scanner.h"
 
-void disassemble_chunk(const chunk_t *chunk, const char *name)
+void chunk_t_disassemble(const chunk_t *chunk, const char *name)
 {
     printf(gettext("== start %s ==\n"), name);
     for (int offset = 0; offset < chunk->count;) {
-        offset = disassemble_instruction(chunk, offset);
+        offset = chunk_t_disassemble_instruction(chunk, offset);
     }
     printf(gettext("==   end %s ==\n"), name);
 }
@@ -21,7 +21,7 @@ static int constant_instruction(const char *name, const chunk_t *chunk, const in
     const uint8_t constant = chunk->code[offset + 1];
     printf("%-16s %4d '", name, constant);
     assert(chunk->constants.count >= constant);
-    print_value(chunk->constants.values[constant]);
+    value_t_print(chunk->constants.values[constant]);
     printf("'\n");
     return offset + 2;
 }
@@ -69,29 +69,21 @@ static int long_constant_instruction(const char *name, const chunk_t *chunk, con
         (chunk->code[offset + 2] << 8) |
         (chunk->code[offset + 3] << 16);
     printf("%-16s %4d '", name, constant);
-    print_value(chunk->constants.values[constant]);
+    value_t_print(chunk->constants.values[constant]);
     printf("'\n");
     return offset + 4;
 }
 
-int disassemble_instruction(const chunk_t *chunk, int offset)
+int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
 {
     printf("%04d ", offset);
 
-    if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+    int line = chunk_t_get_line(chunk, offset);
+    if (offset > 0 && line == chunk_t_get_line(chunk, offset - 1)) {
         printf("     | ");
-    } else {
-        printf("%4d ", chunk->lines[offset]);
-    }
-
-    /* line_info_t/get_line hack
-    const int line = get_line(chunk, offset);
-    if (offset > 0 && line == get_line(chunk, offset - 1)) {
-        printf("   | ");
     } else {
         printf("%4d ", line);
     }
-    */
 
     uint8_t instruction = chunk->code[offset];
     switch (instruction) {
@@ -130,15 +122,14 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
             offset++;
             uint8_t constant = chunk->code[offset++];
             printf("%-16s %4d ", "OP_CLOSURE", constant);
-            print_value(chunk->constants.values[constant]);
+            value_t_print(chunk->constants.values[constant]);
             printf("\n");
 
             obj_function_t *function = AS_FUNCTION(chunk->constants.values[constant]);
             for (int j = 0; j < function->upvalue_count; j++) {
                 int is_local = chunk->code[offset++];
                 int index = chunk->code[offset++];
-                printf("%04d            |                                         %s %d\n",
-                    offset - 2, is_local ? "local" : "upvalue", index);
+                printf("%04d      |                     %s %d\n", offset - 2, is_local ? "local" : "upvalue", index);
             }
             return offset;
         }
@@ -149,7 +140,6 @@ int disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
         case OP_INHERIT: return simple_instruction("OP_INHERIT", offset);
         case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
-        // not in lox
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
         case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
         case OP_DUP: return simple_instruction("OP_DUP", offset);
@@ -202,7 +192,6 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_CLASS: return "OP_CLASS";
         case OP_INHERIT: return "OP_INHERIT";
         case OP_METHOD: return "OP_METHOD";
-        // not in lox
         case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG";
         case OP_POPN: return "OP_POPN";
         case OP_DUP: return "OP_DUP";

@@ -101,7 +101,7 @@ typedef struct {
     int line;
 } token_t;
 
-void init_scanner(const char *source);
-token_t scan_token(void);
+void scanner_t_init(const char *source);
+token_t scanner_t_scan_token(void);
 
 #endif

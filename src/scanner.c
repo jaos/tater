@@ -12,7 +12,7 @@ typedef struct {
 
 static scanner_t scanner;
 
-void init_scanner(const char *source)
+void scanner_t_init(const char *source)
 {
     scanner.start = source;
     scanner.current = source;
@@ -233,7 +233,7 @@ static token_t identifier(void)
     return make_token(identifier_type());
 }
 
-token_t scan_token(void)
+token_t scanner_t_scan_token(void)
 {
     skip_whitespace();
     scanner.start = scanner.current;

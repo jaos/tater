@@ -50,11 +50,11 @@ typedef struct {
     value_t *values;
 } value_array_t;
 
-bool values_equal(const value_t a, const value_t b);
-void init_value_array_t(value_array_t *array);
-void write_value_array_t(value_array_t *array, const value_t value);
-void free_value_array_t(value_array_t *array);
-void print_value(const value_t value);
-uint32_t hash_value(const value_t value);
+bool value_t_equal(const value_t a, const value_t b);
+void value_array_t_init(value_array_t *array);
+void value_array_t_add(value_array_t *array, const value_t value);
+void value_array_t_free(value_array_t *array);
+void value_t_print(const value_t value);
+uint32_t value_t_hash(const value_t value);
 
 #endif

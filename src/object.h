@@ -59,7 +59,6 @@ struct obj_string_t {
     obj_t obj;
     int length;
     uint32_t hash;
-    // char chars[]; // FAM
     char *chars;
 };
 
@@ -91,22 +90,21 @@ typedef struct {
 
 typedef struct {
     obj_t obj;
-    value_t receiver;
+    value_t receiving_instance;
     obj_closure_t *method;
 } obj_bound_method_t;
 
-obj_bound_method_t *new_obj_bound_method_t(value_t receiver, obj_closure_t *method);
-obj_function_t *new_obj_function_t(void);
-obj_native_t *new_obj_native_t(native_fn_t function);
-obj_closure_t *new_obj_closure_t(obj_function_t *function);
-obj_upvalue_t *new_obj_upvalue_t(value_t *slot);
-obj_class_t *new_obj_class_t(obj_string_t *name);
-obj_instance_t *new_obj_instance_t(obj_class_t *cls);
+obj_bound_method_t *obj_bound_method_t_allocate(value_t receiving_instance, obj_closure_t *method);
+obj_function_t *obj_function_t_allocate(void);
+obj_native_t *obj_native_t_allocate(native_fn_t function);
+obj_closure_t *obj_closure_t_allocate(obj_function_t *function);
+obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot);
+obj_class_t *obj_class_t_allocate(obj_string_t *name);
+obj_instance_t *obj_instance_t_allocate(obj_class_t *cls);
 
-obj_string_t *take_string(char *chars, const int length);
-obj_string_t *copy_string(const char *chars, const int length);
-//FAM obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b);
-void print_object(const value_t value);
+obj_string_t *obj_string_t_copy_own(char *chars, const int length);
+obj_string_t *obj_string_t_copy_from(const char *chars, const int length);
+void obj_t_print(const value_t value);
 
 static inline bool is_obj_type(const value_t value, const obj_type_t type)
 {

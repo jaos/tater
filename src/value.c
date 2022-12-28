@@ -6,7 +6,7 @@
 #include "object.h"
 #include "value.h"
 
-bool values_equal(const value_t a, const value_t b)
+bool value_t_equal(const value_t a, const value_t b)
 {
     if (a.type != b.type) return false;
     switch (a.type) {
@@ -30,7 +30,7 @@ static uint32_t hash_double(const double value)
     return cast.ints[0] + cast.ints[1];
 }
 
-uint32_t hash_value(const value_t value)
+uint32_t value_t_hash(const value_t value)
 {
     switch (value.type) {
         case VAL_BOOL: return AS_BOOL(value) ? 3 : 5; // arbitrary hash values
@@ -42,14 +42,14 @@ uint32_t hash_value(const value_t value)
     }
 }
 
-void init_value_array_t(value_array_t *array)
+void value_array_t_init(value_array_t *array)
 {
     array->values = NULL;
     array->capacity = 0;
     array->count = 0;
 }
 
-void write_value_array_t(value_array_t *array, const value_t value)
+void value_array_t_add(value_array_t *array, const value_t value)
 {
     if (array->capacity < array->count + 1) {
         int old_capacity = array->capacity;
@@ -61,19 +61,19 @@ void write_value_array_t(value_array_t *array, const value_t value)
     array->count++;
 }
 
-void free_value_array_t(value_array_t *array)
+void value_array_t_free(value_array_t *array)
 {
     FREE_ARRAY(value_t, array->values, array->capacity);
-    init_value_array_t(array);
+    value_array_t_init(array);
 }
 
-void print_value(const value_t value)
+void value_t_print(const value_t value)
 {
     switch (value.type) {
         case VAL_BOOL: printf(AS_BOOL(value) ? "true" : "false"); break;
         case VAL_NIL: printf("nil"); break;
         case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
-        case VAL_OBJ: print_object(value); break;
+        case VAL_OBJ: obj_t_print(value); break;
         case VAL_EMPTY: printf("<empty>"); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }

@@ -37,7 +37,7 @@ void *reallocate(void *pointer, const size_t old_size __unused__, const size_t n
     return result;
 }
 
-void mark_object(obj_t *obj)
+void obj_t_mark(obj_t *obj)
 {
     if (obj == NULL)
         return;
@@ -46,7 +46,7 @@ void mark_object(obj_t *obj)
 
     #ifdef DEBUG_LOG_GC
     printf("%p mark ", (void*)obj);
-    print_value(OBJ_VAL(obj));
+    value_t_print(OBJ_VAL(obj));
     printf("\n");
     #endif
 
@@ -64,16 +64,16 @@ void mark_object(obj_t *obj)
     vm.gray_stack[vm.gray_count++] = obj;
 }
 
-void mark_value(value_t value)
+void value_t_mark(value_t value)
 {
     if (IS_OBJ(value))
-        mark_object(AS_OBJ(value));
+        obj_t_mark(AS_OBJ(value));
 }
 
 static void mark_array(value_array_t *array)
 {
     for (int i = 0; i < array->count; i++) {
-        mark_value(array->values[i]);
+        value_t_mark(array->values[i]);
     }
 }
 
@@ -81,44 +81,44 @@ static void blacken_object(obj_t *object)
 {
     #ifdef DEBUG_LOG_GC
     printf("%p blacken ", (void*)object);
-    print_value(OBJ_VAL(object));
+    value_t_print(OBJ_VAL(object));
     printf("\n");
     #endif
 
     switch (object->type) {
         case OBJ_BOUND_METHOD: {
             obj_bound_method_t *bound_method = (obj_bound_method_t*)object;
-            mark_value(bound_method->receiver); // should be an obj_instance_t that is already marked... but insurance here
-            mark_object((obj_t*)bound_method->method);
+            value_t_mark(bound_method->receiving_instance); // should be an obj_instance_t that is already marked... but insurance here
+            obj_t_mark((obj_t*)bound_method->method);
             break;
         }
         case OBJ_CLASS: {
             obj_class_t *cls = (obj_class_t*)object;
-            mark_object((obj_t*)cls->name);
-            mark_table(&cls->methods);
+            obj_t_mark((obj_t*)cls->name);
+            table_t_mark(&cls->methods);
             break;
         }
         case OBJ_CLOSURE: {
             obj_closure_t *closure = (obj_closure_t*)object;
-            mark_object((obj_t*)closure->function);
+            obj_t_mark((obj_t*)closure->function);
             for (int i = 0; i < closure->upvalue_count; i++) {
-                mark_object((obj_t*)closure->upvalues[i]);
+                obj_t_mark((obj_t*)closure->upvalues[i]);
             }
             break;
         }
         case OBJ_FUNCTION: {
             obj_function_t *function = (obj_function_t*)object;
-            mark_object((obj_t*)function->name);
+            obj_t_mark((obj_t*)function->name);
             mark_array(&function->chunk.constants);
             break;
         }
         case OBJ_INSTANCE: {
             obj_instance_t *instance = (obj_instance_t*)object;
-            mark_object((obj_t*)instance->cls);
-            mark_table(&instance->fields);
+            obj_t_mark((obj_t*)instance->cls);
+            table_t_mark(&instance->fields);
             break;
         }
-        case OBJ_UPVALUE: mark_value(((obj_upvalue_t*)object)->closed); break;
+        case OBJ_UPVALUE: value_t_mark(((obj_upvalue_t*)object)->closed); break;
         case OBJ_NATIVE:
         case OBJ_STRING:
             break;
@@ -138,7 +138,7 @@ static void free_object(obj_t *o)
         }
         case OBJ_CLASS: {
             obj_class_t *cls = (obj_class_t*)o;
-            free_table_t(&cls->methods);
+            table_t_free(&cls->methods);
             FREE(obj_class_t, o); // TODO obj_string_t ?
             break;
         }
@@ -151,13 +151,13 @@ static void free_object(obj_t *o)
         }
         case OBJ_FUNCTION: {
             obj_function_t *function = (obj_function_t*)o;
-            free_chunk(&function->chunk);
+            chunk_t_free(&function->chunk);
             FREE(obj_function_t, o);
             break;
         }
         case OBJ_INSTANCE: {
             obj_instance_t *instance = (obj_instance_t*)o;
-            free_table_t(&instance->fields);
+            table_t_free(&instance->fields);
             FREE(obj_instance_t, o);
             break;
         }
@@ -183,20 +183,20 @@ static void free_object(obj_t *o)
 static void mark_roots(void)
 {
     for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
-        mark_value(*slot);
+        value_t_mark(*slot);
     }
 
     for (int i =0; i < vm.frame_count; i++) {
-        mark_object((obj_t*)vm.frames[i].closure);
+        obj_t_mark((obj_t*)vm.frames[i].closure);
     }
 
     for (obj_upvalue_t *upvalue = vm.open_upvalues; upvalue != NULL; upvalue = upvalue->next) {
-        mark_object((obj_t*)upvalue);
+        obj_t_mark((obj_t*)upvalue);
     }
 
-    mark_table(&vm.globals);
-    mark_compiler_roots();
-    mark_object((obj_t*)vm.init_string);
+    table_t_mark(&vm.globals);
+    compiler_t_mark_roots();
+    obj_t_mark((obj_t*)vm.init_string);
 }
 
 static void trace_references(void)
@@ -242,7 +242,7 @@ void collect_garbage(void)
 
     mark_roots();
     trace_references();
-    table_remove_white(&vm.strings);
+    table_t_remove_white(&vm.strings);
     sweep();
 
     vm.next_garbage_collect = vm.bytes_allocated * GC_HEAP_GROW_FACTOR;

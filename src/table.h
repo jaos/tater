@@ -15,14 +15,14 @@ typedef struct {
     entry_t *entries;
 } table_t;
 
-void init_table_t(table_t *table);
-void free_table_t(table_t *table);
-bool set_table_t(table_t *table, obj_string_t *key, const value_t value);
-bool get_table_t(table_t *table, const obj_string_t *key, value_t *value);
-bool delete_table_t(table_t *table, const obj_string_t *key);
-obj_string_t *find_string_table_t(const table_t *table, const char *chars, const int length, const uint32_t hash);
-void table_remove_white(table_t *table);
-void mark_table(table_t *table);
-void add_all_table_t(const table_t *from, table_t *to);
+void table_t_init(table_t *table);
+void table_t_free(table_t *table);
+bool table_t_set(table_t *table, obj_string_t *key, const value_t value);
+bool table_t_get(table_t *table, const obj_string_t *key, value_t *value);
+bool table_t_delete(table_t *table, const obj_string_t *key);
+obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, const int length, const uint32_t hash);
+void table_t_remove_white(table_t *table);
+void table_t_mark(table_t *table);
+void table_t_copy_to(const table_t *from, table_t *to);
 
 #endif

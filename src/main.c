@@ -69,7 +69,7 @@ static void repl(void)
         if (line != NULL) {
             if (line && *line)
                 add_history(line);
-            const interpret_result_t rv = interpret(line);
+            const vm_t_interpret_result_t rv = vm_t_interpret(line);
             printf("\n");
             free(line);
             if (rv == INTERPRET_EXIT) {
@@ -121,7 +121,7 @@ static char *read_file(const char *file_path)
 static void run_file(const char *file_path)
 {
     char *source = read_file(file_path);
-    interpret_result_t r = interpret(source);
+    vm_t_interpret_result_t r = vm_t_interpret(source);
     free(source);
     switch (r) {
         case INTERPRET_OK:
@@ -135,7 +135,7 @@ static void run_file(const char *file_path)
 
 int main(const int argc, const char *argv[])
 {
-    init_vm();
+    vm_t_init();
 
     if (argc == 1) {
         repl();
@@ -144,6 +144,6 @@ int main(const int argc, const char *argv[])
     } else {
         fprintf(stderr, "Usage: %s [path]\n", argv[0]);
     }
-    free_vm();
+    vm_t_free();
     return 0;
 }

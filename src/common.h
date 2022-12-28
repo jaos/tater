@@ -20,7 +20,7 @@
 
 // #define DEBUG_STRESS_GC
 // #define DEBUG_LOG_GC
-#define DEBUG_TRACE_EXECUTION
+// #define DEBUG_TRACE_EXECUTION
 
 #endif
 

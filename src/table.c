@@ -9,17 +9,17 @@
 
 #define TABLE_MAX_LOAD 0.75
 
-void init_table_t(table_t *table)
+void table_t_init(table_t *table)
 {
     table->count = 0;
     table->capacity = 0;
     table->entries = NULL;
 }
 
-void free_table_t(table_t *table)
+void table_t_free(table_t *table)
 {
     FREE_ARRAY(entry_t, table->entries, table->capacity);
-    init_table_t(table);
+    table_t_init(table);
 }
 
 static entry_t *find_entry(entry_t *entries, const int capacity, const obj_string_t *key)
@@ -44,7 +44,7 @@ static entry_t *find_entry(entry_t *entries, const int capacity, const obj_strin
     }
 }
 
-bool get_table_t(table_t *table, const obj_string_t *key, value_t *value)
+bool table_t_get(table_t *table, const obj_string_t *key, value_t *value)
 {
     if (table->count == 0)
         return false;
@@ -82,7 +82,7 @@ static void adjust_capacity(table_t *table, const int capacity)
     table->capacity = capacity;
 }
 
-bool set_table_t(table_t *table, obj_string_t *key, const value_t value)
+bool table_t_set(table_t *table, obj_string_t *key, const value_t value)
 {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         const int capacity = GROW_CAPACITY(table->capacity);
@@ -99,7 +99,7 @@ bool set_table_t(table_t *table, obj_string_t *key, const value_t value)
     return is_new_key;
 }
 
-bool delete_table_t(table_t *table, const obj_string_t *key)
+bool table_t_delete(table_t *table, const obj_string_t *key)
 {
     if (table->count == 0)
         return false;
@@ -114,17 +114,17 @@ bool delete_table_t(table_t *table, const obj_string_t *key)
     return true;
 }
 
-void add_all_table_t(const table_t *from, table_t *to)
+void table_t_copy_to(const table_t *from, table_t *to)
 {
     for (int i = 0; i < from->capacity; i++) {
         const entry_t *entry = &from->entries[i];
         if (entry->key != NULL) {
-            set_table_t(to, entry->key, entry->value);
+            table_t_set(to, entry->key, entry->value);
         }
     }
 }
 
-obj_string_t *find_string_table_t(const table_t *table, const char *chars, const int length, const uint32_t hash)
+obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, const int length, const uint32_t hash)
 {
     if (table->count == 0)
         return NULL;
@@ -146,21 +146,21 @@ obj_string_t *find_string_table_t(const table_t *table, const char *chars, const
     }
 }
 
-void table_remove_white(table_t *table)
+void table_t_remove_white(table_t *table)
 {
     for (int i = 0; i < table->capacity; i++) {
         entry_t *entry = &table->entries[i];
         if (entry->key != NULL && !entry->key->obj.is_marked) {
-            delete_table_t(table, entry->key);
+            table_t_delete(table, entry->key);
         }
     }
 }
 
-void mark_table(table_t *table)
+void table_t_mark(table_t *table)
 {
     for (int i = 0; i < table->capacity; i++) {
         entry_t *entry = &table->entries[i];
-        mark_object((obj_t*)entry->key);
-        mark_value(entry->value);
+        obj_t_mark((obj_t*)entry->key);
+        value_t_mark(entry->value);
     }
 }

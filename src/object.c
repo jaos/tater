@@ -24,31 +24,31 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type)
     return object;
 }
 
-obj_bound_method_t *new_obj_bound_method_t(value_t receiver, obj_closure_t *method)
+obj_bound_method_t *obj_bound_method_t_allocate(value_t receiving_instance, obj_closure_t *method)
 {
     obj_bound_method_t *bound_method = ALLOCATE_OBJ(obj_bound_method_t, OBJ_BOUND_METHOD);
-    bound_method->receiver = receiver;
+    bound_method->receiving_instance = receiving_instance;
     bound_method->method = method;
     return bound_method;
 }
 
-obj_class_t *new_obj_class_t(obj_string_t *name)
+obj_class_t *obj_class_t_allocate(obj_string_t *name)
 {
     obj_class_t *cls = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
     cls->name = name;
-    init_table_t(&cls->methods);
+    table_t_init(&cls->methods);
     return cls;
 }
 
-obj_instance_t *new_obj_instance_t(obj_class_t *cls)
+obj_instance_t *obj_instance_t_allocate(obj_class_t *cls)
 {
     obj_instance_t *instance = ALLOCATE_OBJ(obj_instance_t, OBJ_INSTANCE);
     instance->cls = cls;
-    init_table_t(&instance->fields);
+    table_t_init(&instance->fields);
     return instance;
 }
 
-obj_closure_t *new_obj_closure_t(obj_function_t *function)
+obj_closure_t *obj_closure_t_allocate(obj_function_t *function)
 {
     obj_upvalue_t **upvalues = ALLOCATE(obj_upvalue_t*, function->upvalue_count);
     for (int i = 0; i < function->upvalue_count; i++) {
@@ -61,32 +61,22 @@ obj_closure_t *new_obj_closure_t(obj_function_t *function)
     return closure;
 }
 
-obj_function_t *new_obj_function_t(void)
+obj_function_t *obj_function_t_allocate(void)
 {
     obj_function_t *function = ALLOCATE_OBJ(obj_function_t, OBJ_FUNCTION);
     function->arity = 0;
     function->upvalue_count = 0;
     function->name = NULL;
-    init_chunk(&function->chunk);
+    chunk_t_init(&function->chunk);
     return function;
 }
 
-obj_native_t *new_obj_native_t(native_fn_t function)
+obj_native_t *obj_native_t_allocate(native_fn_t function)
 {
     obj_native_t *native = ALLOCATE_OBJ(obj_native_t, OBJ_NATIVE);
     native->function = function;
     return native;
 }
-
-/* FAM
-static obj_string_t *make_string(const int length)
-{
-    obj_string_t *str = (obj_string_t *)allocate_object(sizeof(obj_string_t) + length + 1, OBJ_STRING);
-    str->length = length;
-    str->hash = 0;
-    return str;
-}
-*/
 
 static obj_string_t *allocate_string(char *chars, const int length, const uint32_t hash) {
     obj_string_t *string = ALLOCATE_OBJ(obj_string_t, OBJ_STRING);
@@ -94,9 +84,9 @@ static obj_string_t *allocate_string(char *chars, const int length, const uint32
     string->chars = chars;
     string->hash = hash;
 
-    push(OBJ_VAL(string));
-    set_table_t(&vm.strings, string, NIL_VAL);
-    pop();
+    vm_push(OBJ_VAL(string));
+    table_t_set(&vm.strings, string, NIL_VAL);
+    vm_pop();
 
     return string;
 }
@@ -111,10 +101,10 @@ static uint32_t hash_string(const char *key, const int length)
     return hash;
 }
 
-obj_string_t *take_string(char *chars, const int length)
+obj_string_t *obj_string_t_copy_own(char *chars, const int length)
 {
     const uint32_t hash = hash_string(chars, length);
-    obj_string_t *interned = find_string_table_t(&vm.strings, chars, length, hash);
+    obj_string_t *interned = table_t_find_key_by_str(&vm.strings, chars, length, hash);
     if (interned != NULL) {
         FREE_ARRAY(char, chars, length + 1);
         return interned;
@@ -123,10 +113,10 @@ obj_string_t *take_string(char *chars, const int length)
     return allocate_string(chars, length, hash);
 }
 
-obj_string_t *copy_string(const char *chars, const int length)
+obj_string_t *obj_string_t_copy_from(const char *chars, const int length)
 {
     const uint32_t hash = hash_string(chars, length);
-    obj_string_t *interned = find_string_table_t(&vm.strings, chars, length, hash);
+    obj_string_t *interned = table_t_find_key_by_str(&vm.strings, chars, length, hash);
     if (interned != NULL) {
         return interned;
     }
@@ -135,45 +125,9 @@ obj_string_t *copy_string(const char *chars, const int length)
     memcpy(str, chars, length);
     str[length] = '\0';
     return allocate_string(str, length, hash);
-
-    /* FAM
-    obj_string_t *str = make_string(length);
-    memcpy(str->chars, chars, length);
-    str->chars[length] = '\0';
-    str->hash = hash;
-    push(OBJ_VAL(str)); // make GC happy
-    set_table_t(&vm.strings, str, NIL_VAL);
-    pop(); // make GC happy
-    return str;
-    */
 }
 
-/* FAM
-obj_string_t *concatenate_string(const obj_string_t *a, const obj_string_t *b)
-{
-    const int length = a->length + b->length;
-    obj_string_t *str = make_string(length);
-    push(OBJ_VAL(str)); // make GC happy
-
-    memcpy(str->chars, a->chars, a->length);
-    memcpy(str->chars + a->length, b->chars, b->length);
-    str->chars[length] = '\0';
-    str->hash = hash_string(str->chars, length);
-
-    obj_string_t *interned = find_string_table_t(&vm.strings, str->chars, length, str->hash);
-    if (interned != NULL) {
-        pop();
-        FREE(obj_string_t, str);
-        return interned;
-    }
-
-    set_table_t(&vm.strings, str, NIL_VAL);
-    pop();
-    return str;
-}
-*/
-
-obj_upvalue_t *new_obj_upvalue_t(value_t *slot)
+obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot)
 {
     obj_upvalue_t *upvalue = ALLOCATE_OBJ(obj_upvalue_t, OBJ_UPVALUE);
     upvalue->location = slot;
@@ -191,7 +145,7 @@ static void print_function(const obj_function_t *function)
     }
 }
 
-void print_object(const value_t value)
+void obj_t_print(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_METHOD: print_function(AS_BOUND_METHOD(value)->method->function); break;
@@ -204,7 +158,7 @@ void print_object(const value_t value)
         case OBJ_UPVALUE: printf("<upvalue>"); break;
         default: {
             DEBUG_LOGGER("Unhandled default for object type %d (%p)\n", OBJ_TYPE(value), (void *)&value);
-            //exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE);
         }
     }
 }

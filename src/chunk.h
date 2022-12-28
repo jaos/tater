@@ -59,18 +59,15 @@ typedef struct {
     int capacity;
     uint8_t *code;
     value_array_t constants;
-    int *lines;
-    /*
     int line_count;
     int line_capacity;
     line_info_t *lines;
-    */
 } chunk_t;
 
-void init_chunk(chunk_t *chunk);
-void free_chunk(chunk_t *chunk);
-void write_chunk(chunk_t *chunk, const uint8_t byte, const int line);
-int add_constant(chunk_t *chunk, const value_t value);
-// int get_line(const chunk_t *chunk, const int instruction);
+void chunk_t_init(chunk_t *chunk);
+void chunk_t_free(chunk_t *chunk);
+void chunk_t_write(chunk_t *chunk, const uint8_t byte, const int line);
+int chunk_t_add_constant(chunk_t *chunk, const value_t value);
+int chunk_t_get_line(const chunk_t *chunk, const int instruction);
 
 #endif

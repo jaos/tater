@@ -40,15 +40,15 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR,
     INTERPRET_EXIT_OK,
     INTERPRET_EXIT,
-} interpret_result_t;
+} vm_t_interpret_result_t;
 
 extern vm_t vm;
 
-void init_vm(void);
-void free_vm(void);
-interpret_result_t interpret(const char *source);
-void push(const value_t value);
-value_t pop(void);
-void define_native(const char *name, const native_fn_t function);
+void vm_t_init(void);
+void vm_t_free(void);
+vm_t_interpret_result_t vm_t_interpret(const char *source);
+void vm_push(const value_t value);
+value_t vm_pop(void);
+void vm_define_native(const char *name, const native_fn_t function);
 
 #endif

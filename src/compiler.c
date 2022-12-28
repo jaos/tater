@@ -69,6 +69,7 @@ typedef struct compiler {
     int local_count;
     upvalue_t upvalues[UINT8_COUNT];
     int scope_depth;
+    table_t string_constants;
 } compiler_t;
 
 typedef struct class_compiler {
@@ -77,7 +78,6 @@ typedef struct class_compiler {
 } class_compiler_t;
 
 static parser_t parser;
-// static table_t string_constants; // chapter 21 challenge
 static compiler_t *current = NULL;
 static class_compiler_t *current_class = NULL;
 static int compiler_count = 0;
@@ -122,7 +122,7 @@ static void advance(void)
 {
     parser.previous = parser.current;
     for (;;) {
-        parser.current = scan_token();
+        parser.current = scanner_t_scan_token();
         if (parser.current.type != TOKEN_ERROR) break;
         error_at_current(parser.current.start);
     }
@@ -152,7 +152,7 @@ static bool match(const token_type_t type)
 
 static void emit_byte(const uint8_t byte)
 {
-    write_chunk(current_chunk(), byte, parser.previous.line);
+    chunk_t_write(current_chunk(), byte, parser.previous.line);
 }
 
 static void emit_bytes(const uint8_t byte1, const uint8_t byte2)
@@ -193,7 +193,7 @@ static void emit_return(void)
 
 static uint8_t make_constant(const value_t value)
 {
-    const int constant = add_constant(current_chunk(), value);
+    const int constant = chunk_t_add_constant(current_chunk(), value);
     if (constant > UINT8_MAX) {
         error(gettext("Too many constants in one chunk.")); // See OP_CONSTANT_LONG to fix
         return 0;
@@ -216,7 +216,7 @@ static void patch_jump(const int offset)
     current_chunk()->code[offset + 1] = jump & 0xff;
 }
 
-static void init_compiler(compiler_t *compiler, const function_type_t type)
+static void compiler_t_init(compiler_t *compiler, const function_type_t type)
 {
     if (compiler_count >= MAX_COMPILERS) {
         fprintf(stderr, gettext("Too many compilers."));
@@ -228,11 +228,13 @@ static void init_compiler(compiler_t *compiler, const function_type_t type)
     compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
-    compiler->function = new_obj_function_t();
+    compiler->function = obj_function_t_allocate();
+    table_t_init(&compiler->string_constants);
+
     current = compiler;
 
     if (type != TYPE_SCRIPT) {
-        current->function->name = copy_string(parser.previous.start, parser.previous.length);
+        current->function->name = obj_string_t_copy_from(parser.previous.start, parser.previous.length);
     }
 
     local_t *local = &current->locals[current->local_count++];
@@ -247,13 +249,14 @@ static void init_compiler(compiler_t *compiler, const function_type_t type)
     }
 }
 
-static obj_function_t *end_compiler(void)
+static obj_function_t *compiler_t_end(void)
 {
     emit_return();
+    table_t_free(&current->string_constants);
     obj_function_t *function = current->function;
-    #ifdef DEBUG
-    if (!parser.had_error) {
-        disassemble_chunk(current_chunk(), function->name != NULL ? function->name->chars : "<script>");
+    #ifdef DEBUG_TRACE_EXECUTION
+    if (parser.had_error) {
+        chunk_t_disassemble(current_chunk(), function->name != NULL ? function->name->chars : "<script>");
     }
     #endif
     current = current->enclosing;
@@ -270,25 +273,24 @@ static void end_scope(void)
 {
     current->scope_depth--;
 
-    /*
-    */
+    uint8_t to_pop = 0;
     while (current->local_count > 0 && current->locals[current->local_count - 1].depth > current->scope_depth) {
         if (current->locals[current->local_count - 1].is_captured) {
+            // flush any to pop before the OP_CLOSE_UPVALUEA
+            if (to_pop) {
+                emit_bytes(OP_POPN, to_pop);
+                to_pop = 0;
+            }
             emit_byte(OP_CLOSE_UPVALUE);
         } else {
-            emit_byte(OP_POP);
+            to_pop++;
         }
         current->local_count--;
     }
-
-    /* From sidebar: implement a OP_POPN instruction
-    uint8_t local_count = current->local_count;
-    while (local_count > 0 && current->locals[local_count - 1].depth > current->scope_depth) {
-        local_count--;
+    if (to_pop > 0) {
+        // flush remaining pops
+        emit_bytes(OP_POPN, to_pop);
     }
-    emit_bytes(OP_POPN, current->local_count - local_count);
-    current->local_count = local_count;
-    */
 }
 
 static void expression(void);
@@ -299,17 +301,14 @@ static void parse_precedence(const precedence_t precedence);
 
 static uint8_t identifier_constant(const token_t *name)
 {
-    /* NOTE: chapter 21 challenge
-    obj_string_t *constant_str = copy_string(name->start, name->length);
+    obj_string_t *constant_str = obj_string_t_copy_from(name->start, name->length);
     value_t existing_index;
-    if (get_table_t(&string_constants, constant_str, &existing_index)) {
+    if (table_t_get(&current->string_constants, constant_str, &existing_index)) {
         return (uint8_t)AS_NUMBER(existing_index);
     }
     uint8_t index = make_constant(OBJ_VAL(constant_str));
-    set_table_t(&string_constants, constant_str, NUMBER_VAL(index));
+    table_t_set(&current->string_constants, constant_str, NUMBER_VAL(index));
     return index;
-    */
-    return make_constant(OBJ_VAL(copy_string(name->start, name->length)));
 }
 
 static bool identifiers_equal(const token_t *a, const token_t *b)
@@ -537,7 +536,7 @@ static void or_expr(const bool) // can_assign
 
 static void string(const bool)
 {
-    emit_constant(OBJ_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
+    emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void named_variable(const token_t name, const bool can_assign)
@@ -737,7 +736,7 @@ static void block(void)
 static void function(function_type_t type)
 {
     compiler_t compiler;
-    init_compiler(&compiler, type);
+    compiler_t_init(&compiler, type);
     begin_scope();
 
     consume(TOKEN_LEFT_PAREN, gettext("Expect '(' after function name."));
@@ -755,7 +754,7 @@ static void function(function_type_t type)
     consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before function body."));
     block();
 
-    obj_function_t *function = end_compiler(); // no end_scope required here
+    obj_function_t *function = compiler_t_end(); // no end_scope required here
     emit_bytes(OP_CLOSURE, make_constant(OBJ_VAL(function)));
 
     for (int i = 0; i < function->upvalue_count; i++) {
@@ -866,7 +865,7 @@ int inner_most_loop_scope_depth = 0;
 static void for_statement(void)
 {
     int surrounding_loop_start = inner_most_loop_start;
-    //int surrounding_loop_end = inner_most_loop_end;
+    int surrounding_loop_end = inner_most_loop_end;
     int surrounding_loop_scope_depth = inner_most_loop_scope_depth;
 
     begin_scope();
@@ -892,7 +891,6 @@ static void for_statement(void)
         exit_jump = emit_jump(OP_JUMP_IF_FALSE);
         emit_byte(OP_POP); // condition
     }
-    //inner_most_loop_end = exit_jump;
 
     if (!match(TOKEN_RIGHT_PAREN)) { // increment clause
         int body_jump = emit_jump(OP_JUMP);
@@ -916,8 +914,12 @@ static void for_statement(void)
         emit_byte(OP_POP);
     }
 
+    if (inner_most_loop_end != -1) {
+        patch_jump(inner_most_loop_end);
+    }
+
     inner_most_loop_start = surrounding_loop_start;
-    // inner_most_loop_end = surrounding_loop_end;
+    inner_most_loop_end = surrounding_loop_end;
     inner_most_loop_scope_depth = surrounding_loop_scope_depth;
     end_scope();
 }
@@ -973,6 +975,7 @@ static void return_statement(void)
 static void while_statement(void)
 {
     int surrounding_loop_start = inner_most_loop_start;
+    int surrounding_loop_end = inner_most_loop_end;
     int surrounding_loop_scope_depth = inner_most_loop_scope_depth;
 
     inner_most_loop_start = current_chunk()->count;
@@ -991,7 +994,12 @@ static void while_statement(void)
     patch_jump(exit_jump);
     emit_byte(OP_POP);
 
+    if (inner_most_loop_end != -1) {
+        patch_jump(inner_most_loop_end);
+    }
+
     inner_most_loop_start = surrounding_loop_start;
+    inner_most_loop_end = surrounding_loop_end;
     inner_most_loop_scope_depth = surrounding_loop_scope_depth;
 }
 
@@ -1034,7 +1042,6 @@ static void declaration(void)
 
 #define MAX_CASES 256
 
-// NOT IN LOX
 static void switch_statement(void)
 {
     consume(TOKEN_LEFT_PAREN, gettext("Expect '(' after 'switch'."));
@@ -1106,21 +1113,21 @@ static void switch_statement(void)
     emit_byte(OP_POP); // The switch value.
 }
 
-// NOT IN LOX
 static void break_statement(void)
 {
-    assert("This does not work!");
-   if (inner_most_loop_end == -1) {
+    if (inner_most_loop_start == -1) {
         error(gettext("Can't use 'break' outside of a loop."));
     }
     consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'break'."));
+
+    uint8_t pop_count = 0;
     for (int i = current->local_count - 1; i >=0 && current->locals[i].depth > inner_most_loop_scope_depth; i--) {
-        emit_byte(OP_POP);
+        pop_count++;
     }
-    emit_loop(inner_most_loop_end);
+    emit_bytes(OP_POPN, pop_count);
+    inner_most_loop_end = emit_jump(OP_JUMP);
 }
 
-// NOT IN LOX
 static void continue_statement(void)
 {
     if (inner_most_loop_start == -1) {
@@ -1128,20 +1135,12 @@ static void continue_statement(void)
     }
     consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'continue'."));
 
-    /*
-    */
+    uint8_t pop_count = 0;
     for (int i = current->local_count - 1; i >=0 && current->locals[i].depth > inner_most_loop_scope_depth; i--) {
-        emit_byte(OP_POP);
+        pop_count++;
     }
-
-    /* From sidebar: implment a OP_POPN instruction
-    uint8_t local_count = current->local_count;
-    while (local_count > 0 && current->locals[local_count].depth > inner_most_loop_scope_depth) {
-        local_count--;
-    }
-    emit_bytes(OP_POPN, current->local_count - local_count);
+    emit_bytes(OP_POPN, pop_count);
     emit_loop(inner_most_loop_start);
-    */
 }
 
 static void exit_statement(void)
@@ -1166,6 +1165,7 @@ static void assert_statement(void)
     consume(TOKEN_SEMICOLON, gettext("Expect ';' after 'assert'."));
 
     const int fail_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
     const int succeed_jump = emit_jump(OP_JUMP);
     patch_jump(fail_jump);
 
@@ -1196,7 +1196,6 @@ static void statement(void)
         begin_scope();
         block();
         end_scope();
-    // not in lox
     } else if (match(TOKEN_ASSERT)) {
         assert_statement();
     } else if (match(TOKEN_EXIT)) {
@@ -1212,17 +1211,15 @@ static void statement(void)
     }
 }
 
-obj_function_t *compile(const char *source)
+obj_function_t *compiler_t_compile(const char *source)
 {
-    init_scanner(source);
+    scanner_t_init(source);
 
     compiler_t compiler;
-    init_compiler(&compiler, TYPE_SCRIPT);
+    compiler_t_init(&compiler, TYPE_SCRIPT);
 
     parser.had_error = false;
     parser.panic_mode = false;
-
-    // init_table_t(&string_constants); // chapter 21 challenge
 
     advance();
 
@@ -1230,15 +1227,15 @@ obj_function_t *compile(const char *source)
         declaration();
     }
 
-    obj_function_t *function = end_compiler();
+    obj_function_t *function = compiler_t_end();
     return parser.had_error ? NULL : function;
 }
 
-void mark_compiler_roots(void)
+void compiler_t_mark_roots(void)
 {
     compiler_t *compiler = current;
     while (compiler != NULL) {
-        mark_object((obj_t*)compiler->function);
+        obj_t_mark((obj_t*)compiler->function);
         compiler = compiler->enclosing;
     }
 }
