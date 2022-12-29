@@ -15,3 +15,6 @@ ${clox} /tmp/nosuchfileordir || true # expected failure
 ${clox} /tmp/nosuchfileordir noarg || true # expected failure
 echo 'var a = 1;' > "${TEST_TMPDIR}/t.lox"
 ${clox} "${TEST_TMPDIR}/t.lox"
+${clox} --version
+${clox} --help
+${clox} --debug --gc-trace --gc-stress --invalid-option-will-fail || true

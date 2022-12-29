@@ -126,7 +126,7 @@ START_TEST(test_compiler)
 {
     vm_t_init();
     const char *source1 = "var v = 27; { var v = 1; var y = 2; var z = v + y; }";
-    obj_function_t *func1 = compiler_t_compile(source1);
+    obj_function_t *func1 = compiler_t_compile(source1, false);
     ck_assert(func1->chunk.count == 17);
     ck_assert(func1->chunk.code[0] == OP_CONSTANT);
     ck_assert(func1->chunk.code[2] == OP_DEFINE_GLOBAL);
@@ -150,7 +150,7 @@ START_TEST(test_compiler)
 
     vm_t_init();
     const char *func_source = "fun a(x,y) { var sum = x + y; print(sum);}";
-    obj_function_t *func2 = compiler_t_compile(func_source);
+    obj_function_t *func2 = compiler_t_compile(func_source, false);
     ck_assert(func2->chunk.count == 6);
     ck_assert(func2->chunk.code[0] == OP_CLOSURE);
     ck_assert(func2->chunk.code[2] == OP_DEFINE_GLOBAL);
@@ -177,7 +177,7 @@ START_TEST(test_compiler)
     };
     for (int p = 0; programs[p] != NULL; p++) {
         vm_t_init();
-        obj_function_t *program_func __unused__ = compiler_t_compile(programs[p]);
+        obj_function_t *program_func __unused__ = compiler_t_compile(programs[p], false);
         vm_t_free();
     }
 }
@@ -428,6 +428,10 @@ START_TEST(test_vm)
         "class NoArgInit {} var i = NoArgInit(1, 2);", // chapter 28
         "var NotClass = \"so not a class\"; class OhNo < NotClass {}", // chapter 29
         "var a = 1; a = a / 0;", // divbyzero
+        "var f = 1; f.foo = 1;", // only instances have property
+        "var f = 1; f.foo(1);", // only instances have methods
+        "class Foo {} var f = Foo(); f.nosuchproperty();",
+        "class Foo {} var f = Foo(); var invalid = f.nosuchproperty;",
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {
@@ -595,18 +599,56 @@ START_TEST(test_object)
 
 START_TEST(test_debug)
 {
+    vm_t_init();
+    vm_toggle_gc_stress();
+    vm_toggle_gc_trace();
+    vm_toggle_stack_trace();
+
     chunk_t chunk;
     chunk_t_init(&chunk);
+
     chunk_t_write(&chunk, OP_CLOSE_UPVALUE, 1);
-    chunk_t_disassemble_instruction(&chunk, 0);
+    chunk_t_disassemble_instruction(&chunk, 0); // simple, +1
+
+    chunk_t_write(&chunk, OP_SET_UPVALUE, 1); //byte +2
+    chunk_t_write(&chunk, 1, 1);
+    chunk_t_disassemble_instruction(&chunk, 1);
+
+    int i = chunk_t_add_constant(&chunk, NUMBER_VAL(0));
+    chunk_t_write(&chunk, OP_GET_SUPER, 1); // const +2
+    chunk_t_write(&chunk, i, 1);
+    chunk_t_disassemble_instruction(&chunk, 3);
+
     chunk_t_free(&chunk);
 
-    for (op_code_t op = OP_CONSTANT; op <= OP_RETURN; op++) {
+    for (op_code_t op = OP_CONSTANT; op < INVALID_OPCODE; op++) {
         const char *op_str __unused__ = op_code_t_to_str(op);
     }
     for (token_type_t t = TOKEN_LEFT_PAREN; t <= TOKEN_EOF; t++) {
         const char *op_str __unused__ = token_type_t_to_str(t);
     }
+
+    // trigger gc
+    const char *program =
+        "var x = 1; var y = 2; var z = x + y; var z2 = z - 1; var t = true; var f = false; var invalid = !true;"
+        "class Point { init(x,y) { this.x = x; this.y = y;} dostuff() { z = z + x + y; }}"
+        "class SubPoint < Point { init(x,y) { super.init(x/2,y*10); }} var sp= SubPoint(10, 20); assert(sp.x == 5);"
+        "var f1; { var i = 100; fun inner() { print i;} f1 = inner;}"
+        "var f2 = Point(-900, -900).dostuff;"
+        "fun lots_of_stuff() { "
+            "var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\";"
+            "var b = \"asdfsdfasdfasfdafsdfas\";"
+            "{print(a+b);}"
+            "var p = Point(100, 200);"
+            "{ p.dostuff(); print(p.x + p.y); p.x < p.y; p.x > p.y; print(a + b); f1(); f2();}"
+            "return p;"
+        "}"
+        "for (var i = 0; i < 1000; i = i + 1) {"
+            "var r = lots_of_stuff();"
+            "print(r);"
+        "}";
+    ck_assert(vm_t_interpret(program) == INTERPRET_OK);
+    vm_t_free();
 }
 
 int main(const int argc, const char *argv[])

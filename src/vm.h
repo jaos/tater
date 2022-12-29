@@ -16,6 +16,13 @@ typedef struct {
     value_t *slots;
 } call_frame_t;
 
+typedef enum vm_flag {
+    VM_FLAG_NONE = 0x0,
+    VM_FLAG_STACK_TRACE = 0x1,
+    VM_FLAG_GC_TRACE = 0x2,
+    VM_FLAG_GC_STRESS = 0x4,
+} vm_flag_t;
+
 typedef struct {
     call_frame_t frames[FRAMES_MAX];
     int frame_count;
@@ -31,6 +38,7 @@ typedef struct {
     int gray_count;
     int gray_capacity;
     obj_t **gray_stack;
+    uint64_t flags;
     int exit_status;
 } vm_t;
 
@@ -50,5 +58,9 @@ vm_t_interpret_result_t vm_t_interpret(const char *source);
 void vm_push(const value_t value);
 value_t vm_pop(void);
 void vm_define_native(const char *name, const native_fn_t function);
+
+void vm_toggle_gc_stress(void);
+void vm_toggle_gc_trace(void);
+void vm_toggle_stack_trace(void);
 
 #endif

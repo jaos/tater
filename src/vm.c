@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -12,6 +13,21 @@
 #include "vm.h"
 
 vm_t vm;
+
+void vm_toggle_gc_stress(void)
+{
+    vm.flags ^= VM_FLAG_GC_STRESS;
+}
+
+void vm_toggle_gc_trace(void)
+{
+    vm.flags ^= VM_FLAG_GC_TRACE;
+}
+
+void vm_toggle_stack_trace(void)
+{
+    vm.flags ^= VM_FLAG_STACK_TRACE;
+}
 
 static value_t clock_native(const int, const value_t*)
 {
@@ -35,7 +51,7 @@ static void runtime_error(const char *format, ...)
     vfprintf(stderr, format, args); // Flawfinder: disable
 # pragma GCC diagnostic pop
     va_end(args);
-    fputs("\n", stderr);
+    fprintf(stderr, "\n");
 
     for (int i = vm.frame_count - 1; i >= 0; i--) {
         const call_frame_t *frame = &vm.frames[i];
@@ -135,6 +151,7 @@ void vm_t_init(void)
     vm.objects = NULL;
     vm.bytes_allocated = 0;
     vm.next_garbage_collect = 1024 * 1024;
+    vm.flags = 0;
     vm.exit_status = 0;
 
     vm.gray_count = 0;
@@ -369,22 +386,25 @@ static vm_t_interpret_result_t run(void)
 
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
-        #ifdef DEBUG_TRACE_EXECUTION
-        printf("                    ");
-        for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
-            printf("[ ");
-            value_t_print(*slot);
-            printf(" ]");
-        }
-        printf("\n");
+        if (vm.flags & VM_FLAG_STACK_TRACE) {
+            printf("                    ");
+            for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
+                printf("[ ");
+                value_t_print(*slot);
+                printf(" ]");
+            }
+            printf("\n");
 
-        // TODO on errors we might end up with nothing here and blow up, including the instruction READ_BYTE below...
-        if (!frame->ip) {
-            fprintf(stderr, "FIXME I am a work in progress!\n");
-            exit(EXIT_FAILURE);
+            // TODO on errors we might end up with nothing here and blow up, including the instruction READ_BYTE below...
+            if (!frame->ip) {
+                fprintf(stderr, "FIXME I am a work in progress!\n");
+                exit(EXIT_FAILURE);
+            }
+            chunk_t_disassemble_instruction(
+                &frame->closure->function->chunk,
+                (int)(frame->ip - frame->closure->function->chunk.code)
+            );
         }
-        chunk_t_disassemble_instruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
-        #endif
         assert(frame);
         assert(frame->ip);
 
@@ -662,7 +682,7 @@ static vm_t_interpret_result_t run(void)
 
 vm_t_interpret_result_t vm_t_interpret(const char *source)
 {
-    obj_function_t *function = compiler_t_compile(source);
+    obj_function_t *function = compiler_t_compile(source, vm.flags & VM_FLAG_STACK_TRACE);
     if (function == NULL)
         return INTERPRET_COMPILE_ERROR;
 

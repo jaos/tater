@@ -7,9 +7,7 @@
 #include "chunk.h"
 #include "common.h"
 #include "compiler.h"
-#ifdef DEBUG
 #include "debug.h"
-#endif
 #include "memory.h"
 #include "object.h"
 #include "scanner.h"
@@ -249,16 +247,14 @@ static void compiler_t_init(compiler_t *compiler, const function_type_t type)
     }
 }
 
-static obj_function_t *compiler_t_end(void)
+static obj_function_t *compiler_t_end(const bool debug)
 {
     emit_return();
     table_t_free(&current->string_constants);
     obj_function_t *function = current->function;
-    #ifdef DEBUG_TRACE_EXECUTION
-    if (parser.had_error) {
+    if (debug || parser.had_error) {
         chunk_t_disassemble(current_chunk(), function->name != NULL ? function->name->chars : "<script>");
     }
-    #endif
     current = current->enclosing;
     compiler_count--;
     return function;
@@ -754,7 +750,7 @@ static void function(function_type_t type)
     consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before function body."));
     block();
 
-    obj_function_t *function = compiler_t_end(); // no end_scope required here
+    obj_function_t *function = compiler_t_end(false); // no end_scope required here
     emit_bytes(OP_CLOSURE, make_constant(OBJ_VAL(function)));
 
     for (int i = 0; i < function->upvalue_count; i++) {
@@ -1211,7 +1207,7 @@ static void statement(void)
     }
 }
 
-obj_function_t *compiler_t_compile(const char *source)
+obj_function_t *compiler_t_compile(const char *source, const bool debug)
 {
     scanner_t_init(source);
 
@@ -1227,7 +1223,7 @@ obj_function_t *compiler_t_compile(const char *source)
         declaration();
     }
 
-    obj_function_t *function = compiler_t_end();
+    obj_function_t *function = compiler_t_end(debug);
     return parser.had_error ? NULL : function;
 }
 

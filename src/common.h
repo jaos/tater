@@ -17,11 +17,6 @@
 #define DEBUG_LOGGER(fmt, ...)  ((void)0)
 #else
 #define DEBUG_LOGGER(fmt, ...) do { fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, __LINE__, __func__ __VA_OPT__(,) __VA_ARGS__); } while (0) // Flawfinder: disable
-
-// #define DEBUG_STRESS_GC
-// #define DEBUG_LOG_GC
-// #define DEBUG_TRACE_EXECUTION
-
 #endif
 
 #define UINT8_COUNT (UINT8_MAX + 1)

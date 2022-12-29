@@ -18,9 +18,9 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type)
     object->is_marked = false;
     object->next = vm.objects; // add to our vm's linked list of objects so we always have a reference to it
     vm.objects = object;
-    #ifdef DEBUG_LOG_GC
-    printf("%p allocate %zu for %s\n", (void*)object, size, obj_type_t_to_str(type));
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("%p allocate %zu for %s\n", (void*)object, size, obj_type_t_to_str(type));
+    }
     return object;
 }
 

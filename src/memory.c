@@ -1,14 +1,11 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "common.h"
 #include "compiler.h"
+#include "debug.h"
 #include "memory.h"
 #include "vm.h"
-
-#ifdef DEBUG_LOG_GC
-#include <stdio.h>
-#include "debug.h"
-#endif
 
 #define GC_HEAP_GROW_FACTOR 2
 
@@ -16,10 +13,7 @@ void *reallocate(void *pointer, const size_t old_size __unused__, const size_t n
 {
     vm.bytes_allocated += new_size - old_size;
     if (new_size > old_size) {
-    #ifdef DEBUG_STRESS_GC
-        collect_garbage();
-    #endif
-        if (vm.bytes_allocated > vm.next_garbage_collect) {
+        if (vm.flags & VM_FLAG_GC_STRESS || vm.bytes_allocated > vm.next_garbage_collect) {
             collect_garbage();
         }
     }
@@ -44,11 +38,11 @@ void obj_t_mark(obj_t *obj)
     if (obj->is_marked)
         return;
 
-    #ifdef DEBUG_LOG_GC
-    printf("%p mark ", (void*)obj);
-    value_t_print(OBJ_VAL(obj));
-    printf("\n");
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("%p mark ", (void*)obj);
+        value_t_print(OBJ_VAL(obj));
+        printf("\n");
+    }
 
     obj->is_marked = true;
 
@@ -79,11 +73,11 @@ static void mark_array(value_array_t *array)
 
 static void blacken_object(obj_t *object)
 {
-    #ifdef DEBUG_LOG_GC
-    printf("%p blacken ", (void*)object);
-    value_t_print(OBJ_VAL(object));
-    printf("\n");
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("%p blacken ", (void*)object);
+        value_t_print(OBJ_VAL(object));
+        printf("\n");
+    }
 
     switch (object->type) {
         case OBJ_BOUND_METHOD: {
@@ -128,9 +122,9 @@ static void blacken_object(obj_t *object)
 
 static void free_object(obj_t *o)
 {
-    #ifdef DEBUG_LOG_GC
-    printf("%p free type %s\n", (void*)o, obj_type_t_to_str(o->type));
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("%p free type %s\n", (void*)o, obj_type_t_to_str(o->type));
+    }
     switch (o->type) {
         case OBJ_BOUND_METHOD: {
             FREE(obj_bound_method_t, o);
@@ -235,10 +229,10 @@ static void sweep(void)
 
 void collect_garbage(void)
 {
-    #ifdef DEBUG_LOG_GC
-    printf("== start gc\n");
     size_t before = vm.bytes_allocated;
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("== start gc\n");
+    }
 
     mark_roots();
     trace_references();
@@ -247,14 +241,14 @@ void collect_garbage(void)
 
     vm.next_garbage_collect = vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
 
-    #ifdef DEBUG_LOG_GC
-    printf("==   end gc\n");
-    printf("           collected %zu bytes (from %zu to %zu) next at %zu\n",
-        before - vm.bytes_allocated,
-        before,
-        vm.bytes_allocated,
-        vm.next_garbage_collect);
-    #endif
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("==   end gc\n");
+        printf("           collected %zu bytes (from %zu to %zu) next at %zu\n",
+            before - vm.bytes_allocated,
+            before,
+            vm.bytes_allocated,
+            vm.next_garbage_collect);
+    }
 }
 
 void free_objects(void)

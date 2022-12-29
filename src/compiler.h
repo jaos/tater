@@ -6,6 +6,6 @@
 #include "object.h"
 #include "vm.h"
 
-obj_function_t *compiler_t_compile(const char *source);
+obj_function_t *compiler_t_compile(const char *source, const bool debug);
 void compiler_t_mark_roots(void);
 #endif
