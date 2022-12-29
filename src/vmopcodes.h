@@ -1,8 +1,7 @@
-#ifndef clox_chunk_h
-#define clox_chunk_h
+#ifndef clox_vmopcodes_h
+#define clox_vmopcodes_h
 
 #include "common.h"
-#include "value.h"
 
 typedef enum {
     OP_CONSTANT,
@@ -49,26 +48,5 @@ typedef enum {
     OP_METHOD,
     INVALID_OPCODE,
 } op_code_t;
-
-typedef struct {
-    int offset;
-    int line;
-} line_info_t;
-
-typedef struct {
-    int count;
-    int capacity;
-    uint8_t *code;
-    value_array_t constants;
-    int line_count;
-    int line_capacity;
-    line_info_t *lines;
-} chunk_t;
-
-void chunk_t_init(chunk_t *chunk);
-void chunk_t_free(chunk_t *chunk);
-void chunk_t_write(chunk_t *chunk, const uint8_t byte, const int line);
-int chunk_t_add_constant(chunk_t *chunk, const value_t value);
-int chunk_t_get_line(const chunk_t *chunk, const int instruction);
 
 #endif

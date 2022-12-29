@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: clox\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-29 12:04-0500\n"
+"POT-Creation-Date: 2022-12-29 17:47-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,10 @@ msgstr ""
 
 #, c-format
 msgid " at end"
+msgstr ""
+
+#, c-format
+msgid "%s version %s\n"
 msgstr ""
 
 #, c-format
@@ -93,6 +97,15 @@ msgstr ""
 
 #, c-format
 msgid "Could not read source file \"%s\".\n"
+msgstr ""
+
+msgid "Enable debugging"
+msgstr ""
+
+msgid "Enable garbage collector stress testing"
+msgstr ""
+
+msgid "Enable garbage collector tracing"
 msgstr ""
 
 msgid "Expect '(' after 'assert'."
@@ -245,10 +258,16 @@ msgstr ""
 msgid "Operands must be two numbers or two strings."
 msgstr ""
 
+msgid "Show version"
+msgstr ""
+
 msgid "Stack overflow."
 msgstr ""
 
 msgid "Superclass must be a class."
+msgstr ""
+
+msgid "This help"
 msgstr ""
 
 msgid "Too many closure variables in function."
@@ -286,7 +305,7 @@ msgid "Unterminated string."
 msgstr ""
 
 #, c-format
-msgid "Usage: %s [path]\n"
+msgid "Usage: %s [options] [path | -]\n"
 msgstr ""
 
 #, c-format

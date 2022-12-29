@@ -1,7 +1,5 @@
 
 sources = [
-    'chunk.c',
-    'chunk.h',
     'common.h',
     'compiler.c',
     'compiler.h',
@@ -13,12 +11,9 @@ sources = [
     'object.h',
     'scanner.c',
     'scanner.h',
-    'table.c',
-    'table.h',
-    'value.c',
-    'value.h',
     'vm.h',
     'vm.c',
+    'vmopcodes.h',
 ]
 
 libclox = library('libclox', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')

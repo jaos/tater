@@ -1,10 +1,9 @@
 #ifndef clox_debug_h
 #define clox_debug_h
 
-#include "chunk.h"
 #include "object.h"
-#include "value.h"
 #include "scanner.h"
+#include "vmopcodes.h"
 
 void chunk_t_disassemble(const chunk_t *chunk, const char *name);
 int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset);

@@ -2,9 +2,9 @@
 #define clox_compiler_h
 
 #include <stdbool.h>
-#include "chunk.h"
 #include "object.h"
 #include "vm.h"
+#include "vmopcodes.h"
 
 obj_function_t *compiler_t_compile(const char *source, const bool debug);
 void compiler_t_mark_roots(void);

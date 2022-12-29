@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "chunk.h"
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
 #include "scanner.h"
+#include "vmopcodes.h"
 
 typedef struct {
     token_t current;

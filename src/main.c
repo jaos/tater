@@ -10,9 +10,9 @@
 #include <readline/history.h>
 
 #include "common.h"
-#include "chunk.h"
 #include "debug.h"
 #include "vm.h"
+#include "vmopcodes.h"
 
 #define CLOX_PROMPT "clox> "
 #define CLOX_HISTORY_FILE ".clox_history"

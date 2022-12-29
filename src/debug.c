@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include "debug.h"
 #include "object.h"
-#include "value.h"
 #include "compiler.h"
 #include "scanner.h"
 

@@ -4,8 +4,6 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
-#include "table.h"
-#include "value.h"
 #include "vm.h"
 
 #define ALLOCATE_OBJ(type, object_type) \
@@ -162,3 +160,361 @@ void obj_t_print(const value_t value)
         }
     }
 }
+
+bool value_t_equal(const value_t a, const value_t b)
+{
+    if (a.type != b.type) return false;
+    switch (a.type) {
+        case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
+        case VAL_NIL: return true;
+        case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+        case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
+        case VAL_EMPTY: return true;
+        default: return false; // unreachable
+    }
+}
+
+static uint32_t hash_double(const double value)
+{
+    union bitcast {
+        double value;
+        uint32_t ints[2];
+    };
+    union bitcast cast;
+    cast.value = (value) + 1.0;
+    return cast.ints[0] + cast.ints[1];
+}
+
+uint32_t value_t_hash(const value_t value)
+{
+    switch (value.type) {
+        case VAL_BOOL: return AS_BOOL(value) ? 3 : 5; // arbitrary hash values
+        case VAL_NIL: return 7; // arbitrary hash value
+        case VAL_NUMBER: return hash_double(AS_NUMBER(value));
+        case VAL_OBJ: return AS_STRING(value)->hash;
+        case VAL_EMPTY: return 0; // arbitrary hash value
+        default: return 0; // unreachable
+    }
+}
+
+void value_array_t_init(value_array_t *array)
+{
+    array->values = NULL;
+    array->capacity = 0;
+    array->count = 0;
+}
+
+void value_array_t_add(value_array_t *array, const value_t value)
+{
+    if (array->capacity < array->count + 1) {
+        int old_capacity = array->capacity;
+        array->capacity = GROW_CAPACITY(old_capacity);
+        array->values = GROW_ARRAY(value_t, array->values, old_capacity, array->capacity);
+    }
+
+    array->values[array->count] = value;
+    array->count++;
+}
+
+void value_array_t_free(value_array_t *array)
+{
+    FREE_ARRAY(value_t, array->values, array->capacity);
+    value_array_t_init(array);
+}
+
+void value_t_print(const value_t value)
+{
+    switch (value.type) {
+        case VAL_BOOL: printf(AS_BOOL(value) ? "true" : "false"); break;
+        case VAL_NIL: printf("nil"); break;
+        case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
+        case VAL_OBJ: obj_t_print(value); break;
+        case VAL_EMPTY: printf("<empty>"); break;
+        default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
+    }
+}
+
+#define TABLE_MAX_LOAD 0.75
+
+void table_t_init(table_t *table)
+{
+    table->count = 0;
+    table->capacity = 0;
+    table->entries = NULL;
+}
+
+void table_t_free(table_t *table)
+{
+    FREE_ARRAY(entry_t, table->entries, table->capacity);
+    table_t_init(table);
+}
+
+static entry_t *find_entry(entry_t *entries, const int capacity, const obj_string_t *key)
+{
+    uint32_t index = key->hash & (capacity - 1);
+    entry_t *tombstone = NULL;
+
+    for (;;) {
+        entry_t *entry = &entries[index];
+        if (entry->key == NULL) {
+            if (IS_NIL(entry->value)) {
+                return tombstone != NULL ? tombstone : entry;
+            } else {
+                if (tombstone == NULL) {
+                    tombstone = entry;
+                }
+            }
+        } else if (entry->key == key) {
+            return entry;
+        }
+        index = (index + 1) & (capacity - 1);
+    }
+}
+
+bool table_t_get(table_t *table, const obj_string_t *key, value_t *value)
+{
+    if (table->count == 0)
+        return false;
+    entry_t *entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL)
+        return false;
+    // if using an object instead of string keys
+    // if (IS_NIL(entry->key))
+    //     return false;
+    // or IS_EMPTY() if empty values
+    *value = entry->value;
+    return true;
+}
+
+static void adjust_capacity(table_t *table, const int capacity)
+{
+    entry_t *entries = ALLOCATE(entry_t, capacity);
+    for (int i = 0; i < capacity; i++) {
+        entries[i].key = NULL;
+        entries[i].value = NIL_VAL;
+    }
+    table->count = 0;
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t *entry = &table->entries[i];
+        if (entry->key == NULL)
+            continue;
+        entry_t *dest = find_entry(entries, capacity, entry->key);
+        dest->key = entry->key;
+        dest->value = entry->value;
+        table->count++;
+    }
+
+    FREE_ARRAY(entry_t, table->entries, table->capacity);
+    table->entries = entries;
+    table->capacity = capacity;
+}
+
+bool table_t_set(table_t *table, obj_string_t *key, const value_t value)
+{
+    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
+        const int capacity = GROW_CAPACITY(table->capacity);
+        adjust_capacity(table, capacity);
+    }
+
+    entry_t *entry = find_entry(table->entries, table->capacity, key);
+    const bool is_new_key = entry->key == NULL;
+    if (is_new_key && IS_NIL(entry->value))
+        table->count++; // we only increment if not a tombstone
+
+    entry->key = key;
+    entry->value = value;
+    return is_new_key;
+}
+
+bool table_t_delete(table_t *table, const obj_string_t *key)
+{
+    if (table->count == 0)
+        return false;
+
+    entry_t *entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL)
+        return false;
+
+    // place a tombstone entry
+    entry->key = NULL;
+    entry->value = TRUE_VAL;
+    return true;
+}
+
+void table_t_copy_to(const table_t *from, table_t *to)
+{
+    for (int i = 0; i < from->capacity; i++) {
+        const entry_t *entry = &from->entries[i];
+        if (entry->key != NULL) {
+            table_t_set(to, entry->key, entry->value);
+        }
+    }
+}
+
+obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, const int length, const uint32_t hash)
+{
+    if (table->count == 0)
+        return NULL;
+
+    uint32_t index = hash & (table->capacity - 1);
+    for (;;) {
+        entry_t *entry = &table->entries[index];
+
+        if (entry->key == NULL) {
+            // stop if we find an empty non-tombstone entry
+            if (IS_NIL(entry->value))
+                return NULL;
+        } else if (entry->key->length == length && entry->key->hash == hash && memcmp(entry->key->chars, chars, length) == 0) {
+            // we found it
+            return entry->key;
+        }
+
+        index = (index + 1) & (table->capacity - 1);
+    }
+}
+
+void table_t_remove_white(table_t *table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t *entry = &table->entries[i];
+        if (entry->key != NULL && !entry->key->obj.is_marked) {
+            table_t_delete(table, entry->key);
+        }
+    }
+}
+
+void table_t_mark(table_t *table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t *entry = &table->entries[i];
+        obj_t_mark((obj_t*)entry->key);
+        value_t_mark(entry->value);
+    }
+}
+
+
+void chunk_t_init(chunk_t *chunk)
+{
+    chunk->count = 0;
+    chunk->capacity = 0;
+    chunk->code = NULL;
+    value_array_t_init(&chunk->constants);
+    chunk->line_count = 0;
+    chunk->line_capacity = 0;
+    chunk->lines = NULL;
+}
+
+void chunk_t_free(chunk_t *chunk)
+{
+    FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
+    FREE_ARRAY(line_info_t, chunk->lines, chunk->line_capacity);
+    value_array_t_free(&chunk->constants);
+    chunk_t_init(chunk);
+}
+
+void chunk_t_write(chunk_t *chunk, const uint8_t byte, const int line)
+{
+    if (chunk->capacity < chunk->count + 1) {
+        const int old_capacity = chunk->capacity;
+        chunk->capacity = GROW_CAPACITY(old_capacity);
+        chunk->code = GROW_ARRAY(uint8_t, chunk->code, old_capacity, chunk->capacity);
+        if (chunk->code == NULL) {
+            fprintf(stderr, gettext("Could not allocate chunk code storage."));
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    chunk->code[chunk->count] = byte;
+    chunk->count++;
+
+    if (chunk->line_count > 0 && chunk->lines[chunk->line_count - 1].line == line) {
+        return;
+    }
+
+    if (chunk->line_capacity < chunk->line_count + 1) {
+        const int old_capacity = chunk->line_capacity;
+        chunk->line_capacity = GROW_CAPACITY(old_capacity);
+        chunk->lines = GROW_ARRAY(line_info_t, chunk->lines, old_capacity, chunk->line_capacity);
+        if (chunk->lines == NULL) {
+            fprintf(stderr, gettext("Could not allocate chunk line storage."));
+            exit(EXIT_FAILURE);
+        }
+    }
+    line_info_t *line_info = &chunk->lines[chunk->line_count++];
+    line_info->offset = chunk->count - 1;
+    line_info->line = line;
+}
+
+int chunk_t_get_line(const chunk_t *chunk, const int instruction)
+{
+    int start = 0;
+    int end = chunk->line_count - 1;
+    for (;;) {
+        const int mid = (start + end) / 2;
+        line_info_t *line = &chunk->lines[mid];
+        if (instruction < line->offset) {
+            end = mid - 1;
+        } else if (mid == chunk->line_count - 1 || instruction < chunk->lines[mid + 1].offset) {
+            return line->line;
+        } else {
+            start = mid + 1;
+        }
+    }
+}
+
+int chunk_t_add_constant(chunk_t *chunk, const value_t value)
+{
+    vm_push(value); // make GC happy
+    value_array_t_add(&chunk->constants, value);
+    vm_pop(); // make GC happy
+    return chunk->constants.count - 1;
+}
+
+void obj_t_mark(obj_t *obj)
+{
+    if (obj == NULL)
+        return;
+    if (obj->is_marked)
+        return;
+
+    if (vm.flags & VM_FLAG_GC_TRACE) {
+        printf("%p mark ", (void*)obj);
+        value_t_print(OBJ_VAL(obj));
+        printf("\n");
+    }
+
+    obj->is_marked = true;
+
+    if (vm.gray_capacity < vm.gray_count + 1) {
+        vm.gray_capacity = GROW_CAPACITY(vm.gray_capacity);
+        vm.gray_stack = (obj_t **)realloc(vm.gray_stack, sizeof(obj_t*) * vm.gray_capacity);
+        if(vm.gray_stack == NULL) {
+            fprintf(stderr, "Failed to reallocate GC stack.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    vm.gray_stack[vm.gray_count++] = obj;
+}
+
+void value_t_mark(value_t value)
+{
+    if (IS_OBJ(value))
+        obj_t_mark(AS_OBJ(value));
+}
+
+/* Used by OP_CONSTANT_LONG
+void write_constant(chunk_t *chunk, const value_t value, const int line)
+{
+    int index = chunk_t_add_constant(chunk, value);
+    if (index < 256) {
+        chunk_t_write(chunk, OP_CONSTANT, line);
+        chunk_t_write(chunk, (uint8_t)index, line);
+    } else {
+        chunk_t_write(chunk, OP_CONSTANT_LONG, line);
+        chunk_t_write(chunk, (uint8_t)(index & 0xff), line);
+        chunk_t_write(chunk, (uint8_t)((index >> 8) & 0xff), line);
+        chunk_t_write(chunk, (uint8_t)((index >> 16) & 0xff), line);
+    }
+}
+*/

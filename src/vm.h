@@ -1,10 +1,8 @@
 #ifndef clox_vm_h
 #define clox_vm_h
 
-#include "chunk.h"
 #include "object.h"
-#include "table.h"
-#include "value.h"
+#include "vmopcodes.h"
 
 // TODO consider a more robust way to avoid stack overflows
 #define FRAMES_MAX 64
@@ -62,5 +60,6 @@ void vm_define_native(const char *name, const native_fn_t function);
 void vm_toggle_gc_stress(void);
 void vm_toggle_gc_trace(void);
 void vm_toggle_stack_trace(void);
+void vm_collect_garbage(void);
 
 #endif
