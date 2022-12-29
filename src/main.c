@@ -94,7 +94,7 @@ static char *read_file(const char *file_path)
 {
     FILE *f = fopen(file_path, "rb");
     if (f == NULL) {
-        fprintf(stderr, "Could not read source file \"%s\".\n", file_path);
+        fprintf(stderr, gettext("Could not read source file \"%s\".\n"), file_path);
         exit(EXIT_FAILURE);
     }
     if (fseek(f, 0L, SEEK_END) == -1) {
@@ -104,13 +104,13 @@ static char *read_file(const char *file_path)
     const size_t fsize = ftell(f);
     char *buffer = malloc(sizeof *buffer * fsize);
     if (buffer == NULL) {
-        fprintf(stderr, "Could not allocate buffer to read \"%s\".\n", file_path);
+        fprintf(stderr, gettext("Could not allocate buffer to read \"%s\".\n"), file_path);
         exit(EXIT_FAILURE);
     }
     rewind(f);
     const size_t b_read = fread(buffer, sizeof(char), fsize, f);
     if (b_read < fsize) {
-        fprintf(stderr, "Could not read all of \"%s\" (expected %ld, got %ld).\n", file_path, fsize, b_read);
+        fprintf(stderr, gettext("Could not read all of \"%s\" (expected %ld, got %ld).\n"), file_path, fsize, b_read);
         exit(EXIT_FAILURE);
     }
     buffer[fsize - 1] = '\0';
@@ -142,7 +142,7 @@ int main(const int argc, const char *argv[])
     } else if (argc == 2) {
         run_file(argv[1]);
     } else {
-        fprintf(stderr, "Usage: %s [path]\n", argv[0]);
+        fprintf(stderr, gettext("Usage: %s [path]\n"), argv[0]);
     }
     vm_t_free();
     return 0;

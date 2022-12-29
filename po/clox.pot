@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: clox\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-27 17:59-0500\n"
+"POT-Creation-Date: 2022-12-29 12:04-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -31,6 +31,9 @@ msgstr ""
 
 #, c-format
 msgid "== start %s ==\n"
+msgstr ""
+
+msgid "A class can't inherit from itself."
 msgstr ""
 
 msgid "Already a variable with this name in this scope."
@@ -63,7 +66,36 @@ msgstr ""
 msgid "Can't use 'continue' outside of a loop."
 msgstr ""
 
+msgid "Can't use 'super' in a class with no superclass."
+msgstr ""
+
+msgid "Can't use 'super' outside of a class."
+msgstr ""
+
 msgid "Can't use 'this' outside of a class."
+msgstr ""
+
+#, c-format
+msgid "Could not allocate buffer to read \"%s\".\n"
+msgstr ""
+
+#, c-format
+msgid "Could not allocate chunk code storage."
+msgstr ""
+
+#, c-format
+msgid "Could not allocate chunk line storage."
+msgstr ""
+
+#, c-format
+msgid "Could not read all of \"%s\" (expected %ld, got %ld).\n"
+msgstr ""
+
+#, c-format
+msgid "Could not read source file \"%s\".\n"
+msgstr ""
+
+msgid "Expect '(' after 'assert'."
 msgstr ""
 
 msgid "Expect '(' after 'for'."
@@ -87,6 +119,9 @@ msgstr ""
 msgid "Expect ')' after condition."
 msgstr ""
 
+msgid "Expect ')' after exit expression."
+msgstr ""
+
 msgid "Expect ')' after expression."
 msgstr ""
 
@@ -99,16 +134,25 @@ msgstr ""
 msgid "Expect ')' after value."
 msgstr ""
 
+msgid "Expect '.' after 'super'."
+msgstr ""
+
 msgid "Expect ':' after case value."
 msgstr ""
 
 msgid "Expect ':' after default."
 msgstr ""
 
+msgid "Expect ';' after 'assert'."
+msgstr ""
+
 msgid "Expect ';' after 'break'."
 msgstr ""
 
 msgid "Expect ';' after 'continue'."
+msgstr ""
+
+msgid "Expect ';' after 'exit'."
 msgstr ""
 
 msgid "Expect ';' after expression."
@@ -154,6 +198,12 @@ msgstr ""
 msgid "Expect property name after '.'."
 msgstr ""
 
+msgid "Expect superclass method name."
+msgstr ""
+
+msgid "Expect superclass name."
+msgstr ""
+
 #, c-format
 msgid "Expected %d arguments but got %d."
 msgstr ""
@@ -166,6 +216,9 @@ msgid "Failed to ready history file"
 msgstr ""
 
 msgid "Failed to write history file"
+msgstr ""
+
+msgid "Illegal divide by zero."
 msgstr ""
 
 msgid "Invalid assignment target."
@@ -193,6 +246,9 @@ msgid "Operands must be two numbers or two strings."
 msgstr ""
 
 msgid "Stack overflow."
+msgstr ""
+
+msgid "Superclass must be a class."
 msgstr ""
 
 msgid "Too many closure variables in function."
@@ -227,6 +283,10 @@ msgid "Unknown opcode %d\n"
 msgstr ""
 
 msgid "Unterminated string."
+msgstr ""
+
+#, c-format
+msgid "Usage: %s [path]\n"
 msgstr ""
 
 #, c-format
