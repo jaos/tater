@@ -277,6 +277,9 @@ const char *obj_type_t_to_str(const obj_type_t type)
         case OBJ_INSTANCE: return "OBJ_INSTANCE";
         case OBJ_NATIVE: return "OBJ_NATIVE";
         case OBJ_STRING: return "OBJ_STRING";
+        case OBJ_LIST: return "OBJ_LIST";
+        case OBJ_MAP: return "OBJ_MAP";
+        case OBJ_BOUND_NATIVE_METHOD: return "OBJ_BOUND_NATIVE_METHOD";
         default: return NULL;
     }
 }

@@ -90,7 +90,7 @@ static int repl(void)
             if (is_a_tty) printf("\n");
             free(line);
 
-            if (rv == INTERPRET_EXIT) {
+            if (rv == INTERPRET_EXIT || rv == INTERPRET_RUNTIME_ERROR) {
                 status = vm.exit_status;
                 break;
             } else if (rv == INTERPRET_EXIT_OK) {

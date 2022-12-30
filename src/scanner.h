@@ -7,6 +7,7 @@ typedef enum {
     // single character
     TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
     TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
+    TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
     TOKEN_COLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
     TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
     // one or two characters
@@ -33,6 +34,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_RIGHT_PAREN] = ")",
     [TOKEN_LEFT_BRACE] = "{",
     [TOKEN_RIGHT_BRACE] = "}",
+    [TOKEN_LEFT_BRACKET] = "[",
+    [TOKEN_RIGHT_BRACKET] = "]",
     [TOKEN_COLON] = ":",
     [TOKEN_COMMA] = ",",
     [TOKEN_DOT] = ".",
@@ -58,8 +61,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_PLUS_PLUS] = "++",
     // literals
     [TOKEN_IDENTIFIER] = "<identifier>",
-    [TOKEN_STRING] = "<string>",
-    [TOKEN_NUMBER] = "<number>",
+    [TOKEN_STRING] = "string",
+    [TOKEN_NUMBER] = "number",
     // keywords
     [TOKEN_AND] = "and",
     [TOKEN_ASSERT] = "assert",
@@ -86,6 +89,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_WHILE] = "while",
     [TOKEN_ERROR] = "error",
     [TOKEN_EOF] = "<EOF>",
+    "list",
+    "map",
     NULL,
 };
 
@@ -93,6 +98,24 @@ static const char *const token_keyword_names[] = {
 #define KEYWORD_INIT "init"
 #define KEYWORD_INIT_LEN 4
 #define TOKEN_THIS_LEN 4
+#define KEYWORD_SUBSCRIPT "subscript"
+#define KEYWORD_SUBSCRIPT_LEN 9
+#define KEYWORD_LEN "len"
+#define KEYWORD_LEN_LEN 3
+#define KEYWORD_GET "get"
+#define KEYWORD_GET_LEN 3
+#define KEYWORD_SET "set"
+#define KEYWORD_SET_LEN 3
+#define KEYWORD_APPEND "append"
+#define KEYWORD_APPEND_LEN 6
+#define KEYWORD_REMOVE "remove"
+#define KEYWORD_REMOVE_LEN 6
+#define KEYWORD_CLEAR "clear"
+#define KEYWORD_CLEAR_LEN 5
+#define KEYWORD_KEYS "keys"
+#define KEYWORD_KEYS_LEN 4
+#define KEYWORD_VALUES "values"
+#define KEYWORD_VALUES_LEN 6
 
 typedef struct {
     token_type_t type;

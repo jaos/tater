@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -11,6 +12,7 @@
 
 static obj_t *allocate_object(const size_t size, const obj_type_t type)
 {
+    assert(!vm_gc_active()); // attempt to catch us allocating during garbage collection
     obj_t *object = (obj_t*)reallocate(NULL, 0, size);
     object->type = type;
     object->is_marked = false;
@@ -30,6 +32,15 @@ obj_bound_method_t *obj_bound_method_t_allocate(value_t receiving_instance, obj_
     return bound_method;
 }
 
+obj_bound_native_method_t * obj_bound_native_method_t_allocate(value_t receiving_instance, obj_string_t *name, native_method_fn_t function)
+{
+    obj_bound_native_method_t *bound_native_method = ALLOCATE_OBJ(obj_bound_native_method_t, OBJ_BOUND_NATIVE_METHOD);
+    bound_native_method->receiving_instance = receiving_instance;
+    bound_native_method->name = name;
+    bound_native_method->function = function;
+    return bound_native_method;
+}
+
 obj_class_t *obj_class_t_allocate(obj_string_t *name)
 {
     obj_class_t *cls = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
@@ -44,6 +55,20 @@ obj_instance_t *obj_instance_t_allocate(obj_class_t *cls)
     instance->cls = cls;
     table_t_init(&instance->fields);
     return instance;
+}
+
+obj_list_t *obj_list_t_allocate(void)
+{
+    obj_list_t *list = ALLOCATE_OBJ(obj_list_t, OBJ_LIST);
+    value_array_t_init(&list->elements);
+    return list;
+}
+
+obj_map_t *obj_map_t_allocate(void)
+{
+    obj_map_t *map = ALLOCATE_OBJ(obj_map_t, OBJ_MAP);
+    table_t_init(&map->table);
+    return map;
 }
 
 obj_closure_t *obj_closure_t_allocate(obj_function_t *function)
@@ -69,9 +94,11 @@ obj_function_t *obj_function_t_allocate(void)
     return function;
 }
 
-obj_native_t *obj_native_t_allocate(native_fn_t function)
+obj_native_t *obj_native_t_allocate(native_fn_t function, const obj_string_t *name, const int arity)
 {
     obj_native_t *native = ALLOCATE_OBJ(obj_native_t, OBJ_NATIVE);
+    native->name = name;
+    native->arity = arity;
     native->function = function;
     return native;
 }
@@ -143,17 +170,101 @@ static void print_function(const obj_function_t *function)
     }
 }
 
+obj_string_t *obj_t_to_obj_string_t(const value_t value)
+{
+    char buffer[255];
+    switch (OBJ_TYPE(value)) {
+        case OBJ_BOUND_METHOD: {
+            obj_function_t *function = AS_BOUND_METHOD(value)->method->function;
+            if (function->name == NULL) {
+                snprintf(buffer, 255, "<script>"); // or main ?
+            } else {
+                snprintf(buffer, 255, "<boundmethod %s>", function->name->chars);
+            }
+            break;
+        }
+        case OBJ_BOUND_NATIVE_METHOD: {
+            snprintf(buffer, 255, "<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars);
+            break;
+        }
+        case OBJ_CLOSURE: {
+            obj_function_t *function = AS_CLOSURE(value)->function;
+            if (function->name == NULL) {
+                snprintf(buffer, 255, "<script>"); // or main ?
+            } else {
+                snprintf(buffer, 255, "<closure %s>", function->name->chars);
+            }
+            break;
+        }
+        case OBJ_FUNCTION: {
+            obj_function_t *function = AS_FUNCTION(value);
+            if (function->name == NULL) {
+                snprintf(buffer, 255, "<script>"); // or main ?
+            } else {
+                snprintf(buffer, 255, "<fn %s>", function->name->chars);
+            }
+            break;
+        }
+        case OBJ_CLASS: {
+            snprintf(buffer, 255, "<cls %s>", AS_CLASS(value)->name->chars);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            snprintf(buffer, 255, "<cls %s instance %p>", AS_INSTANCE(value)->cls->name->chars, (void*)AS_OBJ(value));
+            break;
+        }
+        case OBJ_NATIVE: {
+            snprintf(buffer, 255, "<native fn %s>", AS_NATIVE(value)->name->chars);
+            break;
+        }
+        case OBJ_STRING: {
+            snprintf(buffer, 255, "%s", AS_CSTRING(value));
+            break;
+        }
+        case OBJ_UPVALUE: {
+            snprintf(buffer, 255, "<upvalue>");
+            break;
+        }
+        case OBJ_LIST: {
+            obj_list_t *list = AS_LIST(value);
+            snprintf(buffer, 255, "<list %d>", list->elements.count);
+            break;
+        }
+        case OBJ_MAP: {
+            obj_map_t *map = AS_MAP(value);
+            snprintf(buffer, 255, "<map %d>", map->table.count);
+            break;
+        }
+        default: {
+            DEBUG_LOGGER("Unhandled default for object type %d (%p)\n", OBJ_TYPE(value), (void *)&value);
+            exit(EXIT_FAILURE);
+        }
+    }
+    return obj_string_t_copy_from(buffer, strlen(buffer));
+}
+
 void obj_t_print(const value_t value)
 {
     switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_METHOD: print_function(AS_BOUND_METHOD(value)->method->function); break;
+        case OBJ_BOUND_NATIVE_METHOD: printf("<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars); break;
         case OBJ_CLASS: printf("<cls %s>", AS_CLASS(value)->name->chars); break;
         case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
         case OBJ_INSTANCE: printf("<cls %s instance %p>", AS_INSTANCE(value)->cls->name->chars, (void*)AS_OBJ(value)); break;
-        case OBJ_NATIVE: printf("<native fn>"); break;
+        case OBJ_NATIVE: printf("<native fn %s>", AS_NATIVE(value)->name->chars); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
         case OBJ_UPVALUE: printf("<upvalue>"); break;
+        case OBJ_LIST: {
+            obj_list_t *list = AS_LIST(value);
+            printf("<list %d>", list->elements.count);
+            break;
+        }
+        case OBJ_MAP: {
+            obj_map_t *map = AS_MAP(value);
+            printf("<map %d>", map->table.count);
+            break;
+        }
         default: {
             DEBUG_LOGGER("Unhandled default for object type %d (%p)\n", OBJ_TYPE(value), (void *)&value);
             exit(EXIT_FAILURE);
@@ -210,6 +321,10 @@ void value_array_t_add(value_array_t *array, const value_t value)
         int old_capacity = array->capacity;
         array->capacity = GROW_CAPACITY(old_capacity);
         array->values = GROW_ARRAY(value_t, array->values, old_capacity, array->capacity);
+        if (array->values == NULL) {
+            fprintf(stderr, gettext("Could not allocate value array storage."));
+            exit(EXIT_FAILURE);
+        }
     }
 
     array->values[array->count] = value;
@@ -220,6 +335,20 @@ void value_array_t_free(value_array_t *array)
 {
     FREE_ARRAY(value_t, array->values, array->capacity);
     value_array_t_init(array);
+}
+
+obj_string_t *value_t_to_obj_string_t(const value_t value)
+{
+    char buffer[255];
+    switch (value.type) {
+        case VAL_BOOL: snprintf(buffer, 255, AS_BOOL(value) ? "true" : "false"); break;
+        case VAL_NIL: snprintf(buffer, 255, "nil"); break;
+        case VAL_NUMBER: snprintf(buffer, 255, "%g", AS_NUMBER(value)); break;
+        case VAL_OBJ: return obj_t_to_obj_string_t(value);
+        case VAL_EMPTY: snprintf(buffer, 255, "<empty>"); break;
+        default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
+    }
+    return obj_string_t_copy_from(buffer, strlen(buffer));
 }
 
 void value_t_print(const value_t value)

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: clox\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-29 17:47-0500\n"
+"POT-Creation-Date: 2022-12-30 21:03-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,10 @@ msgstr ""
 
 #, c-format
 msgid " at end"
+msgstr ""
+
+#, c-format
+msgid "%s expected %d arguments but got %d."
 msgstr ""
 
 #, c-format
@@ -47,9 +51,6 @@ msgid "Can only call functions and classes."
 msgstr ""
 
 msgid "Can't have another case or default after the default case."
-msgstr ""
-
-msgid "Can't have more than "
 msgstr ""
 
 msgid "Can't have statements before any case."
@@ -79,6 +80,9 @@ msgstr ""
 msgid "Can't use 'this' outside of a class."
 msgstr ""
 
+msgid "Cannot initialize a map with an odd number of arguments."
+msgstr ""
+
 #, c-format
 msgid "Could not allocate buffer to read \"%s\".\n"
 msgstr ""
@@ -106,6 +110,12 @@ msgid "Enable garbage collector stress testing"
 msgstr ""
 
 msgid "Enable garbage collector tracing"
+msgstr ""
+
+msgid "Exceeded maximum number of arguments."
+msgstr ""
+
+msgid "Exceeded maximum number of parameters."
 msgstr ""
 
 msgid "Expect '(' after 'assert'."
@@ -205,7 +215,13 @@ msgstr ""
 msgid "Expect expression."
 msgstr ""
 
+msgid "Expect function name."
+msgstr ""
+
 msgid "Expect method name."
+msgstr ""
+
+msgid "Expect parameter name."
 msgstr ""
 
 msgid "Expect property name after '.'."
@@ -215,6 +231,9 @@ msgid "Expect superclass method name."
 msgstr ""
 
 msgid "Expect superclass name."
+msgstr ""
+
+msgid "Expect variable name."
 msgstr ""
 
 #, c-format
@@ -238,6 +257,21 @@ msgid "Invalid assignment target."
 msgstr ""
 
 msgid "Loop body too large."
+msgstr ""
+
+msgid "Map keys can only be strings."
+msgstr ""
+
+#, c-format
+msgid "No such list method %.*s"
+msgstr ""
+
+#, c-format
+msgid "No such map method %.*s"
+msgstr ""
+
+#, c-format
+msgid "No such str method %.*s"
 msgstr ""
 
 msgid "Only instances have fields."
@@ -310,4 +344,67 @@ msgstr ""
 
 #, c-format
 msgid "[line %d] Error"
+msgstr ""
+
+msgid "get_field requires an object and a string field name."
+msgstr ""
+
+msgid "invalid list.get index."
+msgstr ""
+
+msgid "invalid list.remove index."
+msgstr ""
+
+msgid "invalid str.substr end position."
+msgstr ""
+
+msgid "invalid str.substr start position."
+msgstr ""
+
+msgid "list.append requires a single argument."
+msgstr ""
+
+msgid "list.clear requires no arguments."
+msgstr ""
+
+msgid "list.get requires a single numerical argument."
+msgstr ""
+
+msgid "list.len takes no arguments."
+msgstr ""
+
+msgid "list.remove requires a single argument."
+msgstr ""
+
+msgid "list.remove requires a single numerical argument."
+msgstr ""
+
+msgid "map.get requires a single string argument."
+msgstr ""
+
+msgid "map.keys takes no arguments."
+msgstr ""
+
+msgid "map.len takes no arguments."
+msgstr ""
+
+msgid "map.set failed."
+msgstr ""
+
+msgid "map.set requires a string and a value argument."
+msgstr ""
+
+msgid "number argument invalid."
+msgstr ""
+
+msgid "number requires on argument."
+msgstr ""
+
+msgid "set_field requires instance, field name, and value."
+msgstr ""
+
+msgid "str.len takes no arguments."
+msgstr ""
+
+msgid "str.substr requires a string argument and a start and end position."
 msgstr ""

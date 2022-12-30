@@ -11,16 +11,24 @@
 #define IS_FUNCTION(value) is_obj_type(value, OBJ_FUNCTION)
 #define IS_INSTANCE(value) is_obj_type(value, OBJ_INSTANCE)
 #define IS_NATIVE(value) is_obj_type(value, OBJ_NATIVE)
+#define IS_BOUND_NATIVE_METHOD(value) is_obj_type(value, OBJ_BOUND_NATIVE_METHOD)
 #define IS_STRING(value) is_obj_type(value, OBJ_STRING)
+#define IS_LIST(value) is_obj_type(value, OBJ_LIST)
+#define IS_MAP(value) is_obj_type(value, OBJ_MAP)
 
 #define AS_BOUND_METHOD(value) ((obj_bound_method_t*)AS_OBJ(value))
 #define AS_CLASS(value) ((obj_class_t*)AS_OBJ(value))
 #define AS_CLOSURE(value) ((obj_closure_t*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((obj_function_t*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((obj_instance_t*)AS_OBJ(value))
-#define AS_NATIVE(value) (((obj_native_t*)AS_OBJ(value))->function)
+#define AS_NATIVE(value) (((obj_native_t*)AS_OBJ(value)))
+#define AS_NATIVE_FN(value) (((obj_native_t*)AS_OBJ(value))->function)
+#define AS_BOUND_NATIVE_METHOD(value) ((obj_bound_native_method_t*)AS_OBJ(value))
+
 #define AS_STRING(value) ((obj_string_t*)AS_OBJ(value))
 #define AS_CSTRING(value) (((obj_string_t*)AS_OBJ(value))->chars)
+#define AS_LIST(value) (((obj_list_t*)AS_OBJ(value)))
+#define AS_MAP(value) (((obj_map_t*)AS_OBJ(value)))
 
 #define IS_BOOL(value)   ((value).type == VAL_BOOL)
 #define IS_NIL(value)    ((value).type == VAL_NIL)
@@ -50,6 +58,9 @@ typedef enum {
     OBJ_NATIVE,
     OBJ_STRING,
     OBJ_UPVALUE,
+    OBJ_LIST,
+    OBJ_MAP,
+    OBJ_BOUND_NATIVE_METHOD,
 } obj_type_t;
 
 typedef struct obj_t {
@@ -122,9 +133,12 @@ typedef struct {
     obj_string_t *name;
 } obj_function_t;
 
-typedef value_t (*native_fn_t)(const int arg_count, const value_t *args);
+typedef bool (*native_fn_t)(const int arg_count, const value_t *args);
+
 typedef struct {
     obj_t obj;
+    int arity;
+    const obj_string_t *name;
     native_fn_t function;
 } obj_native_t;
 
@@ -160,17 +174,40 @@ typedef struct {
     obj_closure_t *method;
 } obj_bound_method_t;
 
+typedef  bool (*native_method_fn_t)(const obj_string_t *method, const int arg_count, const value_t *args);
+
+typedef struct {
+    obj_t obj;
+    obj_string_t *name;
+    value_t receiving_instance;
+    native_method_fn_t function;
+} obj_bound_native_method_t;
+
+typedef struct {
+    obj_t obj;
+    value_array_t elements;
+} obj_list_t;
+
+typedef struct {
+    obj_t obj;
+    table_t table;
+} obj_map_t;
+
 obj_bound_method_t *obj_bound_method_t_allocate(value_t receiving_instance, obj_closure_t *method);
+obj_bound_native_method_t * obj_bound_native_method_t_allocate(value_t receiving_instance, obj_string_t *name, native_method_fn_t function);
 obj_function_t *obj_function_t_allocate(void);
-obj_native_t *obj_native_t_allocate(native_fn_t function);
+obj_native_t *obj_native_t_allocate(native_fn_t function, const obj_string_t *name, const int arity);
 obj_closure_t *obj_closure_t_allocate(obj_function_t *function);
 obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot);
 obj_class_t *obj_class_t_allocate(obj_string_t *name);
 obj_instance_t *obj_instance_t_allocate(obj_class_t *cls);
+obj_list_t *obj_list_t_allocate(void);
+obj_map_t *obj_map_t_allocate(void);
 
 obj_string_t *obj_string_t_copy_own(char *chars, const int length);
 obj_string_t *obj_string_t_copy_from(const char *chars, const int length);
 void obj_t_print(const value_t value);
+obj_string_t *obj_t_to_obj_string_t(const value_t value);
 void obj_t_mark(obj_t *obj);
 
 static inline bool is_obj_type(const value_t value, const obj_type_t type)
@@ -183,6 +220,7 @@ void value_array_t_init(value_array_t *array);
 void value_array_t_add(value_array_t *array, const value_t value);
 void value_array_t_free(value_array_t *array);
 void value_t_print(const value_t value);
+obj_string_t *value_t_to_obj_string_t(const value_t value);
 uint32_t value_t_hash(const value_t value);
 void value_t_mark(value_t value);
 

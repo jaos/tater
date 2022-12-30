@@ -190,26 +190,71 @@ START_TEST(test_vm)
         "switch(3) { case 3: print(3); }",
         "switch(3) { }",
         "var counter = 0; while (counter < 10) { break; print counter; counter = counter + 1;} assert(counter == 0);",
+        "var counter = 0; for(var i = 0; i < 5; i++) { break; counter++;} assert(counter == 0);",
+        "var counter = 0; for(var i = 0; i < 5; i++) { counter++; for(var y = 0; y < 3; y++) { break; } } assert(counter == 5);",
         "var counter = 0; var extra = 0; while (counter < 10) { counter = counter + 1; continue; extra++; print \"never reached\";} assert(extra == 0);",
         "var extra = 0; for(var i =0; i < 5; i++) { continue; extra++; print \"never reached\";} assert(extra == 0);",
-        "class Foo {} class Bar {} var f = Foo(); print(is_instance(f, Foo)); print(is_instance(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\")); has_field(f, 2); is_instance(f, \"not a type\");",
-        "is_instance(2, \"not a type\"); is_instance(); has_field(); has_field(2, \"not a type\");",
+        "class Foo {} class Bar {} var f = Foo(); print(is(f, Foo)); print(is(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\"));",
 
         "print(sys_version());",
 
         "fun t1() { var i = 2; fun inner() { return i;} return inner;}"
-        "for (var i = 0; i < 10;i++) { var f = t1(); var f2 = t1(); var f3 = t1(); continue;}", // popn
+        "for (var i = 0; i < 10;i++) { var f = t1(); var f2 = t1(); var f3 = t1(); continue;}" // popn
+        "for (var i = 0; i < 10;i++) { var f = t1(); var f2 = t1(); var f3 = t1(); break;}", // popn
+
+        "is(2, \"not a type\");",
+        "assert(is(\"foo\", str));",
+        "assert(!is(2, str));",
+        "assert(is(list(), list));",
+        "assert(!is(nil, list));",
+        "assert(is(nil, nil));",
+        "assert(is(2, number));",
+        "assert(is(2.0, number));",
+        "assert(!is(nil, number));",
+        "assert(!is(\"foo\", number));",
+        "assert(!is(\"foo\", number));",
+        "assert(number(true) == 1);",
+        "assert(number(false) == 0);",
+        "assert(number(nil) == 0);",
+        "assert(number(9) == 9);",
+        "assert(number(\"1.1\") == 1.1);",
+        "assert(number(\"-5\") == -5);",
 
         "class Foo {} var f = Foo();"
         "assert(!get_field(f, \"name\"));"
         "assert(set_field(f, \"name\", \"foo\"));"
-        "assert(get_field(f, \"name\"));"
-        "assert(!set_field(f, 2));"
-        "assert(!get_field(f, 2));"
-        "assert(!set_field(f));"
-        "assert(!get_field(f));"
-        "assert(!set_field());"
-        "assert(!get_field());",
+        "assert(get_field(f, \"name\"));",
+
+        "assert(\"foo\".len() == 3);",
+        "var s = \"foo\"; var f = s.len; assert(f() == 3);",
+        "var a = str() + str() + str();"
+        "assert(a.len() == 0);",
+        "assert(str(1) == \"1\");",
+        "assert(str(true) == \"true\");",
+        "assert(str(nil) == \"nil\");",
+        "assert(\"foo\".substr(0,2) == \"fo\");",
+        "assert(\"foo\".substr(-2,2) == \"oo\");",
+        "var a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\");",
+
+        "var a = list(1,2,3); assert(a.len() == 3); a.clear(); assert(a.len() == 0); a.append(45); assert(a.len() == 1);",
+        "var a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
+        "var a = list(); a.remove(0); assert(a.len() == 0);",
+        "var a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
+        "var a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
+
+        "var m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
+        "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);",
+
+        "var a = map(\"one\", 1, \"two\", 2); a.set(\"three\", 3); print(a); assert(is(a, map));"
+        "var counter = 0; while (true) {"
+            "var key = a.keys().get(counter);"
+            "print(\"key is \" + key + \", value is \" + str(a.get(key)));"
+            "counter++;"
+            "if (counter >= a.keys().len()) {"
+                "break;"
+            "}"
+        "}",
+
         "var counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
 
         "var s1 = 0; var s2 = 0; var s3 = 0;"
@@ -238,6 +283,14 @@ START_TEST(test_vm)
         "a *= 0; assert(a == 0);",
         "var foo = \"one\"; foo += \" bar\";",
 
+        "var p = list(1, 2, 3); assert(p.len() == 3);",
+        "class Foo {init(name, list) { this.name = name; this.list = list;} len() { return this.list.len();}}"
+        "var f = Foo(\"jason\", list(1,2,3));"
+        "assert(f.len() == 3);"
+        "f.list.append(\"one\");"
+        "assert(f.len() == 4);"
+        "var call = f.list.append; call(200);"
+        "assert(f.len() == 5);",
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
         "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",
@@ -406,6 +459,9 @@ START_TEST(test_vm)
         "class Foo < Foo {}", // chapter 29
         "class NoSuperClass { method() { super.method();}}", // chapter 29
         "fun NotClass() { super.NotClass(); }", // chapter 29
+        "switch(3) { var statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
+        "switch(3) { default: true; case 3: print(\"cannot have case after default\"); }",
+        "{ break;}",
         NULL,
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
@@ -432,30 +488,70 @@ START_TEST(test_vm)
         "var f = 1; f.foo(1);", // only instances have methods
         "class Foo {} var f = Foo(); f.nosuchproperty();",
         "class Foo {} var f = Foo(); var invalid = f.nosuchproperty;",
+        "is();",
+        "has_field();",
+        "has_field(2, \"not a type\");",
+        "set_field();",
+        "set_field(true);",
+        "set_field(true, true);",
+        "set_field(true, true, true);",
+        "class Foo {} var f = Foo(); set_field();",
+        "class Foo {} var f = Foo(); set_field(f);",
+        "class Foo {} var f = Foo(); set_field(f, \"fieldnoval\");",
+        "class Foo {} var f = Foo(); get_field(f);",
+        "class Foo {} var f = Foo(); get_field();",
+        "var a = list(\"one\", 2, \"three\"); a.get(3);",
+        "var a = \"foo\"; var f = a.nosuchmethod; f();",
+        "number(list());",
+        "number();",
+        "\"foo\".substr();",
+        "\"foo\".substr(-10,1);",
+        "\"foo\".substr(0);",
+        "\"foo\".substr(0,10);",
+        "\"foo\".len(1);",
+        "list().len(1);",
+        "list().get();",
+        "list().get(true);",
+        "list().clear(true);",
+        "list().append();",
+        "list(1,2,3).remove(true);",
+        "list(1,2,3).remove();",
+        "list(1).remove(2);",
+        "true.nosuchpropertyonanoninstance;",
+        "map(1);",
+        "map(1, \"one\").len();",
+        "map(\"one\", 1).len(1);",
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {
         vm_t_init();
-        ck_assert_msg(vm_t_interpret(runtime_fail_cases[i]) == INTERPRET_RUNTIME_ERROR,
-            "Unexpected success for \"%s\"\n", runtime_fail_cases[i]);
+        const vm_t_interpret_result_t rv = vm_t_interpret(runtime_fail_cases[i]);
+        // in case we hose up a bad compile
+        ck_assert(rv != INTERPRET_COMPILE_ERROR);
+        ck_assert_msg(rv == INTERPRET_RUNTIME_ERROR, "Unexpected success for \"%s\"\n", runtime_fail_cases[i]);
         vm_t_free();
     }
 }
 
-static value_t native_getpid(const int, const value_t*)
+static bool native_getpid(const int, const value_t*)
 {
-    return NUMBER_VAL((double)getpid());
+    vm_push(NUMBER_VAL((double)getpid()));
+    return true;
 }
 
 START_TEST(test_native)
 {
     vm_t_init();
 
-    vm_define_native("getpid", native_getpid);
-    ck_assert_int_gt(AS_NUMBER(native_getpid(0, NULL)), 0);
+    vm_define_native("getpid", native_getpid, 0);
+    ck_assert(native_getpid(0, NULL));
+    value_t v = vm_pop();
+    ck_assert_int_gt(AS_NUMBER(v), 0);
     ck_assert(vm_t_interpret("print(getpid());") == INTERPRET_OK);
 
-    obj_native_t *native_fn = obj_native_t_allocate(native_getpid);
+    const obj_string_t *name = obj_string_t_copy_from("getpid", 6);
+    vm_push(OBJ_VAL(name));
+    obj_native_t *native_fn = obj_native_t_allocate(native_getpid, name, 0);
     vm_push(OBJ_VAL(native_fn));
     obj_type_t_to_str(((obj_t*)native_fn)->type); // debugging
 
@@ -583,6 +679,10 @@ START_TEST(test_object)
     obj_instance_t *instance = obj_instance_t_allocate(cls);
     vm_push(OBJ_VAL(instance));
 
+
+    obj_list_t *list = obj_list_t_allocate();
+    vm_push(OBJ_VAL(list));
+
     // debugging
     obj_type_t_to_str(((obj_t*)cls_name)->type);
     obj_type_t_to_str(((obj_t*)cls)->type);
@@ -601,8 +701,6 @@ START_TEST(test_debug)
 {
     vm_t_init();
     vm_toggle_gc_stress();
-    vm_toggle_gc_trace();
-    vm_toggle_stack_trace();
 
     chunk_t chunk;
     chunk_t_init(&chunk);
@@ -631,25 +729,63 @@ START_TEST(test_debug)
     // trigger gc
     const char *program =
         "var x = 1; var y = 2; var z = x + y; var z2 = z - 1; var t = true; var f = false; var invalid = !true;"
+        "var alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
         "class Point { init(x,y) { this.x = x; this.y = y;} dostuff() { z = z + x + y; }}"
         "class SubPoint < Point { init(x,y) { super.init(x/2,y*10); }} var sp= SubPoint(10, 20); assert(sp.x == 5);"
         "var f1; { var i = 100; fun inner() { print i;} f1 = inner;}"
         "var f2 = Point(-900, -900).dostuff;"
+        "var alistlen = alist.len;"
         "fun lots_of_stuff() { "
             "var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\";"
             "var b = \"asdfsdfasdfasfdafsdfas\";"
             "{print(a+b);}"
+            "{ assert(alistlen() == 3);}"
             "var p = Point(100, 200);"
+            "{str(p); str(100); str(alistlen); str(true); str(nil); str(Point); var c = Point(1,2).dostuff; str(c);}"
             "{ p.dostuff(); print(p.x + p.y); p.x < p.y; p.x > p.y; print(a + b); f1(); f2();}"
             "return p;"
         "}"
+        "{str(lots_of_stuff);}"
         "for (var i = 0; i < 1000; i = i + 1) {"
             "var r = lots_of_stuff();"
             "print(r);"
         "}";
     ck_assert(vm_t_interpret(program) == INTERPRET_OK);
+
+    vm_toggle_gc_trace();
+    vm_toggle_stack_trace();
+    const char *programs_with_tracing[] = {
+        // https://github.com/munificent/craftingvm_t_interpreters/issues/888
+        "fun returnArg(arg){ return arg;}"
+        "fun returnFunCallWithArg(func, arg){return returnArg(func)(arg);}"
+        "fun printArg(arg){print arg;}"
+        "returnFunCallWithArg(printArg, \"hello world\");",
+
+        // OP_CLOSE_UPVALUE https://github.com/munificent/craftingvm_t_interpreters/issues/746
+        "var f1; var f2; { var i = 1; fun f() { print i; } f1 = f; } { var j = 2; fun f() { print j; } f2 = f; } f1(); f2();",
+
+        "class A { method() { print \"A\"; } }"
+        "class B < A { method() { var closure = super.method; closure(); } }" // prints "A"
+        "B().method();", // chapter 29
+
+        "class Doughnut {"
+            "cook() { print(\"Dunk in the fryer.\"); this.finish(\"sprinkles\"); }"
+            "finish(ingredient) { print(\"Finish with \" + ingredient); }"
+        "}"
+        "class Cruller < Doughnut {"
+            "finish(ingredient) {"
+                // no sprinkles, always icing
+                "super.finish(\"icing\");"
+            "}"
+        "}", // chapter 29
+        NULL,
+    };
+    for (int p = 0; programs_with_tracing[p] != NULL; p++) {
+        ck_assert(vm_t_interpret(programs_with_tracing[p]) == INTERPRET_OK);
+    }
     vm_t_free();
 }
+
 
 int main(const int argc, const char *argv[])
 {

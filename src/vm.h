@@ -19,6 +19,7 @@ typedef enum vm_flag {
     VM_FLAG_STACK_TRACE = 0x1,
     VM_FLAG_GC_TRACE = 0x2,
     VM_FLAG_GC_STRESS = 0x4,
+    VM_FLAG_GC_ACTIVE = 0x8,
 } vm_flag_t;
 
 typedef struct {
@@ -55,11 +56,21 @@ void vm_t_free(void);
 vm_t_interpret_result_t vm_t_interpret(const char *source);
 void vm_push(const value_t value);
 value_t vm_pop(void);
-void vm_define_native(const char *name, const native_fn_t function);
+void vm_define_native(const char *name, const native_fn_t function, const int arity);
 
 void vm_toggle_gc_stress(void);
 void vm_toggle_gc_trace(void);
 void vm_toggle_stack_trace(void);
 void vm_collect_garbage(void);
+
+static inline bool vm_gc_active(void)
+{
+    return vm.flags & VM_FLAG_GC_ACTIVE;
+}
+
+static inline void vm_gc_toggle_active(void)
+{
+    vm.flags ^= VM_FLAG_GC_ACTIVE;
+}
 
 #endif

@@ -434,7 +434,7 @@ static uint8_t argument_list(void)
         do {
             expression();
             if (arg_count >= MAX_PARAMETERS) {
-                error(gettext("Can't have more than " CPP_STRINGIFY(MAX_PARAMETERS) " arguments."));
+                error(gettext("Exceeded maximum number of arguments."));
             }
             arg_count++;
         } while (match(TOKEN_COMMA));
@@ -477,6 +477,24 @@ static void call(const bool)
 {
     const uint8_t arg_count = argument_list();
     emit_bytes(OP_CALL, arg_count);
+}
+
+static token_t synthetic_token(const char *text)
+{
+    token_t token;
+    token.start = text;
+    token.length = strlen(text);
+    return token;
+}
+
+static void subscript(const bool)
+{
+    expression();
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+    token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
+    const uint8_t subscript = identifier_constant(&subscript_token);
+    emit_bytes(OP_INVOKE, subscript);
+    emit_byte(1);
 }
 
 static void dot(const bool can_assign)
@@ -581,14 +599,6 @@ static void variable(const bool can_assign)
     named_variable(parser.previous, can_assign);
 }
 
-static token_t synthetic_token(const char *text)
-{
-    token_t token;
-    token.start = text;
-    token.length = strlen(text);
-    return token;
-}
-
 static void super_expr(const bool)
 {
     if (current_class == NULL) {
@@ -648,6 +658,7 @@ const parse_rule_t rules[] = {
     [TOKEN_RIGHT_BRACE]     = {NULL,        NULL,   PREC_NONE},
     [TOKEN_COMMA]           = {NULL,        NULL,   PREC_NONE},
     [TOKEN_DOT]             = {NULL,        dot,    PREC_CALL},
+    [TOKEN_LEFT_BRACKET]    = {NULL,        subscript,PREC_CALL},
     [TOKEN_MINUS]           = {unary,       binary, PREC_TERM},
     [TOKEN_MINUS_MINUS]     = {NULL,        NULL,   PREC_TERM},
     [TOKEN_PLUS]            = {NULL,        binary, PREC_TERM},
@@ -740,9 +751,9 @@ static void function(function_type_t type)
         do {
             current->function->arity++;
             if (current->function->arity > MAX_PARAMETERS) {
-                error_at_current("Can't have more than " CPP_STRINGIFY(MAX_PARAMETERS) " parameters.");
+                error_at_current(gettext("Exceeded maximum number of parameters."));
             }
-            const uint8_t constant = parse_variable("Expect parameter name.");
+            const uint8_t constant = parse_variable(gettext("Expect parameter name."));
             define_variable(constant);
         } while (match(TOKEN_COMMA));
     }
@@ -828,7 +839,7 @@ static void class_declaration(void)
 
 static void fun_declaration(void)
 {
-    const uint8_t global = parse_variable("Expect function name.");
+    const uint8_t global = parse_variable(gettext("Expect function name."));
     mark_initialized(); // so we can support recursion before we compile the body
     function(TYPE_FUNCTION);
     define_variable(global);
@@ -836,7 +847,7 @@ static void fun_declaration(void)
 
 static void var_declaration(void)
 {
-    const uint8_t global = parse_variable("Expect variable name.");
+    const uint8_t global = parse_variable(gettext("Expect variable name."));
     if (match(TOKEN_EQUAL)) {
         expression();
     } else {
