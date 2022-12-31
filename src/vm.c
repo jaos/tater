@@ -572,6 +572,61 @@ void vm_t_init(void)
     vm_define_native("map", map_native, -1);
 }
 
+void vm_set_argc_argv(const int argc, const char *argv[])
+{
+    obj_string_t *argc_str = obj_string_t_copy_from("argc", 4);
+    vm_push(OBJ_VAL(argc_str));
+    value_t v = NUMBER_VAL(argc);
+    table_t_set(&vm.globals, argc_str, v);
+    vm_pop();
+
+    obj_string_t *argv_str = obj_string_t_copy_from("argv", 4);
+    vm_push(OBJ_VAL(argv_str));
+    obj_list_t *argv_list = obj_list_t_allocate();
+    vm_push(OBJ_VAL(argv_list));
+    for (int i = 0; i < argc; i++) {
+        obj_string_t *arg = obj_string_t_copy_from(argv[i], strlen(argv[i]));
+        vm_push(OBJ_VAL(arg));
+        value_array_t_add(&argv_list->elements, OBJ_VAL(arg));
+        vm_pop();
+    }
+    table_t_set(&vm.globals, argv_str, OBJ_VAL(argv_list));
+    vm_pop();
+    vm_pop();
+}
+
+extern char **environ;
+void vm_inherit_env(void)
+{
+    obj_string_t *env_global_name = obj_string_t_copy_from("env", 3);
+    vm_push(OBJ_VAL(env_global_name));
+
+    obj_map_t *env_map = obj_map_t_allocate();
+    vm_push(OBJ_VAL(env_map));
+
+    char **env = environ;
+    while (*env != NULL) {
+
+        const int env_len = strlen(*env);
+        const char *delim_offset = index(*env, '=') + 1;
+        const int from_delim_len = strlen(delim_offset);
+        const int to_delim_len = env_len - from_delim_len - 1;
+
+        obj_string_t *env_name = obj_string_t_copy_from(*env, to_delim_len);
+        vm_push(OBJ_VAL(env_name));
+        obj_string_t *env_value = obj_string_t_copy_from(delim_offset, from_delim_len);
+        vm_push(OBJ_VAL(env_value));
+        table_t_set(&env_map->table, env_name, OBJ_VAL(env_value));
+        vm_pop();
+        vm_pop();
+
+        env++;
+    }
+    table_t_set(&vm.globals, env_global_name, OBJ_VAL(env_map));
+    vm_pop();
+    vm_pop();
+}
+
 static void mark_array(value_array_t *array);
 static void blacken_object(obj_t *object);
 static void vm_t_free_object(obj_t *o);

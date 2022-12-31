@@ -56,7 +56,11 @@ void vm_t_free(void);
 vm_t_interpret_result_t vm_t_interpret(const char *source);
 void vm_push(const value_t value);
 value_t vm_pop(void);
+
 void vm_define_native(const char *name, const native_fn_t function, const int arity);
+
+void vm_set_argc_argv(const int argc, const char *argv[]);
+void vm_inherit_env(void);
 
 void vm_toggle_gc_stress(void);
 void vm_toggle_gc_trace(void);

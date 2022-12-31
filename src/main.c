@@ -5,7 +5,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <getopt.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -185,57 +184,41 @@ static void help(const char *name)
 #define GC_STRESS_OPT 's'
 #define GC_TRACE_OPT 't'
 
-int main(const int argc, char *argv[])
+int main(const int argc, const char *argv[])
 {
-    static struct option long_options[] __unused__ = {
-        {"debug", no_argument, 0, DEBUG_OPT},
-        {"d", no_argument, 0, DEBUG_OPT},
-        {"gc-trace", no_argument, 0, GC_TRACE_OPT},
-        {"t", no_argument, 0, GC_TRACE_OPT},
-        {"gc-stress", no_argument, 0, GC_STRESS_OPT},
-        {"s", no_argument, 0, GC_STRESS_OPT},
-        {"version", no_argument, 0, VERSION_OPT},
-        {"v", no_argument, 0, VERSION_OPT},
-        {"help", no_argument, 0, HELP_OPT},
-        {"h", no_argument, 0, HELP_OPT},
-        {0, 0, 0, 0},
-    };
-
     bool debug = false;
     bool gc_trace = false;
     bool gc_stress = false;
 
-    int option = -1, option_index = 0;
-    while ((option = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1) {
+    opterr = 0; // silence warnings
+    int option = -1;
+    while((option = getopt(argc, (char **)argv, "+dtsvh")) != -1) {
         switch (option) {
             case DEBUG_OPT: debug = true; break;
             case GC_TRACE_OPT: gc_trace = true; break;
             case GC_STRESS_OPT: gc_stress = true; break;
             case VERSION_OPT: version(argv[0]); return EXIT_SUCCESS;
             case HELP_OPT: help(argv[0]); return EXIT_SUCCESS;
-            default: help(argv[0]); return EXIT_FAILURE;
+            default: break; help(argv[0]); return EXIT_FAILURE;
         }
     }
 
+    vm_t_init();
+    if (debug) vm_toggle_stack_trace();
+    if (gc_trace) vm_toggle_gc_trace();
+    if (gc_stress) vm_toggle_gc_stress();
+
+    int rv = 0;
     if (optind == argc) { // no args
-        vm_t_init();
-        if (debug) vm_toggle_stack_trace();
-        if (gc_trace) vm_toggle_gc_trace();
-        if (gc_stress) vm_toggle_gc_stress();
-        int rv = repl();
-        vm_t_free();
-        return rv;
-    } else if ((optind + 1) == argc) {
-        vm_t_init();
-        if (debug) vm_toggle_stack_trace();
-        if (gc_trace) vm_toggle_gc_trace();
-        if (gc_stress) vm_toggle_gc_stress();
-        int rv = run_file(argv[optind]);
-        vm_t_free();
-        return rv;
+        vm_set_argc_argv(argc, argv); // repl gets ours?
+        vm_inherit_env();
+        rv = repl();
     } else {
-        help(argv[0]);
-        return EXIT_FAILURE;
+        vm_set_argc_argv(argc - optind, argv + optind);
+        vm_inherit_env();
+        rv = run_file(argv[optind]);
     }
-    return EXIT_SUCCESS;
+
+    vm_t_free();
+    return rv;
 }

@@ -55,7 +55,7 @@ Add modulus, bitwise operators
 
 add file type
 
-add argc/argv for scripts
+[DONE] add argc/argv/env for scripts
 
 add printerr or some stderr printing
 

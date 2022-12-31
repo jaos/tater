@@ -786,6 +786,32 @@ START_TEST(test_debug)
     vm_t_free();
 }
 
+START_TEST(test_env) {
+    vm_t_init();
+    vm_toggle_gc_stress();
+    vm_toggle_gc_trace();
+    vm_toggle_stack_trace();
+    vm_inherit_env();
+
+    const char *args[] = {
+        "testprog",
+        "--foo",
+        "--bar",
+    };
+    vm_set_argc_argv(3, args);
+
+    const char *program = ""
+    "assert(argc == 3);"
+    "assert(argv.len() == 3);"
+    "assert(argv.get(0) == \"testprog\");"
+    "assert(argv.get(1) == \"--foo\");"
+    "assert(argv.get(2) == \"--bar\");"
+    "assert(env.get(\"HOME\") != nil);"
+    "assert(env.get(\"NOSUCHENVVARIABLETESTING\") == nil);"
+    "";
+    ck_assert_msg(vm_t_interpret(program) == INTERPRET_OK, "Failed to interpret: %s", program);
+    vm_t_free();
+}
 
 int main(const int argc, const char *argv[])
 {
@@ -829,6 +855,10 @@ int main(const int argc, const char *argv[])
 
     tc = tcase_create("debug");
     tcase_add_test(tc, test_debug);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("env");
+    tcase_add_test(tc, test_env);
     suite_add_tcase(s, tc);
 
     if (argc > 1) {
