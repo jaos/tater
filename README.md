@@ -15,6 +15,18 @@ meson compile -C build
 meson test -C build && ninja coverage-html -C build
 ```
 
+Run the REPL
+
+```sh
+meson devenv -C build ./src/clox
+```
+
+Run the benchmark
+
+```sh
+meson devenv -C build ./src/clox $PWD/t/bench.lox
+```
+
 ## Translations
 
 ```sh

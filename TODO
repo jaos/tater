@@ -1,0 +1,97 @@
+
+[DONE] rename functions with struct/type as prefix uniformly
+
+    init_chunk -> chunk_t_init
+    free_chunk -> chunk_t_free
+    write_chunk -> chunk_t_write
+    add_constant -> chunk_t_add_constant
+
+    new_obj_instance_t -> obj_instance_t_new (or allocate)
+
+    init_table_t ->  table_t_init
+    free_table_t ->  ...
+    set_table_t ->  ...
+    get_table_t ->  ...
+    delete_table_t ->  ...
+    find_string_table_t -> ... 
+    table_remove_white ->  ...
+    mark_table ->  ...
+    add_all_table_t -> ... 
+
+Rename things:
+    [DONE] receiver -> instance
+    ???
+
+[DONE] Make all errors translatable
+
+[DONE] Join modules together
+    chunk -> vm.h (vm_chunk ?)
+    value -> object.h
+    memory -> vm.h (might as well)
+
+Integrate challenges
+
+[DONE] Integrate postfix
+
+how to const a value?
+
+[DONE] Make tracing configurable/runtime
+
+Change all statics to passed to each call.
+
+use a uint8_t generation to mark for gc
+
+[DONE] add an exit/assert
+
+Add modulus, bitwise operators
+
+[DONE] add string helper
+
+[DONE] add number helper
+
+[DONE] add list
+
+[DONE] add map type
+
+add file type
+
+add argc/argv for scripts
+
+add printerr or some stderr printing
+
+[DONE] add subscript operator for strings, list, and map
+
+figure out how to have namespaces and packages
+    - then make a std library
+
+rename class to "type"?
+
+rename var to "let" ?
+
+rename "fun" to "fn" ?
+
+Future language ideas:
+
+    enum State {
+        Sitting;
+        Standing;
+    }
+
+    struct Jason {
+        field name: Str;
+        field age: Int;
+        field state: State;
+
+        method sit() {
+            self.state = State.Sitting;
+        }
+        method stand() {
+            self.state = State.Standing;
+        }
+    }
+
+    fn main() {
+        let me = Jason{name:"jason", age:12, state:State.Standing};
+        print(me.name);
+        return true;
+    }

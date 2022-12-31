@@ -1,0 +1,33 @@
+name: clox CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: setup
+      run: sudo apt-get install meson check gcovr ninja-build
+
+    - name: get newest meson
+      run: pip3 install --user --upgrade meson
+
+    - name: configure
+      run: ~/.local/bin/meson setup build --prefix=/usr --sysconfdir=/etc --mandir=/usr/man --buildtype=debugoptimized -Db_coverage=true
+
+    - name: compile
+      run: ~/.local/bin/meson compile -C build
+
+    - name: run test
+      run: ~/.local/bin/meson test -v -C build
+
+    - name: run test coverage
+      run: ninja coverage-html -C build
