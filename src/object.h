@@ -35,6 +35,8 @@
 #define IS_NUMBER(value) ((value).type == VAL_NUMBER)
 #define IS_OBJ(value)    ((value).type == VAL_OBJ)
 #define IS_EMPTY(value)  ((value).type == VAL_EMPTY)
+#define IS_TRUE(value)   (IS_BOOL(value) && AS_BOOL(value) == true)
+#define IS_FALSE(value)  (IS_BOOL(value) && AS_BOOL(value) == false)
 
 #define AS_OBJ(value)    ((value).as.obj)
 #define AS_BOOL(value)   ((value).as.boolean)
@@ -115,7 +117,7 @@ typedef struct {
 } chunk_t;
 
 typedef struct {
-    obj_string_t *key;
+    value_t key;
     value_t value;
 } entry_t;
 
@@ -226,9 +228,9 @@ void value_t_mark(value_t value);
 
 void table_t_init(table_t *table);
 void table_t_free(table_t *table);
-bool table_t_set(table_t *table, obj_string_t *key, const value_t value);
-bool table_t_get(table_t *table, const obj_string_t *key, value_t *value);
-bool table_t_delete(table_t *table, const obj_string_t *key);
+bool table_t_set(table_t *table, value_t key, const value_t value);
+bool table_t_get(table_t *table, const value_t key, value_t *value);
+bool table_t_delete(table_t *table, const value_t key);
 obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, const int length, const uint32_t hash);
 void table_t_remove_white(table_t *table);
 void table_t_mark(table_t *table);

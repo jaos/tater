@@ -72,7 +72,7 @@ void vm_define_native(const char *name, const native_fn_t function, const int ar
 {
     vm_push(OBJ_VAL(obj_string_t_copy_from(name, (int)strlen(name))));
     vm_push(OBJ_VAL(obj_native_t_allocate(function, AS_STRING(vm.stack[0]), arity)));
-    table_t_set(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    table_t_set(&vm.globals, vm.stack[0], vm.stack[1]);
     vm_pop();
     vm_pop();
 }
@@ -91,7 +91,7 @@ static bool has_field_native(const int arg_count, const value_t *args)
 
     obj_instance_t *instance = AS_INSTANCE(args[0]);
     value_t v;
-    vm_push(BOOL_VAL(table_t_get(&instance->fields, AS_STRING(args[1]), &v)));
+    vm_push(BOOL_VAL(table_t_get(&instance->fields, args[1], &v)));
     return true;
 }
 
@@ -165,7 +165,7 @@ static bool get_field_native(const int arg_count, const value_t *args)
 
     obj_instance_t *instance = AS_INSTANCE(args[0]);
     value_t v = NIL_VAL;
-    table_t_get(&instance->fields, AS_STRING(args[1]), &v);
+    table_t_get(&instance->fields, args[1], &v);
     vm_push(v);
     return true;
 }
@@ -178,7 +178,7 @@ static bool set_field_native(const int arg_count, const value_t *args)
     }
 
     obj_instance_t *instance = AS_INSTANCE(args[0]);
-    table_t_set(&instance->fields, AS_STRING(args[1]), args[2]);
+    table_t_set(&instance->fields, args[1], args[2]);
     vm_push(args[2]);
     return true;
 }
@@ -195,6 +195,10 @@ static bool str_native(const int arg_count, const value_t *args)
         vm_push(OBJ_VAL(obj_string_t_copy_from("", 0)));
         return true;
     }
+    if (IS_STRING(args[0])) {
+        vm_push(args[0]);
+        return true;
+    }
 
     value_t v = args[0];
     vm_push(OBJ_VAL(value_t_to_obj_string_t(v)));
@@ -205,6 +209,12 @@ static bool list_native(const int argc, const value_t *args)
 {
     obj_list_t *list = obj_list_t_allocate();
     vm_push(OBJ_VAL(list));
+    if (argc == 1 && IS_LIST(args[0])) {
+        for (int i = 0 ; i < argc; i++) {
+            value_array_t_add(&list->elements, args[i]);
+        }
+        return true;
+    }
     for (int i = 0 ; i < argc; i++) {
         value_array_t_add(&list->elements, args[i]);
     }
@@ -213,19 +223,29 @@ static bool list_native(const int argc, const value_t *args)
 
 static bool map_native(const int argc, const value_t *args)
 {
-    obj_map_t *map = obj_map_t_allocate();
-    vm_push(OBJ_VAL(map));
+    if (argc == 1 && IS_MAP(args[0])) {
+        obj_map_t *from_map = AS_MAP(args[0]);
+
+        obj_map_t *map = obj_map_t_allocate();
+        vm_push(OBJ_VAL(map));
+        for (int i = 0; i < from_map->table.capacity; i++) {
+            entry_t entry = from_map->table.entries[i];
+            if (IS_EMPTY(entry.key))
+                continue;
+            table_t_set(&map->table, entry.key, entry.value);
+        }
+        return true;
+    }
 
     if (argc % 2) {
         runtime_error(gettext("Cannot initialize a map with an odd number of arguments."));
         return false;
     }
+
+    obj_map_t *map = obj_map_t_allocate();
+    vm_push(OBJ_VAL(map));
     for (int i = 0; i < argc; i += 2) {
-        if (!IS_STRING(args[i])) {
-            runtime_error(gettext("Map keys can only be strings."));
-            return false;
-        }
-        table_t_set(&map->table, AS_STRING(args[i]), args[i+1]);
+        table_t_set(&map->table, args[i], args[i+1]);
     }
     return true;
 }
@@ -415,12 +435,12 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
     }
 
     else if (method->length == 9 && memcmp(method->chars, KEYWORD_SUBSCRIPT, KEYWORD_SUBSCRIPT_LEN) == 0) {
-        if (arg_count != 2) {
-            runtime_error(gettext("list.subscript requires a single numerical argument."));
+        if (!(arg_count == 2 || arg_count == 3)) {
+            runtime_error(gettext("list.subscript requires a single index or an index and a value."));
             return false;
         }
         if (!IS_NUMBER(args[1])) {
-            runtime_error(gettext("list.subscript requires a single numerical argument."));
+            runtime_error(gettext("list.subscript requires a numerical index."));
             return false;
         }
         int index = (int)AS_NUMBER(args[1]);
@@ -431,8 +451,13 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
             runtime_error(gettext("invalid list.subscript index."));
             return false;
         }
-        value_t v = list->elements.values[index];
-        vm_push(v);
+        if (arg_count == 3) {
+            list->elements.values[index] = args[2];
+            vm_push(args[2]);
+        } else {
+            value_t v = list->elements.values[index];
+            vm_push(v);
+        }
         return true;
     }
 
@@ -459,7 +484,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
                 return false;
             }
             value_t v;
-            if (table_t_get(&map->table, AS_STRING(args[1]), &v)) {
+            if (table_t_get(&map->table, args[1], &v)) {
                 vm_push(v);
             } else {
                 vm_push(NIL_VAL);
@@ -467,17 +492,14 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_SET, KEYWORD_SET_LEN) == 0) {
-            if (arg_count != 3 || !IS_STRING(args[1])) {
-                runtime_error(gettext("map.set requires a string and a value argument."));
+            if (arg_count != 3) {
+                runtime_error(gettext("map.set requires a key and a value argument."));
                 return false;
             }
             value_t v = args[2];
-            if (table_t_set(&map->table, AS_STRING(args[1]), v)) {
-                vm_push(NIL_VAL);
-                return true;
-            }
-            runtime_error(gettext("map.set failed."));
-            return false;
+            table_t_set(&map->table, args[1], v);
+            vm_push(v);
+            return true;
         }
     }
 
@@ -490,8 +512,8 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
         vm_push(OBJ_VAL(keys));
         for (int i = 0; i < map->table.capacity; i++) {
             entry_t entry = map->table.entries[i];
-            if (entry.key != NULL) {
-                value_array_t_add(&keys->elements, OBJ_VAL(entry.key));
+            if (!IS_EMPTY(entry.key)) {
+                value_array_t_add(&keys->elements, entry.key);
             }
         }
         return true;
@@ -503,7 +525,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
                 runtime_error(gettext("map.remove requires a single string argument."));
                 return false;
             }
-            table_t_delete(&map->table, AS_STRING(args[1]));
+            table_t_delete(&map->table, args[1]);
             vm_push(NIL_VAL);
             return true;
         }
@@ -516,7 +538,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             vm_push(OBJ_VAL(values));
             for (int i = 0; i < map->table.capacity; i++) {
                 entry_t entry = map->table.entries[i];
-                if (entry.key != NULL) {
+                if (!IS_EMPTY(entry.key)) {
                     value_array_t_add(&values->elements, entry.value);
                 }
             }
@@ -525,12 +547,18 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
     }
 
     else if (method->length == 9 && memcmp(method->chars, KEYWORD_SUBSCRIPT, KEYWORD_SUBSCRIPT_LEN) == 0) {
-        if (arg_count != 2 || !IS_STRING(args[1])) {
-            runtime_error(gettext("map.subscript requires a single string argument."));
+        if (!(arg_count == 2 || arg_count == 3)) {
+            runtime_error(gettext("map.subscript requires a single key argument or a key and a value."));
             return false;
         }
+        if (arg_count == 3) {
+            table_t_set(&map->table, args[1], args[2]);
+            vm_push(args[2]);
+            return true;
+        }
+
         value_t v;
-        if (table_t_get(&map->table, AS_STRING(args[1]), &v)) {
+        if (table_t_get(&map->table, args[1], &v)) {
             vm_push(v);
         } else {
             vm_push(NIL_VAL);
@@ -574,23 +602,26 @@ void vm_t_init(void)
 
 void vm_set_argc_argv(const int argc, const char *argv[])
 {
-    obj_string_t *argc_str = obj_string_t_copy_from("argc", 4);
-    vm_push(OBJ_VAL(argc_str));
+    value_t argc_str = OBJ_VAL(obj_string_t_copy_from("argc", 4));
+    vm_push(argc_str);
     value_t v = NUMBER_VAL(argc);
+    vm_push(v);
     table_t_set(&vm.globals, argc_str, v);
     vm_pop();
+    vm_pop();
 
-    obj_string_t *argv_str = obj_string_t_copy_from("argv", 4);
-    vm_push(OBJ_VAL(argv_str));
-    obj_list_t *argv_list = obj_list_t_allocate();
-    vm_push(OBJ_VAL(argv_list));
+    value_t argv_str = OBJ_VAL(obj_string_t_copy_from("argv", 4));
+    vm_push(argv_str);
+    value_t argv_list = OBJ_VAL(obj_list_t_allocate());
+    vm_push(argv_list);
+    table_t_set(&vm.globals, argv_str, argv_list);
+
     for (int i = 0; i < argc; i++) {
-        obj_string_t *arg = obj_string_t_copy_from(argv[i], strlen(argv[i]));
-        vm_push(OBJ_VAL(arg));
-        value_array_t_add(&argv_list->elements, OBJ_VAL(arg));
+        value_t arg = OBJ_VAL(obj_string_t_copy_from(argv[i], strlen(argv[i])));
+        vm_push(arg);
+        value_array_t_add(&AS_LIST(argv_list)->elements, arg);
         vm_pop();
     }
-    table_t_set(&vm.globals, argv_str, OBJ_VAL(argv_list));
     vm_pop();
     vm_pop();
 }
@@ -598,31 +629,29 @@ void vm_set_argc_argv(const int argc, const char *argv[])
 extern char **environ;
 void vm_inherit_env(void)
 {
-    obj_string_t *env_global_name = obj_string_t_copy_from("env", 3);
-    vm_push(OBJ_VAL(env_global_name));
-
-    obj_map_t *env_map = obj_map_t_allocate();
-    vm_push(OBJ_VAL(env_map));
-
     char **env = environ;
-    while (*env != NULL) {
 
+    value_t env_global_name = OBJ_VAL(obj_string_t_copy_from("env", 3));
+    vm_push(env_global_name);
+    value_t env_map = OBJ_VAL(obj_map_t_allocate());
+    vm_push(env_map);
+    table_t_set(&vm.globals, env_global_name, env_map);
+    while (*env != NULL) {
         const int env_len = strlen(*env);
         const char *delim_offset = index(*env, '=') + 1;
         const int from_delim_len = strlen(delim_offset);
         const int to_delim_len = env_len - from_delim_len - 1;
 
-        obj_string_t *env_name = obj_string_t_copy_from(*env, to_delim_len);
-        vm_push(OBJ_VAL(env_name));
-        obj_string_t *env_value = obj_string_t_copy_from(delim_offset, from_delim_len);
-        vm_push(OBJ_VAL(env_value));
-        table_t_set(&env_map->table, env_name, OBJ_VAL(env_value));
+        value_t env_name = OBJ_VAL(obj_string_t_copy_from(*env, to_delim_len));
+        vm_push(env_name);
+        value_t env_value = OBJ_VAL(obj_string_t_copy_from(delim_offset, from_delim_len));
+        vm_push(env_value);
+        table_t_set(&AS_MAP(env_map)->table, env_name, env_value);
         vm_pop();
         vm_pop();
 
         env++;
     }
-    table_t_set(&vm.globals, env_global_name, OBJ_VAL(env_map));
     vm_pop();
     vm_pop();
 }
@@ -740,7 +769,7 @@ static bool call_value(const value_t callee, const int arg_count)
                 obj_class_t *cls = AS_CLASS(callee);
                 vm.stack_top[-arg_count - 1] = OBJ_VAL(obj_instance_t_allocate(cls));
                 value_t initializer;
-                if (table_t_get(&cls->methods, vm.init_string, &initializer)) {
+                if (table_t_get(&cls->methods, OBJ_VAL(vm.init_string), &initializer)) {
                     return call(AS_CLOSURE(initializer), arg_count);
                 } else if (arg_count != 0) {
                     runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), arg_count, cls->name->chars);
@@ -773,7 +802,7 @@ static bool call_value(const value_t callee, const int arg_count)
 static bool invoke_from_class(obj_class_t *cls, const obj_string_t *name, const int arg_count)
 {
     value_t method;
-    if (!table_t_get(&cls->methods, name, &method)) {
+    if (!table_t_get(&cls->methods, OBJ_VAL(name), &method)) {
         runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
@@ -811,7 +840,7 @@ static bool invoke(const obj_string_t *name, const int arg_count)
 
         // priority... do not invoke a field that is a function like a method
         value_t function_value;
-        if (table_t_get(&instance->fields, name, &function_value)) {
+        if (table_t_get(&instance->fields, OBJ_VAL(name), &function_value)) {
             vm.stack_top[-arg_count - 1] = function_value; // swap receiving_instance for our function
             return call_value(function_value, arg_count);
         }
@@ -828,7 +857,7 @@ static bool invoke(const obj_string_t *name, const int arg_count)
 static bool bind_method(obj_class_t *cls, const obj_string_t *name)
 {
     value_t method;
-    if (!table_t_get(&cls->methods, name, &method)) {
+    if (!table_t_get(&cls->methods, OBJ_VAL(name), &method)) {
         runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
@@ -877,7 +906,7 @@ static void define_method(obj_string_t *name)
 {
     value_t method = peek(0);
     obj_class_t *cls = AS_CLASS(peek(1)); // left on the stack for us by class_declaration
-    table_t_set(&cls->methods, name, method);
+    table_t_set(&cls->methods, OBJ_VAL(name), method);
     vm_pop();
 }
 
@@ -973,7 +1002,7 @@ static vm_t_interpret_result_t run(void)
             case OP_GET_GLOBAL: {
                 const obj_string_t *name = READ_STRING();
                 value_t value;
-                if (!table_t_get(&vm.globals, name, &value)) {
+                if (!table_t_get(&vm.globals, OBJ_VAL(name), &value)) {
                     frame->ip = ip;
                     runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
@@ -983,14 +1012,14 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_DEFINE_GLOBAL: {
                 obj_string_t *name = READ_STRING();
-                table_t_set(&vm.globals, name, peek(0));
+                table_t_set(&vm.globals, OBJ_VAL(name), peek(0));
                 vm_pop();
                 break;
             }
             case OP_SET_GLOBAL: {
                 obj_string_t *name = READ_STRING();
-                if (table_t_set(&vm.globals, name, peek(0))) {
-                    table_t_delete(&vm.globals, name);
+                if (table_t_set(&vm.globals, OBJ_VAL(name), peek(0))) {
+                    table_t_delete(&vm.globals, OBJ_VAL(name));
                     frame->ip = ip;
                     runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
@@ -1039,7 +1068,7 @@ static vm_t_interpret_result_t run(void)
 
                     // fields (priority, may shadow methods)
                     value_t value;
-                    if (table_t_get(&instance->fields, name, &value)) {
+                    if (table_t_get(&instance->fields, OBJ_VAL(name), &value)) {
                         vm_pop(); // instance
                         vm_push(value);
                         break;
@@ -1063,7 +1092,7 @@ static vm_t_interpret_result_t run(void)
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 obj_instance_t *instance = AS_INSTANCE(peek(1));
-                table_t_set(&instance->fields, READ_STRING(), peek(0)); // read name, peek the value to set
+                table_t_set(&instance->fields, OBJ_VAL(READ_STRING()), peek(0)); // read name, peek the value to set
                 const value_t value = vm_pop(); // pop the value
                 vm_pop(); // pop the instance
                 vm_push(value); // push the value so we leave the value as the return
@@ -1445,6 +1474,7 @@ static void mark_roots(void)
     }
 
     table_t_mark(&vm.globals);
+    table_t_mark(&vm.strings);
     compiler_t_mark_roots();
     obj_t_mark((obj_t*)vm.init_string);
 }

@@ -116,6 +116,10 @@ static const char *const token_keyword_names[] = {
 #define KEYWORD_KEYS_LEN 4
 #define KEYWORD_VALUES "values"
 #define KEYWORD_VALUES_LEN 6
+#define KEYWORD_LIST "list"
+#define KEYWORD_LIST_LEN 4
+#define KEYWORD_MAP "map"
+#define KEYWORD_MAP_LEN 3
 
 typedef struct {
     token_type_t type;

@@ -241,9 +241,21 @@ START_TEST(test_vm)
         "var a = list(); a.remove(0); assert(a.len() == 0);",
         "var a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
         "var a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
+        "var a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\");",
+
+        "var a = [{\"name\": \"foo\", \"counter\": 11}, {\"name\": \"bar\", \"counter\": 22}];"
+        "assert(a[0][\"counter\"] == 11); assert(a[1][\"counter\"] == 22); assert(a[0][\"name\"] + a[1][\"name\"] == \"foobar\");",
 
         "var m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
         "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);",
+        "map(1, \"one\").len();",
+        "var a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\");",
+
+        "var a = map(); for (var i = 0; i < 255; i++) { a.set(\"testcase\" + str(i), str(i * 255)); }"
+        "for (var i = 0; i < 255; i++) { assert(a[\"testcase\" + str(i)] == str(i * 255)); }",
+
+        "class Animal {} class Dog < Animal {} class Cat < Animal {}"
+        "var m = {Cat:[], Dog:[]}; m[Cat].append(Cat()); assert(m[Cat].len() == 1); m[Animal] = [Dog(), Cat()]; assert(m[Animal].len() == 2);",
 
         "var a = map(\"one\", 1, \"two\", 2); a.set(\"three\", 3); print(a); assert(is(a, map));"
         "var counter = 0; while (true) {"
@@ -519,7 +531,6 @@ START_TEST(test_vm)
         "list(1).remove(2);",
         "true.nosuchpropertyonanoninstance;",
         "map(1);",
-        "map(1, \"one\").len();",
         "map(\"one\", 1).len(1);",
         NULL,
     };
@@ -619,27 +630,29 @@ START_TEST(test_table)
     ck_assert(strncmp(key1->chars, key2->chars, key1->length) != 0);
     ck_assert(strncmp(key1->chars, key3->chars, key1->length) != 0);
 
-    ck_assert(!table_t_delete(&t, key1));
-    ck_assert(!table_t_delete(&t, key2));
-    ck_assert(!table_t_delete(&t, key3));
+    ck_assert(!table_t_delete(&t, OBJ_VAL(key1)));
+    ck_assert(!table_t_delete(&t, OBJ_VAL(key2)));
+    ck_assert(!table_t_delete(&t, OBJ_VAL(key3)));
 
-    ck_assert(table_t_set(&t, key1, NUMBER_VAL(10)));
-    ck_assert(table_t_set(&t, key2, NUMBER_VAL(20)));
-    ck_assert(table_t_set(&t, key3, NUMBER_VAL(30)));
-    ck_assert(table_t_delete(&t, key3));
-    ck_assert(!table_t_delete(&t, key3));
+    ck_assert(table_t_set(&t, OBJ_VAL(key1), NUMBER_VAL(10)));
+    ck_assert(table_t_set(&t, OBJ_VAL(key2), NUMBER_VAL(20)));
+    ck_assert(table_t_set(&t, OBJ_VAL(key3), NUMBER_VAL(30)));
+    ck_assert(table_t_delete(&t, OBJ_VAL(key3)));
+    ck_assert(!table_t_delete(&t, OBJ_VAL(key3)));
     value_t v;
-    ck_assert(!table_t_get(&t, key3, &v));
+    ck_assert(table_t_get(&t, OBJ_VAL(key1), &v));
+    ck_assert(table_t_get(&t, OBJ_VAL(key2), &v));
+    ck_assert(!table_t_get(&t, OBJ_VAL(key3), &v));
 
     table_t tcopy;
     table_t_init(&tcopy);
     table_t_copy_to(&t, &tcopy);
 
-    for (int i = 0; i < t.count; i++) {
+    for (int i = 0; i < t.capacity; i++) {
         value_t from_t;
         value_t from_tcopy;
-        ck_assert(table_t_get(&t, key1, &from_t));
-        ck_assert(table_t_get(&tcopy, key1, &from_tcopy));
+        ck_assert(table_t_get(&t, OBJ_VAL(key1), &from_t));
+        ck_assert(table_t_get(&tcopy, OBJ_VAL(key1), &from_tcopy));
         ck_assert(value_t_equal(from_t, from_tcopy));
     }
 
@@ -649,6 +662,39 @@ START_TEST(test_table)
 
     table_t_free(&t);
     table_t_free(&tcopy);
+
+
+    table_t big;
+    table_t_init(&big);
+    for (int i = 0; i < 8192; i++) {
+        char buffer[255];
+        int wrote = snprintf(buffer, 255, "item%dforhash", i);
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        ck_assert(table_t_set(&big, key, NUMBER_VAL(i)));
+    }
+    for (int i = 0; i < 8192; i++) {
+        char buffer[255];
+        int wrote = snprintf(buffer, 255, "item%dforhash", i);
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        value_t rv;
+        ck_assert(table_t_get(&big, key, &rv));
+        ck_assert(AS_NUMBER(rv) == i);
+    }
+    table_t bigcopy;
+    table_t_init(&bigcopy);
+    table_t_copy_to(&big, &bigcopy);
+    for (int i = 0; i < 8192; i++) {
+        char buffer[255];
+        int wrote = snprintf(buffer, 255, "item%dforhash", i);
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        value_t from_big;
+        value_t from_bigcopy;
+        ck_assert(table_t_get(&big, key, &from_big));
+        ck_assert(table_t_get(&bigcopy, key, &from_bigcopy));
+        ck_assert(value_t_equal(from_big, from_bigcopy));
+    }
+    table_t_free(&big);
+    table_t_free(&bigcopy);
 
     vm_t_free();
 }

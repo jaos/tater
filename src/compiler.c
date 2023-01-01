@@ -299,11 +299,11 @@ static uint8_t identifier_constant(const token_t *name)
 {
     obj_string_t *constant_str = obj_string_t_copy_from(name->start, name->length);
     value_t existing_index;
-    if (table_t_get(&current->string_constants, constant_str, &existing_index)) {
+    if (table_t_get(&current->string_constants, OBJ_VAL(constant_str), &existing_index)) {
         return (uint8_t)AS_NUMBER(existing_index);
     }
     uint8_t index = make_constant(OBJ_VAL(constant_str));
-    table_t_set(&current->string_constants, constant_str, NUMBER_VAL(index));
+    table_t_set(&current->string_constants, OBJ_VAL(constant_str), NUMBER_VAL(index));
     return index;
 }
 
@@ -487,14 +487,69 @@ static token_t synthetic_token(const char *text)
     return token;
 }
 
-static void subscript(const bool)
+static void map(const bool)
 {
+    token_t map_token = synthetic_token(KEYWORD_MAP);
+    const uint8_t map = identifier_constant(&map_token);
+    emit_bytes(OP_GET_GLOBAL, map);
+    int arg_count = 0;
+
+    if (!match(TOKEN_RIGHT_BRACE)) {
+        do {
+            expression();
+            match(TOKEN_COLON);
+            expression();
+            arg_count += 2;
+        } while (match(TOKEN_COMMA));
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after expression.");
+    }
+    emit_bytes(OP_CALL, arg_count);
+}
+
+static void list(const bool)
+{
+    token_t list_token = synthetic_token(KEYWORD_LIST);
+    const uint8_t list = identifier_constant(&list_token);
+    emit_bytes(OP_GET_GLOBAL, list);
+
+    int arg_count = 0;
+    if (!match(TOKEN_RIGHT_BRACKET)) {
+        do {
+            expression();
+            arg_count++;
+        } while (match(TOKEN_COMMA));
+        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+    }
+    emit_bytes(OP_CALL, arg_count);
+}
+
+static void subscript(const bool can_assign)
+{
+    uint8_t arg_count = 0;
     expression();
     consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+    arg_count++;
+
+    if (can_assign && match(TOKEN_EQUAL)) {
+        expression();
+        arg_count++;
+    }
     token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
     const uint8_t subscript = identifier_constant(&subscript_token);
     emit_bytes(OP_INVOKE, subscript);
-    emit_byte(1);
+    emit_byte(arg_count);
+}
+
+static void increment(const bool)
+{
+    emit_constant(NUMBER_VAL(1));
+    emit_byte(OP_ADD);
+}
+
+static void decrement(const bool)
+{
+    emit_constant(NUMBER_VAL(-1));
+    emit_byte(OP_ADD);
 }
 
 static void dot(const bool can_assign)
@@ -652,51 +707,52 @@ static void unary(const bool)
 }
 
 const parse_rule_t rules[] = {
-    [TOKEN_LEFT_PAREN]      = {grouping,    call,   PREC_CALL},
-    [TOKEN_RIGHT_PAREN]     = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_LEFT_BRACE]      = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_RIGHT_BRACE]     = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_COMMA]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_DOT]             = {NULL,        dot,    PREC_CALL},
-    [TOKEN_LEFT_BRACKET]    = {NULL,        subscript,PREC_CALL},
-    [TOKEN_MINUS]           = {unary,       binary, PREC_TERM},
-    [TOKEN_MINUS_MINUS]     = {NULL,        NULL,   PREC_TERM},
-    [TOKEN_PLUS]            = {NULL,        binary, PREC_TERM},
-    [TOKEN_PLUS_PLUS]       = {NULL,        NULL,   PREC_TERM},
-    [TOKEN_SEMICOLON]       = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_SLASH]           = {NULL,        binary, PREC_FACTOR},
-    [TOKEN_STAR]            = {NULL,        binary, PREC_FACTOR},
-    [TOKEN_BANG]            = {unary,       NULL,   PREC_NONE},
-    [TOKEN_BANG_EQUAL]      = {NULL,        binary, PREC_EQUALITY},
-    [TOKEN_EQUAL]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]     = {NULL,        binary, PREC_EQUALITY},
-    [TOKEN_GREATER]         = {NULL,        binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL]   = {NULL,        binary, PREC_COMPARISON},
-    [TOKEN_LESS]            = {NULL,        binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL]      = {NULL,        binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER]      = {variable,    NULL,   PREC_NONE},
-    [TOKEN_STRING]          = {string,      NULL,   PREC_NONE},
-    [TOKEN_NUMBER]          = {number,      NULL,   PREC_NONE},
-    [TOKEN_AND]             = {NULL,        and_expr,PREC_AND},
-    [TOKEN_CLASS]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_ELSE]            = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_FALSE]           = {literal,     NULL,   PREC_NONE},
-    [TOKEN_FOR]             = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_FUN]             = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_IF]              = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_NIL]             = {literal,     NULL,   PREC_NONE},
-    [TOKEN_OR]              = {NULL,        or_expr,PREC_OR},
-    [TOKEN_PRINT]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_RETURN]          = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_SUPER]           = {super_expr,  NULL,   PREC_NONE},
-    [TOKEN_THIS]            = {this_expr,   NULL,   PREC_NONE},
-    [TOKEN_TRUE]            = {literal,     NULL,   PREC_NONE},
-    [TOKEN_VAR]             = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_WHILE]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_ERROR]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_EXIT]            = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_ASSERT]          = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_EOF]             = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_LEFT_PAREN]      = {grouping,    call,       PREC_CALL},
+    [TOKEN_RIGHT_PAREN]     = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_LEFT_BRACE]      = {map,         NULL,       PREC_NONE},
+    [TOKEN_RIGHT_BRACE]     = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_COMMA]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_DOT]             = {NULL,        dot,        PREC_CALL},
+    [TOKEN_LEFT_BRACKET]    = {list,        subscript,  PREC_CALL},
+    [TOKEN_RIGHT_BRACKET]   = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_MINUS]           = {unary,       binary,     PREC_TERM},
+    [TOKEN_MINUS_MINUS]     = {NULL,        decrement,  PREC_TERM},
+    [TOKEN_PLUS]            = {NULL,        binary,     PREC_TERM},
+    [TOKEN_PLUS_PLUS]       = {NULL,        increment,  PREC_TERM},
+    [TOKEN_SEMICOLON]       = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_SLASH]           = {NULL,        binary,     PREC_FACTOR},
+    [TOKEN_STAR]            = {NULL,        binary,     PREC_FACTOR},
+    [TOKEN_BANG]            = {unary,       NULL,       PREC_NONE},
+    [TOKEN_BANG_EQUAL]      = {NULL,        binary,     PREC_EQUALITY},
+    [TOKEN_EQUAL]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_EQUAL_EQUAL]     = {NULL,        binary,     PREC_EQUALITY},
+    [TOKEN_GREATER]         = {NULL,        binary,     PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL]   = {NULL,        binary,     PREC_COMPARISON},
+    [TOKEN_LESS]            = {NULL,        binary,     PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL]      = {NULL,        binary,     PREC_COMPARISON},
+    [TOKEN_IDENTIFIER]      = {variable,    NULL,       PREC_NONE},
+    [TOKEN_STRING]          = {string,      NULL,       PREC_NONE},
+    [TOKEN_NUMBER]          = {number,      NULL,       PREC_NONE},
+    [TOKEN_AND]             = {NULL,        and_expr,   PREC_AND},
+    [TOKEN_CLASS]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_ELSE]            = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_FALSE]           = {literal,     NULL,       PREC_NONE},
+    [TOKEN_FOR]             = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_FUN]             = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_IF]              = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_NIL]             = {literal,     NULL,       PREC_NONE},
+    [TOKEN_OR]              = {NULL,        or_expr,    PREC_OR},
+    [TOKEN_PRINT]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_RETURN]          = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_SUPER]           = {super_expr,  NULL,       PREC_NONE},
+    [TOKEN_THIS]            = {this_expr,   NULL,       PREC_NONE},
+    [TOKEN_TRUE]            = {literal,     NULL,       PREC_NONE},
+    [TOKEN_VAR]             = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_WHILE]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_ERROR]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_EXIT]            = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_ASSERT]          = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_EOF]             = {NULL,        NULL,       PREC_NONE},
 };
 
 static void parse_precedence(const precedence_t precedence)
@@ -738,6 +794,7 @@ static void block(void)
         declaration();
     }
     consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after block."));
+    match(TOKEN_SEMICOLON);
 }
 
 static void function(function_type_t type)
@@ -826,6 +883,7 @@ static void class_declaration(void)
         method();
     }
     consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after class body."));
+    match(TOKEN_SEMICOLON);
 
     emit_byte(OP_POP); // done with our class, pop it off the stack
 
