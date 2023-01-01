@@ -906,15 +906,17 @@ static void concatenate(void)
 static vm_t_interpret_result_t run(void)
 {
     call_frame_t *frame = &vm.frames[vm.frame_count - 1];
+    register uint8_t *ip = frame->ip;
 
-#define READ_BYTE() (*frame->ip++)
+#define READ_BYTE() (*ip++)
 #define READ_SHORT() \
-    (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+    (ip += 2, (uint16_t)((ip[-2] << 8) | ip[-1]))
 #define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type_wrapper, op) \
     do { \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+            frame->ip = ip; \
             runtime_error(gettext("Operands must be numbers.")); \
             return INTERPRET_RUNTIME_ERROR; \
         } \
@@ -935,17 +937,17 @@ static vm_t_interpret_result_t run(void)
             printf("\n");
 
             // TODO on errors we might end up with nothing here and blow up, including the instruction READ_BYTE below...
-            if (!frame->ip) {
+            if (!ip) {
                 fprintf(stderr, "FIXME I am a work in progress!\n");
                 exit(EXIT_FAILURE);
             }
             chunk_t_disassemble_instruction(
                 &frame->closure->function->chunk,
-                (int)(frame->ip - frame->closure->function->chunk.code)
+                (int)(ip - frame->closure->function->chunk.code)
             );
         }
         assert(frame);
-        assert(frame->ip);
+        assert(ip);
 
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
@@ -972,6 +974,7 @@ static vm_t_interpret_result_t run(void)
                 const obj_string_t *name = READ_STRING();
                 value_t value;
                 if (!table_t_get(&vm.globals, name, &value)) {
+                    frame->ip = ip;
                     runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -988,6 +991,7 @@ static vm_t_interpret_result_t run(void)
                 obj_string_t *name = READ_STRING();
                 if (table_t_set(&vm.globals, name, peek(0))) {
                     table_t_delete(&vm.globals, name);
+                    frame->ip = ip;
                     runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -1046,6 +1050,7 @@ static vm_t_interpret_result_t run(void)
                         return INTERPRET_RUNTIME_ERROR;
                     }
                 } else {
+                    frame->ip = ip;
                     runtime_error(gettext("Only instances have properties."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -1053,6 +1058,7 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_SET_PROPERTY: {
                 if (!IS_INSTANCE(peek(1))) {
+                    frame->ip = ip;
                     runtime_error(gettext("Only instances have fields."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -1088,6 +1094,7 @@ static vm_t_interpret_result_t run(void)
                     const double a = AS_NUMBER(vm_pop());
                     vm_push(NUMBER_VAL(a + b));
                 } else {
+                    frame->ip = ip;
                     runtime_error(gettext("Operands must be two numbers or two strings."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -1097,18 +1104,21 @@ static vm_t_interpret_result_t run(void)
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE: {
                 if (IS_NUMBER(peek(0)) && AS_NUMBER(peek(0)) == 0) {
+                    frame->ip = ip;
                     runtime_error(gettext("Illegal divide by zero."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 BINARY_OP(NUMBER_VAL, /); break;
             }
             case OP_NOT: vm_push(BOOL_VAL(is_falsey(vm_pop()))); break;
-            case OP_NEGATE: { // TODO this can optimize by changing the value in place w/o push/pop
+            case OP_NEGATE: {
                 if (!IS_NUMBER(peek(0))) {
+                    frame->ip = ip;
                     runtime_error(gettext("Operand must be a number."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                vm_push(NUMBER_VAL(-AS_NUMBER(vm_pop())));
+                value_t *v = vm.stack_top - 1;
+                v->as.number = -v->as.number;
                 break;
             }
             case OP_PRINT: {
@@ -1118,45 +1128,51 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_JUMP: {
                 const uint16_t offset = READ_SHORT();
-                frame->ip += offset;
+                ip += offset;
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 const uint16_t offset = READ_SHORT();
                 if (is_falsey(peek(0)))
-                    frame->ip += offset;
+                    ip += offset;
                 break;
             }
             case OP_LOOP: {
                 const uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
+                ip -= offset;
                 break;
             }
             case OP_CALL: {
                 const int arg_count = READ_BYTE();
+                frame->ip = ip;
                 if (!call_value(peek(arg_count), arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                ip = frame->ip;
                 break;
             }
             case OP_INVOKE: { // combined OP_GET_PROPERTY and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
                 const int arg_count = READ_BYTE();
+                frame->ip = ip;
                 if (!invoke(method_name, arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                ip = frame->ip;
                 break;
             }
             case OP_SUPER_INVOKE: { // combined OP_GET_SUPER and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
                 const int arg_count = READ_BYTE();
                 obj_class_t *superclass = AS_CLASS(vm_pop());
+                frame->ip = ip;
                 if (!invoke_from_class(superclass, method_name, arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                ip = frame->ip;
                 break;
             }
             case OP_CLOSURE: {
@@ -1189,6 +1205,7 @@ static vm_t_interpret_result_t run(void)
                 vm.stack_top = frame->slots;
                 vm_push(result);
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
+                ip = frame->ip;
                 break;
             }
             case OP_EXIT: {
@@ -1209,6 +1226,7 @@ static vm_t_interpret_result_t run(void)
             case OP_INHERIT: {
                 const value_t superclass = peek(1);
                 if (!IS_CLASS(superclass)) {
+                    frame->ip = ip;
                     runtime_error(gettext("Superclass must be a class."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
