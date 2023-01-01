@@ -2,7 +2,7 @@
 #define clox_compiler_h
 
 #include <stdbool.h>
-#include "object.h"
+#include "type.h"
 #include "vm.h"
 #include "vmopcodes.h"
 

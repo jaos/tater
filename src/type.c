@@ -4,7 +4,7 @@
 
 #include "debug.h"
 #include "memory.h"
-#include "object.h"
+#include "type.h"
 #include "vm.h"
 
 #define ALLOCATE_OBJ(type, object_type) \
@@ -41,18 +41,19 @@ obj_bound_native_method_t * obj_bound_native_method_t_allocate(value_t receiving
     return bound_native_method;
 }
 
-obj_class_t *obj_class_t_allocate(obj_string_t *name)
+obj_typeobj_t *obj_typeobj_t_allocate(obj_string_t *name)
 {
-    obj_class_t *cls = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
-    cls->name = name;
-    table_t_init(&cls->methods);
-    return cls;
+    obj_typeobj_t *typeobj = ALLOCATE_OBJ(obj_typeobj_t, OBJ_TYPECLASS);
+    typeobj->name = name;
+    typeobj->super = NULL;
+    table_t_init(&typeobj->methods);
+    return typeobj;
 }
 
-obj_instance_t *obj_instance_t_allocate(obj_class_t *cls)
+obj_instance_t *obj_instance_t_allocate(obj_typeobj_t *typeobj)
 {
     obj_instance_t *instance = ALLOCATE_OBJ(obj_instance_t, OBJ_INSTANCE);
-    instance->cls = cls;
+    instance->typeobj = typeobj;
     table_t_init(&instance->fields);
     return instance;
 }
@@ -60,7 +61,7 @@ obj_instance_t *obj_instance_t_allocate(obj_class_t *cls)
 obj_list_t *obj_list_t_allocate(void)
 {
     obj_list_t *list = ALLOCATE_OBJ(obj_list_t, OBJ_LIST);
-    value_array_t_init(&list->elements);
+    value_list_t_init(&list->elements);
     return list;
 }
 
@@ -205,12 +206,12 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
             }
             break;
         }
-        case OBJ_CLASS: {
-            snprintf(buffer, 255, "<cls %s>", AS_CLASS(value)->name->chars);
+        case OBJ_TYPECLASS: {
+            snprintf(buffer, 255, "<type %s>", AS_TYPECLASS(value)->name->chars);
             break;
         }
         case OBJ_INSTANCE: {
-            snprintf(buffer, 255, "<cls %s instance %p>", AS_INSTANCE(value)->cls->name->chars, (void*)AS_OBJ(value));
+            snprintf(buffer, 255, "<type %s instance %p>", AS_INSTANCE(value)->typeobj->name->chars, (void*)AS_OBJ(value));
             break;
         }
         case OBJ_NATIVE: {
@@ -248,10 +249,10 @@ void obj_t_print(const value_t value)
     switch (OBJ_TYPE(value)) {
         case OBJ_BOUND_METHOD: print_function(AS_BOUND_METHOD(value)->method->function); break;
         case OBJ_BOUND_NATIVE_METHOD: printf("<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars); break;
-        case OBJ_CLASS: printf("<cls %s>", AS_CLASS(value)->name->chars); break;
+        case OBJ_TYPECLASS: printf("<type %s>", AS_TYPECLASS(value)->name->chars); break;
         case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
         case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
-        case OBJ_INSTANCE: printf("<cls %s instance %p>", AS_INSTANCE(value)->cls->name->chars, (void*)AS_OBJ(value)); break;
+        case OBJ_INSTANCE: printf("<type %s instance %p>", AS_INSTANCE(value)->typeobj->name->chars, (void*)AS_OBJ(value)); break;
         case OBJ_NATIVE: printf("<native fn %s>", AS_NATIVE(value)->name->chars); break;
         case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
         case OBJ_UPVALUE: printf("<upvalue>"); break;
@@ -308,14 +309,14 @@ uint32_t value_t_hash(const value_t value)
     }
 }
 
-void value_array_t_init(value_array_t *array)
+void value_list_t_init(value_list_t *array)
 {
     array->values = NULL;
     array->capacity = 0;
     array->count = 0;
 }
 
-void value_array_t_add(value_array_t *array, const value_t value)
+void value_list_t_add(value_list_t *array, const value_t value)
 {
     if (array->capacity < array->count + 1) {
         int old_capacity = array->capacity;
@@ -331,10 +332,10 @@ void value_array_t_add(value_array_t *array, const value_t value)
     array->count++;
 }
 
-void value_array_t_free(value_array_t *array)
+void value_list_t_free(value_list_t *array)
 {
     FREE_ARRAY(value_t, array->values, array->capacity);
-    value_array_t_init(array);
+    value_list_t_init(array);
 }
 
 obj_string_t *value_t_to_obj_string_t(const value_t value)
@@ -522,7 +523,7 @@ void chunk_t_init(chunk_t *chunk)
     chunk->count = 0;
     chunk->capacity = 0;
     chunk->code = NULL;
-    value_array_t_init(&chunk->constants);
+    value_list_t_init(&chunk->constants);
     chunk->line_count = 0;
     chunk->line_capacity = 0;
     chunk->lines = NULL;
@@ -532,7 +533,7 @@ void chunk_t_free(chunk_t *chunk)
 {
     FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
     FREE_ARRAY(line_info_t, chunk->lines, chunk->line_capacity);
-    value_array_t_free(&chunk->constants);
+    value_list_t_free(&chunk->constants);
     chunk_t_init(chunk);
 }
 
@@ -589,7 +590,7 @@ int chunk_t_get_line(const chunk_t *chunk, const int instruction)
 int chunk_t_add_constant(chunk_t *chunk, const value_t value)
 {
     vm_push(value); // make GC happy
-    value_array_t_add(&chunk->constants, value);
+    value_list_t_add(&chunk->constants, value);
     vm_pop(); // make GC happy
     return chunk->constants.count - 1;
 }

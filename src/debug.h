@@ -1,7 +1,7 @@
 #ifndef clox_debug_h
 #define clox_debug_h
 
-#include "object.h"
+#include "type.h"
 #include "scanner.h"
 #include "vmopcodes.h"
 

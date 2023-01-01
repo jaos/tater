@@ -31,20 +31,20 @@ START_TEST(test_chunk)
 
 START_TEST(test_scanner)
 {
-    const char *source = "var foo = \"foo\"; { var bar = \"bar\"; var foobar = foo + bar; print foobar;}";
+    const char *source = "let foo = \"foo\"; { let bar = \"bar\"; let foobar = foo + bar; print foobar;}";
     const token_t results[] = {
-        {.type=TOKEN_VAR, .start="var", .length=3, .line=1},
+        {.type=TOKEN_LET, .start="let", .length=3, .line=1},
         {.type=TOKEN_IDENTIFIER, .start="foo", .length=3, .line=1},
         {.type=TOKEN_EQUAL, .start="=", .length=1, .line=1},
         {.type=TOKEN_STRING, .start="\"foo\"", .length=5, .line=1},
         {.type=TOKEN_SEMICOLON, .start=";", .length=1, .line=1},
         {.type=TOKEN_LEFT_BRACE, .start="{", .length=1, .line=1},
-        {.type=TOKEN_VAR, .start="var", .length=3, .line=1},
+        {.type=TOKEN_LET, .start="let", .length=3, .line=1},
         {.type=TOKEN_IDENTIFIER, .start="bar", .length=3, .line=1},
         {.type=TOKEN_EQUAL, .start="=", .length=1, .line=1},
         {.type=TOKEN_STRING, .start="\"bar\"", .length=5, .line=1},
         {.type=TOKEN_SEMICOLON, .start=";", .length=1, .line=1},
-        {.type=TOKEN_VAR, .start="var", .length=3, .line=1},
+        {.type=TOKEN_LET, .start="let", .length=3, .line=1},
         {.type=TOKEN_IDENTIFIER, .start="foobar", .length=6, .line=1},
         {.type=TOKEN_EQUAL, .start="=", .length=1, .line=1},
         {.type=TOKEN_IDENTIFIER, .start="foo", .length=3, .line=1},
@@ -68,10 +68,10 @@ START_TEST(test_scanner)
     }
 
 
-    source = "fun f() { f(\"too\", \"many\"); }";
+    source = "fn f() { f(\"too\", \"many\"); }";
     scanner_t_init(source);
     const token_t results2[] = {
-        {.type=TOKEN_FUN, .start="fun", .length=3, .line=1},
+        {.type=TOKEN_FN, .start="fn", .length=2, .line=1},
         {.type=TOKEN_IDENTIFIER, .start="f", .length=1, .line=1},
         {.type=TOKEN_LEFT_PAREN, .start="(", .length=1, .line=1},
         {.type=TOKEN_RIGHT_PAREN, .start=")", .length=1, .line=1},
@@ -96,7 +96,7 @@ START_TEST(test_scanner)
         ck_assert(t.line == results2[idx].line);
     }
 
-    source = "fun p() { return 1;}; for(var i = 0; i <= 3; i = i + 1) { !(true and false); false or true; if (i == 2) { print(i); } else {print(p()); continue;}}";
+    source = "fn p() { return 1;}; for(let i = 0; i <= 3; i = i + 1) { !(true and false); false or true; if (i == 2) { print(i); } else {print(p()); continue;}}";
     scanner_t_init(source);
     token_t next = scanner_t_scan_token();
     do {
@@ -125,7 +125,7 @@ START_TEST(test_scanner)
 START_TEST(test_compiler)
 {
     vm_t_init();
-    const char *source1 = "var v = 27; { var v = 1; var y = 2; var z = v + y; }";
+    const char *source1 = "let v = 27; { let v = 1; let y = 2; let z = v + y; }";
     obj_function_t *func1 = compiler_t_compile(source1, false);
     ck_assert(func1->chunk.count == 17);
     ck_assert(func1->chunk.code[0] == OP_CONSTANT);
@@ -149,7 +149,7 @@ START_TEST(test_compiler)
     vm_t_free();
 
     vm_t_init();
-    const char *func_source = "fun a(x,y) { var sum = x + y; print(sum);}";
+    const char *func_source = "fn a(x,y) { let sum = x + y; print(sum);}";
     obj_function_t *func2 = compiler_t_compile(func_source, false);
     ck_assert(func2->chunk.count == 6);
     ck_assert(func2->chunk.code[0] == OP_CLOSURE);
@@ -170,9 +170,9 @@ START_TEST(test_compiler)
     vm_t_free();
 
     const char *programs[] = {
-        "for(var i = 0; i < 5; i = i + 1) { print i; var v = 1; v = v + 2; v = v / 3; v = v * 4;}",
-        "var counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
-        "var foo = 10; var result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
+        "for(let i = 0; i < 5; i = i + 1) { print i; let v = 1; v = v + 2; v = v / 3; v = v * 4;}",
+        "let counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
+        "let foo = 10; let result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
         NULL,
     };
     for (int p = 0; programs[p] != NULL; p++) {
@@ -189,18 +189,18 @@ START_TEST(test_vm)
         "switch(3) { default: print(0); }",
         "switch(3) { case 3: print(3); }",
         "switch(3) { }",
-        "var counter = 0; while (counter < 10) { break; print counter; counter = counter + 1;} assert(counter == 0);",
-        "var counter = 0; for(var i = 0; i < 5; i++) { break; counter++;} assert(counter == 0);",
-        "var counter = 0; for(var i = 0; i < 5; i++) { counter++; for(var y = 0; y < 3; y++) { break; } } assert(counter == 5);",
-        "var counter = 0; var extra = 0; while (counter < 10) { counter = counter + 1; continue; extra++; print \"never reached\";} assert(extra == 0);",
-        "var extra = 0; for(var i =0; i < 5; i++) { continue; extra++; print \"never reached\";} assert(extra == 0);",
-        "class Foo {} class Bar {} var f = Foo(); print(is(f, Foo)); print(is(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\"));",
+        "let counter = 0; while (counter < 10) { break; print counter; counter = counter + 1;} assert(counter == 0);",
+        "let counter = 0; for(let i = 0; i < 5; i++) { break; counter++;} assert(counter == 0);",
+        "let counter = 0; for(let i = 0; i < 5; i++) { counter++; for(let y = 0; y < 3; y++) { break; } } assert(counter == 5);",
+        "let counter = 0; let extra = 0; while (counter < 10) { counter = counter + 1; continue; extra++; print \"never reached\";} assert(extra == 0);",
+        "let extra = 0; for(let i =0; i < 5; i++) { continue; extra++; print \"never reached\";} assert(extra == 0);",
+        "type Foo {} type Bar {} let f = Foo(); print(is(f, Foo)); print(is(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\"));",
 
         "print(sys_version());",
 
-        "fun t1() { var i = 2; fun inner() { return i;} return inner;}"
-        "for (var i = 0; i < 10;i++) { var f = t1(); var f2 = t1(); var f3 = t1(); continue;}" // popn
-        "for (var i = 0; i < 10;i++) { var f = t1(); var f2 = t1(); var f3 = t1(); break;}", // popn
+        "fn t1() { let i = 2; fn inner() { return i;} return inner;}"
+        "for (let i = 0; i < 10;i++) { let f = t1(); let f2 = t1(); let f3 = t1(); continue;}" // popn
+        "for (let i = 0; i < 10;i++) { let f = t1(); let f2 = t1(); let f3 = t1(); break;}", // popn
 
         "is(2, \"not a type\");",
         "assert(is(\"foo\", str));",
@@ -220,46 +220,46 @@ START_TEST(test_vm)
         "assert(number(\"1.1\") == 1.1);",
         "assert(number(\"-5\") == -5);",
 
-        "class Foo {} var f = Foo();"
+        "type Foo {} let f = Foo();"
         "assert(!get_field(f, \"name\"));"
         "assert(set_field(f, \"name\", \"foo\"));"
         "assert(get_field(f, \"name\"));",
 
         "assert(\"foo\".len() == 3);",
-        "var s = \"foo\"; var f = s.len; assert(f() == 3);",
-        "var a = str() + str() + str();"
+        "let s = \"foo\"; let f = s.len; assert(f() == 3);",
+        "let a = str() + str() + str();"
         "assert(a.len() == 0);",
         "assert(str(1) == \"1\");",
         "assert(str(true) == \"true\");",
         "assert(str(nil) == \"nil\");",
         "assert(\"foo\".substr(0,2) == \"fo\");",
         "assert(\"foo\".substr(-2,2) == \"oo\");",
-        "var a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\");",
+        "let a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\");",
 
-        "var a = list(1,2,3); assert(a.len() == 3); a.clear(); assert(a.len() == 0); a.append(45); assert(a.len() == 1);",
-        "var a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
-        "var a = list(); a.remove(0); assert(a.len() == 0);",
-        "var a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
-        "var a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
-        "var a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\");",
+        "let a = list(1,2,3); assert(a.len() == 3); a.clear(); assert(a.len() == 0); a.append(45); assert(a.len() == 1);",
+        "let a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
+        "let a = list(); a.remove(0); assert(a.len() == 0);",
+        "let a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
+        "let a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
+        "let a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\");",
 
-        "var a = [{\"name\": \"foo\", \"counter\": 11}, {\"name\": \"bar\", \"counter\": 22}];"
+        "let a = [{\"name\": \"foo\", \"counter\": 11}, {\"name\": \"bar\", \"counter\": 22}];"
         "assert(a[0][\"counter\"] == 11); assert(a[1][\"counter\"] == 22); assert(a[0][\"name\"] + a[1][\"name\"] == \"foobar\");",
 
-        "var m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
+        "let m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
         "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);",
         "map(1, \"one\").len();",
-        "var a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\");",
+        "let a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\");",
 
-        "var a = map(); for (var i = 0; i < 255; i++) { a.set(\"testcase\" + str(i), str(i * 255)); }"
-        "for (var i = 0; i < 255; i++) { assert(a[\"testcase\" + str(i)] == str(i * 255)); }",
+        "let a = map(); for (let i = 0; i < 255; i++) { a.set(\"testcase\" + str(i), str(i * 255)); }"
+        "for (let i = 0; i < 255; i++) { assert(a[\"testcase\" + str(i)] == str(i * 255)); }",
 
-        "class Animal {} class Dog < Animal {} class Cat < Animal {}"
-        "var m = {Cat:[], Dog:[]}; m[Cat].append(Cat()); assert(m[Cat].len() == 1); m[Animal] = [Dog(), Cat()]; assert(m[Animal].len() == 2);",
+        "type Animal {} type Dog (Animal) {} type Cat (Animal) {}"
+        "let m = {Cat:[], Dog:[]}; m[Cat].append(Cat()); assert(m[Cat].len() == 1); m[Animal] = [Dog(), Cat()]; assert(m[Animal].len() == 2);",
 
-        "var a = map(\"one\", 1, \"two\", 2); a.set(\"three\", 3); print(a); assert(is(a, map));"
-        "var counter = 0; while (true) {"
-            "var key = a.keys().get(counter);"
+        "let a = map(\"one\", 1, \"two\", 2); a.set(\"three\", 3); print(a); assert(is(a, map));"
+        "let counter = 0; while (true) {"
+            "let key = a.keys().get(counter);"
             "print(\"key is \" + key + \", value is \" + str(a.get(key)));"
             "counter++;"
             "if (counter >= a.keys().len()) {"
@@ -267,13 +267,13 @@ START_TEST(test_vm)
             "}"
         "}",
 
-        "var counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
+        "let counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
 
-        "var s1 = 0; var s2 = 0; var s3 = 0;"
-        "fun outer(){"
-            "var x = 100; "
-            "fun middle() { "
-                "fun inner() {"
+        "let s1 = 0; let s2 = 0; let s3 = 0;"
+        "fn outer(){"
+            "let x = 100; "
+            "fn middle() { "
+                "fn inner() {"
                     "s3 = 3;"
                     "return x + 3;"
                 "}"
@@ -284,46 +284,46 @@ START_TEST(test_vm)
             "s1 = 1;"
             "x = x + 1;"
             "return middle;"
-        "} var mid = outer(); var in = mid(); assert(in() == 106); assert(s1 == 1); assert(s2 == 2); assert(s3 == 3);",
-        "for(var i = 0; i < 5; i++) { print i;}",
-        "var a = 1; a++; assert(a == 2);"
+        "} let mid = outer(); let in = mid(); assert(in() == 106); assert(s1 == 1); assert(s2 == 2); assert(s3 == 3);",
+        "for(let i = 0; i < 5; i++) { print i;}",
+        "let a = 1; a++; assert(a == 2);"
         "a += 10; assert(a == 12);"
         "a /= 6; assert(a == 2);"
         "a *= 6; assert(a == 12);"
         "a -= 0; assert(a == 12);"
         "a += 0; assert(a == 12);"
         "a *= 0; assert(a == 0);",
-        "var foo = \"one\"; foo += \" bar\";",
+        "let foo = \"one\"; foo += \" bar\";",
 
-        "var p = list(1, 2, 3); assert(p.len() == 3);",
-        "class Foo {init(name, list) { this.name = name; this.list = list;} len() { return this.list.len();}}"
-        "var f = Foo(\"jason\", list(1,2,3));"
+        "let p = list(1, 2, 3); assert(p.len() == 3);",
+        "type Foo {init(name, list) { self.name = name; self.list = list;} len() { return self.list.len();}}"
+        "let f = Foo(\"jason\", list(1,2,3));"
         "assert(f.len() == 3);"
         "f.list.append(\"one\");"
         "assert(f.len() == 4);"
-        "var call = f.list.append; call(200);"
+        "let call = f.list.append; call(200);"
         "assert(f.len() == 5);",
 
         "print 1+2; print 3-1; print 4/2; print 10*10; print 1 == 1; print 2 != 4;",
         "print 2<4; print 4>2; print 4>=4; print 8<=9; print (!true);",
         "print false; print true; print nil;",
-        "var foo = \"foo\"; { var bar = \"bar\"; var foobar = foo + bar; print foobar;}",
-        "var foo = 10; var result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
-        "var counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
+        "let foo = \"foo\"; { let bar = \"bar\"; let foobar = foo + bar; print foobar;}",
+        "let foo = 10; let result = 0; if (foo > 10) { result = 1; } else { result = -1; }",
+        "let counter = 0; while (counter < 10) { print counter; counter = counter + 1;}",
         "if (false or true) { print \"yep\"; }",
         "if (!false and true) { print \"yep\"; }",
-        "for(var i = 0; i < 5; i = i + 1) { print i;}",
-        "var counter = 0; for(1; counter < 5; counter = counter + 1) { print counter;}",
-        "fun a() { print 1;} a();", // chapter 24
+        "for(let i = 0; i < 5; i = i + 1) { print i;}",
+        "let counter = 0; for(1; counter < 5; counter = counter + 1) { print counter;}",
+        "fn a() { print 1;} a();", // chapter 24
         "print clock();", // chapter 24
-        "fun mk() {var l = \"local\"; fun inner() {print l;}return inner;} var closure = mk(); closure();", // chapter 25
-        "fun outer() {var x = 1; x = 2;fun inner() {print x;} inner(); } outer();", // chapter 25
-        "fun novalue() { return; } novalue();",
+        "fn mk() {let l = \"local\"; fn inner() {print l;}return inner;} let closure = mk(); closure();", // chapter 25
+        "fn outer() {let x = 1; x = 2;fn inner() {print x;} inner(); } outer();", // chapter 25
+        "fn novalue() { return; } novalue();",
 
-        "fun outer(){"
-            "var x = 1; "
-            "fun middle() { "
-                "fun inner() {"
+        "fn outer(){"
+            "let x = 1; "
+            "fn middle() { "
+                "fn inner() {"
                     "print x;"
                 "}"
                 "print \"create inner closure\";"
@@ -331,14 +331,14 @@ START_TEST(test_vm)
             "}"
             "print \"return from outer\";"
             "return middle;"
-        "} var mid = outer(); var in = mid(); in();", // chapter 25
+        "} let mid = outer(); let in = mid(); in();", // chapter 25
 
-        "var globalSet; "
-        "var globalGet; "
-        "fun main() { "
-        "    var a = 1; var b = 100;"
-        "    fun set() { a = 2; print b;} "
-        "    fun get() { print a; b = 101;} "
+        "let globalSet; "
+        "let globalGet; "
+        "fn main() { "
+        "    let a = 1; let b = 100;"
+        "    fn set() { a = 2; print b;} "
+        "    fn get() { print a; b = 101;} "
         "    globalSet = set; "
         "    globalGet = get; "
         "} "
@@ -346,73 +346,73 @@ START_TEST(test_vm)
         "globalSet(); "
         "globalGet();", // chapter 25
 
-        "fun makeClosure() {\n"
-        "    var a = \"data\";\n"
-        "    fun f() { print a; }\n"
+        "fn makeClosure() {\n"
+        "    let a = \"data\";\n"
+        "    fn f() { print a; }\n"
         "    return f;\n"
         "}\n"
         "{\n"
-        "    var closure = makeClosure();\n"
+        "    let closure = makeClosure();\n"
         "    // GC here.\n"
         "    closure();\n"
         "}\n", // chapter 26
 
         // https://github.com/munificent/craftingvm_t_interpreters/issues/888
-        "fun returnArg(arg){ return arg;}"
-        "fun returnFunCallWithArg(func, arg){return returnArg(func)(arg);}"
-        "fun printArg(arg){print arg;}"
+        "fn returnArg(arg){ return arg;}"
+        "fn returnFunCallWithArg(func, arg){return returnArg(func)(arg);}"
+        "fn printArg(arg){print arg;}"
         "returnFunCallWithArg(printArg, \"hello world\");",
 
         // OP_CLOSE_UPVALUE https://github.com/munificent/craftingvm_t_interpreters/issues/746
-        "var f1; var f2; { var i = 1; fun f() { print i; } f1 = f; } { var j = 2; fun f() { print j; } f2 = f; } f1(); f2();",
+        "let f1; let f2; { let i = 1; fn f() { print i; } f1 = f; } { let j = 2; fn f() { print j; } f2 = f; } f1(); f2();",
 
         // trigger gc
-        "var x = 1; var y = 2; var z = x + y;"
-        "fun lots_of_stuff() { var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; var b = \"asdfsdfasdfasfdafsdfas\"; return a+b;}"
-        "for (var i = 0; i < 1000; i = i + 1) { var r = lots_of_stuff(); print(r); print(x+y+z);}",
+        "let x = 1; let y = 2; let z = x + y;"
+        "fn lots_of_stuff() { let a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; let b = \"asdfsdfasdfasfdafsdfas\"; return a+b;}"
+        "for (let i = 0; i < 1000; i = i + 1) { let r = lots_of_stuff(); print(r); print(x+y+z);}",
 
-        "class Brioche {} print Brioche; print Brioche();", // chapter 27
-        "class Pair {} var pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
+        "type Brioche {} print Brioche; print Brioche();", // chapter 27
+        "type Pair {} let pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
 
-        "class Brunch { bacon() {} eggs() {} } var brunch = Brunch(); var eggs = brunch.eggs; eggs();", // chapter 28
+        "type Brunch { bacon() {} eggs() {} } let brunch = Brunch(); let eggs = brunch.eggs; eggs();", // chapter 28
 
-        "class Scone { topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
-        "var scone = Scone(); scone.topping(\"berries\", \"cream\");", // chapter 28
+        "type Scone { topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
+        "let scone = Scone(); scone.topping(\"berries\", \"cream\");", // chapter 28
 
-        "class Person { say_name() {print this.name;} }"
-        "var me = Person(); me.name = \"test\"; var method = me.say_name; method();", // chapter 28
+        "type Person { say_name() {print self.name;} }"
+        "let me = Person(); me.name = \"test\"; let method = me.say_name; method();", // chapter 28
 
-        "class Nested { method() { fun function() { print this; } function(); } } Nested().method();", // chapter 28
+        "type Nested { method() { fn function() { print self; } function(); } } Nested().method();", // chapter 28
 
-        "class Brunch { init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
+        "type Brunch { init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
 
-        "class CoffeeMaker { "
-            "init(coffee) { this.coffee = coffee; }"
-            "brew() { print \"enjoy \" + this.coffee; this.coffee = nil; }"
+        "type CoffeeMaker { "
+            "init(coffee) { self.coffee = coffee; }"
+            "brew() { print \"enjoy \" + self.coffee; self.coffee = nil; }"
         "}"
-        "var maker = CoffeeMaker(\"coffee and chicory\");"
+        "let maker = CoffeeMaker(\"coffee and chicory\");"
         "maker.brew();", // chapter 28
 
-        "class Oops { init() { fun f() { print \"not a method\"; } this.field = f; } } var oops = Oops(); oops.field();", // chapter 28
+        "type Oops { init() { fn f() { print \"not a method\"; } self.field = f; } } let oops = Oops(); oops.field();", // chapter 28
 
-        "class Doughnut { cook() { print(\"Dunk in the fryer.\"); } }"
-        "class Cruller < Doughnut { finish() { print(\"Glaze with icing.\"); } }"
-        "var c = Cruller(); c.cook(); c.finish();", // chapter 29
+        "type Doughnut { cook() { print(\"Dunk in the fryer.\"); } }"
+        "type Cruller (Doughnut) { finish() { print(\"Glaze with icing.\"); } }"
+        "let c = Cruller(); c.cook(); c.finish();", // chapter 29
 
-        "class A { method() { print(\"A method\");}}"
-        "class B < A { method() { print(\"B method\");} test() { super.method(); }}"
-        "class C < B {}"
+        "type A { method() { print(\"A method\");}}"
+        "type B (A) { method() { print(\"B method\");} test() { super.method(); }}"
+        "type C (B) {}"
         "C().test();", // chapter 29
 
-        "class A { method() { print \"A\"; } }"
-        "class B < A { method() { var closure = super.method; closure(); } }" // prints "A"
+        "type A { method() { print \"A\"; } }"
+        "type B (A) { method() { let closure = super.method; closure(); } }" // prints "A"
         "B().method();", // chapter 29
 
-        "class Doughnut {"
-            "cook() { print(\"Dunk in the fryer.\"); this.finish(\"sprinkles\"); }"
+        "type Doughnut {"
+            "cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
             "finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
-        "class Cruller < Doughnut {"
+        "type Cruller (Doughnut) {"
             "finish(ingredient) {"
                 // no sprinkles, always icing
                 "super.finish(\"icing\");"
@@ -431,7 +431,7 @@ START_TEST(test_vm)
     const char *exit_ok_tests[] = {
         "exit;",
         "exit(0);",
-        "fun finish_and_quit() { print(\"working\"); exit(0); } finish_and_quit();",
+        "fn finish_and_quit() { print(\"working\"); exit(0); } finish_and_quit();",
         NULL,
     };
     for (int i = 0; exit_ok_tests[i] != NULL; i++) {
@@ -445,7 +445,7 @@ START_TEST(test_vm)
         "exit(1);",
         "exit(-1);",
         "assert(1 == 2);",
-        "fun finish_and_fail() { print(\"working\"); exit(-1); } finish_and_fail();",
+        "fn finish_and_fail() { print(\"working\"); exit(-1); } finish_and_fail();",
         NULL,
     };
     for (int i = 0; exit_tests[i] != NULL; i++) {
@@ -458,20 +458,20 @@ START_TEST(test_vm)
     const char *compilation_fail_cases[] = {
         "continue;",
 
-        "var;",
-        "var foo = 1",
-        "{var foo = foo;}",
+        "let;",
+        "let foo = 1",
+        "{let foo = foo;}",
         // "}{",
         "if true ){}",
         " 1 = 3;",
-        "{ var a = 1; var a = 2;}",
-        "print this;", // chapter 28
-        "fun not_a_method() { print this;}", // chapter 28
-        "class CannotReturnFromInitializer { init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
-        "class Foo < Foo {}", // chapter 29
-        "class NoSuperClass { method() { super.method();}}", // chapter 29
-        "fun NotClass() { super.NotClass(); }", // chapter 29
-        "switch(3) { var statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
+        "{ let a = 1; let a = 2;}",
+        "print self;", // chapter 28
+        "fn not_a_method() { print self;}", // chapter 28
+        "type CannotReturnFromInitializer { init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
+        "type Foo (Foo) {}", // chapter 29
+        "type NoSuperClass { method() { super.method();}}", // chapter 29
+        "fn NotClass() { super.NotClass(); }", // chapter 29
+        "switch(3) { let statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
         "switch(3) { default: true; case 3: print(\"cannot have case after default\"); }",
         "{ break;}",
         NULL,
@@ -484,22 +484,22 @@ START_TEST(test_vm)
     }
 
     const char *runtime_fail_cases[] = {
-        "fun no_args() {} no_args(1);", // arguments
-        "fun has_args(v) {print(v);} has_args();", // arguments
-        "var not_callable = 1; not_callable();", // cannot call
+        "fn no_args() {} no_args(1);", // arguments
+        "fn has_args(v) {print(v);} has_args();", // arguments
+        "let not_callable = 1; not_callable();", // cannot call
         "print(undefined_global);", // undefined
         "{ print(undefined_local);}",
-        "var a = \"foo\"; a = -a;", // operand not a number
-        "var a = \"foo\"; a = a + 1;", // operands must be same
+        "let a = \"foo\"; a = -a;", // operand not a number
+        "let a = \"foo\"; a = a + 1;", // operands must be same
         "a = 1;", // set global undefined variable
-        "class OnlyOneArgInit { init(one) {} } var i = OnlyOneArgInit(1, 2);", // chapter 28
-        "class NoArgInit {} var i = NoArgInit(1, 2);", // chapter 28
-        "var NotClass = \"so not a class\"; class OhNo < NotClass {}", // chapter 29
-        "var a = 1; a = a / 0;", // divbyzero
-        "var f = 1; f.foo = 1;", // only instances have property
-        "var f = 1; f.foo(1);", // only instances have methods
-        "class Foo {} var f = Foo(); f.nosuchproperty();",
-        "class Foo {} var f = Foo(); var invalid = f.nosuchproperty;",
+        "type OnlyOneArgInit { init(one) {} } let i = OnlyOneArgInit(1, 2);", // chapter 28
+        "type NoArgInit {} let i = NoArgInit(1, 2);", // chapter 28
+        "let NotClass = \"so not a type\"; type OhNo (NotClass) {}", // chapter 29
+        "let a = 1; a = a / 0;", // divbyzero
+        "let f = 1; f.foo = 1;", // only instances have property
+        "let f = 1; f.foo(1);", // only instances have methods
+        "type Foo {} let f = Foo(); f.nosuchproperty();",
+        "type Foo {} let f = Foo(); let invalid = f.nosuchproperty;",
         "is();",
         "has_field();",
         "has_field(2, \"not a type\");",
@@ -507,13 +507,13 @@ START_TEST(test_vm)
         "set_field(true);",
         "set_field(true, true);",
         "set_field(true, true, true);",
-        "class Foo {} var f = Foo(); set_field();",
-        "class Foo {} var f = Foo(); set_field(f);",
-        "class Foo {} var f = Foo(); set_field(f, \"fieldnoval\");",
-        "class Foo {} var f = Foo(); get_field(f);",
-        "class Foo {} var f = Foo(); get_field();",
-        "var a = list(\"one\", 2, \"three\"); a.get(3);",
-        "var a = \"foo\"; var f = a.nosuchmethod; f();",
+        "type Foo {} let f = Foo(); set_field();",
+        "type Foo {} let f = Foo(); set_field(f);",
+        "type Foo {} let f = Foo(); set_field(f, \"fieldnoval\");",
+        "type Foo {} let f = Foo(); get_field(f);",
+        "type Foo {} let f = Foo(); get_field();",
+        "let a = list(\"one\", 2, \"three\"); a.get(3);",
+        "let a = \"foo\"; let f = a.nosuchmethod; f();",
         "number(list());",
         "number();",
         "\"foo\".substr();",
@@ -538,7 +538,7 @@ START_TEST(test_vm)
         vm_t_init();
         const vm_t_interpret_result_t rv = vm_t_interpret(runtime_fail_cases[i]);
         // in case we hose up a bad compile
-        ck_assert(rv != INTERPRET_COMPILE_ERROR);
+        ck_assert_msg(rv != INTERPRET_COMPILE_ERROR, "Compile failed for: %s\n", runtime_fail_cases[i]);
         ck_assert_msg(rv == INTERPRET_RUNTIME_ERROR, "Unexpected success for \"%s\"\n", runtime_fail_cases[i]);
         vm_t_free();
     }
@@ -598,16 +598,16 @@ START_TEST(test_value)
     ck_assert(value_t_hash(o));
     vm_pop();
 
-    value_array_t a;
-    value_array_t_init(&a);
-    value_array_t_add(&a, NUMBER_VAL(9));
-    value_array_t_add(&a, BOOL_VAL(false));
-    value_array_t_add(&a, NIL_VAL);
-    value_array_t_add(&a, EMPTY_VAL);
+    value_list_t a;
+    value_list_t_init(&a);
+    value_list_t_add(&a, NUMBER_VAL(9));
+    value_list_t_add(&a, BOOL_VAL(false));
+    value_list_t_add(&a, NIL_VAL);
+    value_list_t_add(&a, EMPTY_VAL);
     for (int i = 0; i < a.count; i++) {
         value_t_print(a.values[i]);
     }
-    value_array_t_free(&a);
+    value_list_t_free(&a);
 
     vm_t_free();
 }
@@ -718,11 +718,11 @@ START_TEST(test_object)
     obj_closure_t *closure = obj_closure_t_allocate(function);
     vm_push(OBJ_VAL(closure));
 
-    obj_string_t *cls_name = obj_string_t_copy_from("TestObjectTestCase", 18);
-    vm_push(OBJ_VAL(cls_name));
-    obj_class_t *cls = obj_class_t_allocate(cls_name);
-    vm_push(OBJ_VAL(cls));
-    obj_instance_t *instance = obj_instance_t_allocate(cls);
+    obj_string_t *typeobj_name = obj_string_t_copy_from("TestObjectTestCase", 18);
+    vm_push(OBJ_VAL(typeobj_name));
+    obj_typeobj_t *typeobj = obj_typeobj_t_allocate(typeobj_name);
+    vm_push(OBJ_VAL(typeobj));
+    obj_instance_t *instance = obj_instance_t_allocate(typeobj);
     vm_push(OBJ_VAL(instance));
 
 
@@ -730,8 +730,8 @@ START_TEST(test_object)
     vm_push(OBJ_VAL(list));
 
     // debugging
-    obj_type_t_to_str(((obj_t*)cls_name)->type);
-    obj_type_t_to_str(((obj_t*)cls)->type);
+    obj_type_t_to_str(((obj_t*)typeobj_name)->type);
+    obj_type_t_to_str(((obj_t*)typeobj)->type);
     obj_type_t_to_str(((obj_t*)instance)->type);
     obj_type_t_to_str(((obj_t*)function)->type);
     obj_type_t_to_str(((obj_t*)closure)->type);
@@ -774,26 +774,26 @@ START_TEST(test_debug)
 
     // trigger gc
     const char *program =
-        "var x = 1; var y = 2; var z = x + y; var z2 = z - 1; var t = true; var f = false; var invalid = !true;"
-        "var alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
-        "class Point { init(x,y) { this.x = x; this.y = y;} dostuff() { z = z + x + y; }}"
-        "class SubPoint < Point { init(x,y) { super.init(x/2,y*10); }} var sp= SubPoint(10, 20); assert(sp.x == 5);"
-        "var f1; { var i = 100; fun inner() { print i;} f1 = inner;}"
-        "var f2 = Point(-900, -900).dostuff;"
-        "var alistlen = alist.len;"
-        "fun lots_of_stuff() { "
-            "var a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\";"
-            "var b = \"asdfsdfasdfasfdafsdfas\";"
+        "let x = 1; let y = 2; let z = x + y; let z2 = z - 1; let t = true; let f = false; let invalid = !true;"
+        "let alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
+        "type Point { init(x,y) { self.x = x; self.y = y;} dostuff() { z = z + x + y; }}"
+        "type SubPoint (Point) { init(x,y) { super.init(x/2,y*10); }} let sp= SubPoint(10, 20); assert(sp.x == 5);"
+        "let f1; { let i = 100; fn inner() { print i;} f1 = inner;}"
+        "let f2 = Point(-900, -900).dostuff;"
+        "let alistlen = alist.len;"
+        "fn lots_of_stuff() { "
+            "let a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\";"
+            "let b = \"asdfsdfasdfasfdafsdfas\";"
             "{print(a+b);}"
             "{ assert(alistlen() == 3);}"
-            "var p = Point(100, 200);"
-            "{str(p); str(100); str(alistlen); str(true); str(nil); str(Point); var c = Point(1,2).dostuff; str(c);}"
+            "let p = Point(100, 200);"
+            "{str(p); str(100); str(alistlen); str(true); str(nil); str(Point); let c = Point(1,2).dostuff; str(c);}"
             "{ p.dostuff(); print(p.x + p.y); p.x < p.y; p.x > p.y; print(a + b); f1(); f2();}"
             "return p;"
         "}"
         "{str(lots_of_stuff);}"
-        "for (var i = 0; i < 1000; i = i + 1) {"
-            "var r = lots_of_stuff();"
+        "for (let i = 0; i < 1000; i = i + 1) {"
+            "let r = lots_of_stuff();"
             "print(r);"
         "}";
     ck_assert(vm_t_interpret(program) == INTERPRET_OK);
@@ -802,23 +802,23 @@ START_TEST(test_debug)
     vm_toggle_stack_trace();
     const char *programs_with_tracing[] = {
         // https://github.com/munificent/craftingvm_t_interpreters/issues/888
-        "fun returnArg(arg){ return arg;}"
-        "fun returnFunCallWithArg(func, arg){return returnArg(func)(arg);}"
-        "fun printArg(arg){print arg;}"
+        "fn returnArg(arg){ return arg;}"
+        "fn returnFunCallWithArg(func, arg){return returnArg(func)(arg);}"
+        "fn printArg(arg){print arg;}"
         "returnFunCallWithArg(printArg, \"hello world\");",
 
         // OP_CLOSE_UPVALUE https://github.com/munificent/craftingvm_t_interpreters/issues/746
-        "var f1; var f2; { var i = 1; fun f() { print i; } f1 = f; } { var j = 2; fun f() { print j; } f2 = f; } f1(); f2();",
+        "let f1; let f2; { let i = 1; fn f() { print i; } f1 = f; } { let j = 2; fn f() { print j; } f2 = f; } f1(); f2();",
 
-        "class A { method() { print \"A\"; } }"
-        "class B < A { method() { var closure = super.method; closure(); } }" // prints "A"
+        "type A { method() { print \"A\"; } }"
+        "type B (A) { method() { let closure = super.method; closure(); } }" // prints "A"
         "B().method();", // chapter 29
 
-        "class Doughnut {"
-            "cook() { print(\"Dunk in the fryer.\"); this.finish(\"sprinkles\"); }"
+        "type Doughnut {"
+            "cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
             "finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
-        "class Cruller < Doughnut {"
+        "type Cruller (Doughnut) {"
             "finish(ingredient) {"
                 // no sprinkles, always icing
                 "super.finish(\"icing\");"
@@ -827,7 +827,7 @@ START_TEST(test_debug)
         NULL,
     };
     for (int p = 0; programs_with_tracing[p] != NULL; p++) {
-        ck_assert(vm_t_interpret(programs_with_tracing[p]) == INTERPRET_OK);
+        ck_assert_msg(vm_t_interpret(programs_with_tracing[p]) == INTERPRET_OK, "Failed: %s\n", programs_with_tracing[i]);
     }
     vm_t_free();
 }

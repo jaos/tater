@@ -2,6 +2,6 @@ src/compiler.c
 src/debug.c
 src/main.c
 src/memory.c
-src/object.c
+src/type.c
 src/scanner.c
 src/vm.c

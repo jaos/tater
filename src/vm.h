@@ -1,7 +1,7 @@
 #ifndef clox_vm_h
 #define clox_vm_h
 
-#include "object.h"
+#include "type.h"
 #include "vmopcodes.h"
 
 // TODO consider a more robust way to avoid stack overflows

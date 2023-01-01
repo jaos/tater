@@ -6,7 +6,7 @@
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 #define IS_BOUND_METHOD(value) is_obj_type(value, OBJ_BOUND_METHOD)
-#define IS_CLASS(value) is_obj_type(value, OBJ_CLASS)
+#define IS_TYPECLASS(value) is_obj_type(value, OBJ_TYPECLASS)
 #define IS_CLOSURE(value) is_obj_type(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) is_obj_type(value, OBJ_FUNCTION)
 #define IS_INSTANCE(value) is_obj_type(value, OBJ_INSTANCE)
@@ -17,7 +17,7 @@
 #define IS_MAP(value) is_obj_type(value, OBJ_MAP)
 
 #define AS_BOUND_METHOD(value) ((obj_bound_method_t*)AS_OBJ(value))
-#define AS_CLASS(value) ((obj_class_t*)AS_OBJ(value))
+#define AS_TYPECLASS(value) ((obj_typeobj_t*)AS_OBJ(value))
 #define AS_CLOSURE(value) ((obj_closure_t*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((obj_function_t*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((obj_instance_t*)AS_OBJ(value))
@@ -53,7 +53,7 @@
 
 typedef enum {
     OBJ_BOUND_METHOD,
-    OBJ_CLASS,
+    OBJ_TYPECLASS,
     OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_INSTANCE,
@@ -99,7 +99,7 @@ typedef struct {
     int capacity;
     int count;
     value_t *values;
-} value_array_t;
+} value_list_t;
 
 typedef struct {
     int offset;
@@ -110,7 +110,7 @@ typedef struct {
     int count;
     int capacity;
     uint8_t *code;
-    value_array_t constants;
+    value_list_t constants;
     int line_count;
     int line_capacity;
     line_info_t *lines;
@@ -162,11 +162,11 @@ typedef struct {
     obj_t obj;
     obj_string_t *name;
     table_t methods;
-} obj_class_t;
+} obj_typeobj_t;
 
 typedef struct {
     obj_t obj;
-    obj_class_t *cls;
+    obj_typeobj_t *typeobj;
     table_t fields;
 } obj_instance_t;
 
@@ -187,7 +187,7 @@ typedef struct {
 
 typedef struct {
     obj_t obj;
-    value_array_t elements;
+    value_list_t elements;
 } obj_list_t;
 
 typedef struct {
@@ -201,8 +201,8 @@ obj_function_t *obj_function_t_allocate(void);
 obj_native_t *obj_native_t_allocate(native_fn_t function, const obj_string_t *name, const int arity);
 obj_closure_t *obj_closure_t_allocate(obj_function_t *function);
 obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot);
-obj_class_t *obj_class_t_allocate(obj_string_t *name);
-obj_instance_t *obj_instance_t_allocate(obj_class_t *cls);
+obj_typeobj_t *obj_typeobj_t_allocate(obj_string_t *name);
+obj_instance_t *obj_instance_t_allocate(obj_typeobj_t *typeobj);
 obj_list_t *obj_list_t_allocate(void);
 obj_map_t *obj_map_t_allocate(void);
 
@@ -218,9 +218,9 @@ static inline bool is_obj_type(const value_t value, const obj_type_t type)
 }
 
 bool value_t_equal(const value_t a, const value_t b);
-void value_array_t_init(value_array_t *array);
-void value_array_t_add(value_array_t *array, const value_t value);
-void value_array_t_free(value_array_t *array);
+void value_list_t_init(value_list_t *array);
+void value_list_t_add(value_list_t *array, const value_t value);
+void value_list_t_free(value_list_t *array);
 void value_t_print(const value_t value);
 obj_string_t *value_t_to_obj_string_t(const value_t value);
 uint32_t value_t_hash(const value_t value);

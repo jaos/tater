@@ -9,7 +9,7 @@
 #include "compiler.h"
 #include "debug.h"
 #include "memory.h"
-#include "object.h"
+#include "type.h"
 #include "vm.h"
 
 #define GC_HEAP_GROW_FACTOR 2
@@ -143,12 +143,12 @@ static bool is_instance_native(const int arg_count, const value_t *args)
     if (!IS_INSTANCE(args[0])) {
         vm_push(FALSE_VAL); return true;
     }
-    if (!IS_CLASS(args[1])) {
+    if (!IS_TYPECLASS(args[1])) {
         vm_push(FALSE_VAL); return true;
     }
     obj_instance_t *instance = AS_INSTANCE(args[0]);
-    obj_class_t *cls = AS_CLASS(args[1]);
-    if (instance->cls == cls) {
+    obj_typeobj_t *typeobj = AS_TYPECLASS(args[1]);
+    if (instance->typeobj == typeobj) {
         vm_push(TRUE_VAL);
     } else {
         vm_push(FALSE_VAL);
@@ -211,12 +211,12 @@ static bool list_native(const int argc, const value_t *args)
     vm_push(OBJ_VAL(list));
     if (argc == 1 && IS_LIST(args[0])) {
         for (int i = 0 ; i < argc; i++) {
-            value_array_t_add(&list->elements, args[i]);
+            value_list_t_add(&list->elements, args[i]);
         }
         return true;
     }
     for (int i = 0 ; i < argc; i++) {
-        value_array_t_add(&list->elements, args[i]);
+        value_list_t_add(&list->elements, args[i]);
     }
     return true;
 }
@@ -392,7 +392,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
                 return false;
             }
             value_t to_add = args[1];
-            value_array_t_add(&list->elements, to_add);
+            value_list_t_add(&list->elements, to_add);
             vm_push(to_add);
             return true;
         }
@@ -513,7 +513,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
         for (int i = 0; i < map->table.capacity; i++) {
             entry_t entry = map->table.entries[i];
             if (!IS_EMPTY(entry.key)) {
-                value_array_t_add(&keys->elements, entry.key);
+                value_list_t_add(&keys->elements, entry.key);
             }
         }
         return true;
@@ -539,7 +539,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             for (int i = 0; i < map->table.capacity; i++) {
                 entry_t entry = map->table.entries[i];
                 if (!IS_EMPTY(entry.key)) {
-                    value_array_t_add(&values->elements, entry.value);
+                    value_list_t_add(&values->elements, entry.value);
                 }
             }
             return true;
@@ -619,7 +619,7 @@ void vm_set_argc_argv(const int argc, const char *argv[])
     for (int i = 0; i < argc; i++) {
         value_t arg = OBJ_VAL(obj_string_t_copy_from(argv[i], strlen(argv[i])));
         vm_push(arg);
-        value_array_t_add(&AS_LIST(argv_list)->elements, arg);
+        value_list_t_add(&AS_LIST(argv_list)->elements, arg);
         vm_pop();
     }
     vm_pop();
@@ -656,7 +656,7 @@ void vm_inherit_env(void)
     vm_pop();
 }
 
-static void mark_array(value_array_t *array);
+static void mark_array(value_list_t *array);
 static void blacken_object(obj_t *object);
 static void vm_t_free_object(obj_t *o);
 static void mark_roots(void);
@@ -765,14 +765,14 @@ static bool call_value(const value_t callee, const int arg_count)
                 vm.stack_top -= arg_count + 1;
                 return bound_native_method->function(bound_native_method->name, arg_count + 1, args);
             }
-            case OBJ_CLASS: {
-                obj_class_t *cls = AS_CLASS(callee);
-                vm.stack_top[-arg_count - 1] = OBJ_VAL(obj_instance_t_allocate(cls));
+            case OBJ_TYPECLASS: {
+                obj_typeobj_t *typeobj = AS_TYPECLASS(callee);
+                vm.stack_top[-arg_count - 1] = OBJ_VAL(obj_instance_t_allocate(typeobj));
                 value_t initializer;
-                if (table_t_get(&cls->methods, OBJ_VAL(vm.init_string), &initializer)) {
+                if (table_t_get(&typeobj->methods, OBJ_VAL(vm.init_string), &initializer)) {
                     return call(AS_CLOSURE(initializer), arg_count);
                 } else if (arg_count != 0) {
-                    runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), arg_count, cls->name->chars);
+                    runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), arg_count, typeobj->name->chars);
                     return false;
                 }
                 return true;
@@ -799,10 +799,10 @@ static bool call_value(const value_t callee, const int arg_count)
     return false;
 }
 
-static bool invoke_from_class(obj_class_t *cls, const obj_string_t *name, const int arg_count)
+static bool invoke_from_typeobj(obj_typeobj_t *typeobj, const obj_string_t *name, const int arg_count)
 {
     value_t method;
-    if (!table_t_get(&cls->methods, OBJ_VAL(name), &method)) {
+    if (!table_t_get(&typeobj->methods, OBJ_VAL(name), &method)) {
         runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
@@ -844,7 +844,7 @@ static bool invoke(const obj_string_t *name, const int arg_count)
             vm.stack_top[-arg_count - 1] = function_value; // swap receiving_instance for our function
             return call_value(function_value, arg_count);
         }
-        return invoke_from_class(instance->cls, name, arg_count);
+        return invoke_from_typeobj(instance->typeobj, name, arg_count);
     }
 
     else {
@@ -854,10 +854,10 @@ static bool invoke(const obj_string_t *name, const int arg_count)
     return false;
 }
 
-static bool bind_method(obj_class_t *cls, const obj_string_t *name)
+static bool bind_method(obj_typeobj_t *typeobj, const obj_string_t *name)
 {
     value_t method;
-    if (!table_t_get(&cls->methods, OBJ_VAL(name), &method)) {
+    if (!table_t_get(&typeobj->methods, OBJ_VAL(name), &method)) {
         runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
@@ -905,8 +905,8 @@ static void close_upvalues(const value_t *last)
 static void define_method(obj_string_t *name)
 {
     value_t method = peek(0);
-    obj_class_t *cls = AS_CLASS(peek(1)); // left on the stack for us by class_declaration
-    table_t_set(&cls->methods, OBJ_VAL(name), method);
+    obj_typeobj_t *typeobj = AS_TYPECLASS(peek(1)); // left on the stack for us by class_declaration
+    table_t_set(&typeobj->methods, OBJ_VAL(name), method);
     vm_pop();
 }
 
@@ -1075,7 +1075,7 @@ static vm_t_interpret_result_t run(void)
                     }
 
                     // otherwise methods
-                    if (!bind_method(instance->cls, name)) {
+                    if (!bind_method(instance->typeobj, name)) {
                         return INTERPRET_RUNTIME_ERROR;
                     }
                 } else {
@@ -1100,9 +1100,9 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_GET_SUPER: {
                 const obj_string_t *method_name = READ_STRING();
-                obj_class_t *superclass = AS_CLASS(vm_pop());
+                obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
                 // NOTE this is only for methods, not fields
-                if (!bind_method(superclass, method_name)) {
+                if (!bind_method(super_type_obj, method_name)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -1195,9 +1195,9 @@ static vm_t_interpret_result_t run(void)
             case OP_SUPER_INVOKE: { // combined OP_GET_SUPER and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
                 const int arg_count = READ_BYTE();
-                obj_class_t *superclass = AS_CLASS(vm_pop());
+                obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
                 frame->ip = ip;
-                if (!invoke_from_class(superclass, method_name, arg_count)) {
+                if (!invoke_from_typeobj(super_type_obj, method_name, arg_count)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
@@ -1248,20 +1248,20 @@ static vm_t_interpret_result_t run(void)
                 }
                 return INTERPRET_EXIT_OK;
             }
-            case OP_CLASS: {
-                vm_push(OBJ_VAL(obj_class_t_allocate(READ_STRING())));
+            case OP_TYPE: {
+                vm_push(OBJ_VAL(obj_typeobj_t_allocate(READ_STRING())));
                 break;
             }
             case OP_INHERIT: {
-                const value_t superclass = peek(1);
-                if (!IS_CLASS(superclass)) {
+                const value_t super_type_obj = peek(1);
+                if (!IS_TYPECLASS(super_type_obj)) {
                     frame->ip = ip;
-                    runtime_error(gettext("Superclass must be a class."));
+                    runtime_error(gettext("Super type must be a type."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                obj_class_t *subclass = AS_CLASS(peek(0));
+                obj_typeobj_t *sub_type_obj = AS_TYPECLASS(peek(0));
                 // initialize the new subclass with copies of the superclass methods, to be optionally overridden later
-                table_t_copy_to(&AS_CLASS(superclass)->methods, &subclass->methods);
+                table_t_copy_to(&AS_TYPECLASS(super_type_obj)->methods, &sub_type_obj->methods);
                 vm_pop();
                 break;
             }
@@ -1311,7 +1311,7 @@ vm_t_interpret_result_t vm_t_interpret(const char *source)
     return run();
 }
 
-static void mark_array(value_array_t *array)
+static void mark_array(value_list_t *array)
 {
     for (int i = 0; i < array->count; i++) {
         value_t_mark(array->values[i]);
@@ -1339,10 +1339,10 @@ static void blacken_object(obj_t *object)
             value_t_mark(bound_native_method->receiving_instance); // should be an obj_instance_t that is already marked... but insurance here
             break;
         }
-        case OBJ_CLASS: {
-            obj_class_t *cls = (obj_class_t*)object;
-            obj_t_mark((obj_t*)cls->name);
-            table_t_mark(&cls->methods);
+        case OBJ_TYPECLASS: {
+            obj_typeobj_t *typeobj = (obj_typeobj_t*)object;
+            obj_t_mark((obj_t*)typeobj->name);
+            table_t_mark(&typeobj->methods);
             break;
         }
         case OBJ_CLOSURE: {
@@ -1361,7 +1361,7 @@ static void blacken_object(obj_t *object)
         }
         case OBJ_INSTANCE: {
             obj_instance_t *instance = (obj_instance_t*)object;
-            obj_t_mark((obj_t*)instance->cls);
+            obj_t_mark((obj_t*)instance->typeobj);
             table_t_mark(&instance->fields);
             break;
         }
@@ -1403,10 +1403,10 @@ static void vm_t_free_object(obj_t *o)
             FREE(obj_bound_native_method_t, o);
             break;
         }
-        case OBJ_CLASS: {
-            obj_class_t *cls = (obj_class_t*)o;
-            table_t_free(&cls->methods);
-            FREE(obj_class_t, o); // TODO obj_string_t ?
+        case OBJ_TYPECLASS: {
+            obj_typeobj_t *typeobj = (obj_typeobj_t*)o;
+            table_t_free(&typeobj->methods);
+            FREE(obj_typeobj_t, o);
             break;
         }
         case OBJ_CLOSURE: {
@@ -1445,7 +1445,7 @@ static void vm_t_free_object(obj_t *o)
         }
         case OBJ_LIST: {
             obj_list_t *t = (obj_list_t*)o;
-            value_array_t_free(&t->elements);
+            value_list_t_free(&t->elements);
             FREE(obj_list_t, o);
             break;
         }

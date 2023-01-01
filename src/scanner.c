@@ -158,7 +158,6 @@ static token_type_t identifier_type(void)
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'a': return check_keyword(2, 2, "se", TOKEN_CASE);
-                    case 'l': return check_keyword(2, 3, "ass", TOKEN_CLASS);
                     case 'o': return check_keyword(2, 6, "ntinue", TOKEN_CONTINUE);
                     default: ; // default returned below
                 }
@@ -189,13 +188,14 @@ static token_type_t identifier_type(void)
                 switch (scanner.start[1]) {
                     case 'a': return check_keyword(2, 3, "lse", TOKEN_FALSE);
                     case 'o': return check_keyword(2, 1, "r", TOKEN_FOR);
-                    case 'u': return check_keyword(2, 1, "n", TOKEN_FUN);
+                    case 'n': return TOKEN_FN;
                     default: ; // default returned below
                 }
             }
             break;
         }
         case 'i': return check_keyword(1, 1, "f", TOKEN_IF);
+        case 'l': return check_keyword(1, 2, "et", TOKEN_LET);
         case 'n': return check_keyword(1, 2, "il", TOKEN_NIL);
         case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
         case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);
@@ -203,6 +203,7 @@ static token_type_t identifier_type(void)
         case 's': {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
+                    case 'e': return check_keyword(2, 2, "lf", TOKEN_SELF);
                     case 'u': return check_keyword(2, 3, "per", TOKEN_SUPER);
                     case 'w': return check_keyword(2, 4, "itch", TOKEN_SWITCH);
                     default: ;  // default returned below
@@ -213,14 +214,13 @@ static token_type_t identifier_type(void)
         case 't': {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'h': return check_keyword(2, 2, "is", TOKEN_THIS);
                     case 'r': return check_keyword(2, 2, "ue", TOKEN_TRUE);
+                    case 'y': return check_keyword(2, 2, "pe", TOKEN_TYPE);
                     default: ;  // default returned below
                 }
             }
             break;
         }
-        case 'v': return check_keyword(1, 2, "ar", TOKEN_VAR);
         case 'w': return check_keyword(1, 4, "hile", TOKEN_WHILE);
         default: ; // default return below
     }

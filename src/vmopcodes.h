@@ -43,7 +43,7 @@ typedef enum {
     OP_RETURN,
     OP_ASSERT,
     OP_EXIT,
-    OP_CLASS,
+    OP_TYPE,
     OP_INHERIT,
     OP_METHOD,
     INVALID_OPCODE,

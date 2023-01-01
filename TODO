@@ -64,11 +64,11 @@ add printerr or some stderr printing
 figure out how to have namespaces and packages
     - then make a std library
 
-rename class to "type"?
+[DONE] rename class to "type"?
 
-rename var to "let" ?
+[DONE] rename var to "let" ?
 
-rename "fun" to "fn" ?
+[DONE] rename "fun" to "fn" ?
 
 Future language ideas:
 

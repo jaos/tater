@@ -11,7 +11,7 @@
 #include "../src/compiler.h"
 #include "../src/debug.h"
 #include "../src/memory.h"
-#include "../src/object.h"
+#include "../src/type.h"
 #include "../src/scanner.h"
 #include "../src/vm.h"
 #include "../src/vmopcodes.h"

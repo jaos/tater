@@ -8,7 +8,7 @@
 #include "compiler.h"
 #include "debug.h"
 #include "memory.h"
-#include "object.h"
+#include "type.h"
 #include "scanner.h"
 #include "vmopcodes.h"
 
@@ -70,14 +70,14 @@ typedef struct compiler {
     table_t string_constants;
 } compiler_t;
 
-typedef struct class_compiler {
-    struct class_compiler *enclosing;
-    bool has_superclass;
-} class_compiler_t;
+typedef struct type_compiler {
+    struct type_compiler *enclosing;
+    bool has_supertype;
+} type_compiler_t;
 
 static parser_t parser;
 static compiler_t *current = NULL;
-static class_compiler_t *current_class = NULL;
+static type_compiler_t *current_type = NULL;
 static int compiler_count = 0;
 
 #define MAX_COMPILERS 1024
@@ -239,8 +239,8 @@ static void compiler_t_init(compiler_t *compiler, const function_type_t type)
     local->depth = 0;
     local->is_captured = false;
     if (type != TYPE_FUNCTION) {
-        local->name.start = token_keyword_names[TOKEN_THIS];
-        local->name.length = TOKEN_THIS_LEN;
+        local->name.start = token_keyword_names[TOKEN_SELF];
+        local->name.length = TOKEN_SELF_LEN;
       } else {
         local->name.start = "";
         local->name.length = 0;
@@ -656,18 +656,18 @@ static void variable(const bool can_assign)
 
 static void super_expr(const bool)
 {
-    if (current_class == NULL) {
-        error(gettext("Can't use 'super' outside of a class."));
-    } else if (!current_class->has_superclass) {
-        error(gettext("Can't use 'super' in a class with no superclass."));
+    if (current_type == NULL) {
+        error(gettext("Can't use 'super' outside of a type."));
+    } else if (!current_type->has_supertype) {
+        error(gettext("Can't use 'super' in a type with no supertype."));
     }
 
     consume(TOKEN_DOT, gettext("Expect '.' after 'super'."));
-    consume(TOKEN_IDENTIFIER, gettext("Expect superclass method name."));
+    consume(TOKEN_IDENTIFIER, gettext("Expect supertype method name."));
     const uint8_t method_name = identifier_constant(&parser.previous);
 
-    // capture this and super in case we are in a closure
-    named_variable(synthetic_token(token_keyword_names[TOKEN_THIS]), false);
+    // capture self and super in case we are in a closure
+    named_variable(synthetic_token(token_keyword_names[TOKEN_SELF]), false);
 
     // try a fast path
     if (match(TOKEN_LEFT_PAREN)) {
@@ -681,11 +681,11 @@ static void super_expr(const bool)
     }
 }
 
-static void this_expr(const bool)
+static void self_expr(const bool)
 {
-    // check we have a setup from class_declaration
-    if (current_class == NULL) {
-        error(gettext("Can't use 'this' outside of a class."));
+    // check we have a setup from type_declaration
+    if (current_type == NULL) {
+        error(gettext("Can't use 'self' outside of a type."));
         return;
     }
     variable(false);
@@ -734,20 +734,20 @@ const parse_rule_t rules[] = {
     [TOKEN_STRING]          = {string,      NULL,       PREC_NONE},
     [TOKEN_NUMBER]          = {number,      NULL,       PREC_NONE},
     [TOKEN_AND]             = {NULL,        and_expr,   PREC_AND},
-    [TOKEN_CLASS]           = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_TYPE]            = {NULL,        NULL,       PREC_NONE},
     [TOKEN_ELSE]            = {NULL,        NULL,       PREC_NONE},
     [TOKEN_FALSE]           = {literal,     NULL,       PREC_NONE},
     [TOKEN_FOR]             = {NULL,        NULL,       PREC_NONE},
-    [TOKEN_FUN]             = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_FN]             = {NULL,        NULL,       PREC_NONE},
     [TOKEN_IF]              = {NULL,        NULL,       PREC_NONE},
     [TOKEN_NIL]             = {literal,     NULL,       PREC_NONE},
     [TOKEN_OR]              = {NULL,        or_expr,    PREC_OR},
     [TOKEN_PRINT]           = {NULL,        NULL,       PREC_NONE},
     [TOKEN_RETURN]          = {NULL,        NULL,       PREC_NONE},
     [TOKEN_SUPER]           = {super_expr,  NULL,       PREC_NONE},
-    [TOKEN_THIS]            = {this_expr,   NULL,       PREC_NONE},
+    [TOKEN_SELF]            = {self_expr,   NULL,       PREC_NONE},
     [TOKEN_TRUE]            = {literal,     NULL,       PREC_NONE},
-    [TOKEN_VAR]             = {NULL,        NULL,       PREC_NONE},
+    [TOKEN_LET]             = {NULL,        NULL,       PREC_NONE},
     [TOKEN_WHILE]           = {NULL,        NULL,       PREC_NONE},
     [TOKEN_ERROR]           = {NULL,        NULL,       PREC_NONE},
     [TOKEN_EXIT]            = {NULL,        NULL,       PREC_NONE},
@@ -841,58 +841,59 @@ static void method(void)
     emit_bytes(OP_METHOD, constant);
 }
 
-static void class_declaration(void)
+static void type_declaration(void)
 {
-    consume(TOKEN_IDENTIFIER, gettext("Expect class name."));
-    const token_t class_name = parser.previous;
+    consume(TOKEN_IDENTIFIER, gettext("Expect type name."));
+    const token_t type_name = parser.previous;
     const uint8_t name_constant = identifier_constant(&parser.previous);
     declare_variable();
 
-    emit_bytes(OP_CLASS, name_constant);
+    emit_bytes(OP_TYPE, name_constant);
     define_variable(name_constant);
 
-    // setup a class compiler instance while we do the work
-    class_compiler_t class_compiler;
-    class_compiler.enclosing = current_class;
-    class_compiler.has_superclass = false;
-    current_class = &class_compiler;
+    // setup a type compiler instance while we do the work
+    type_compiler_t type_compiler;
+    type_compiler.enclosing = current_type;
+    type_compiler.has_supertype = false;
+    current_type = &type_compiler;
 
-    if (match(TOKEN_LESS)) {
-        consume(TOKEN_IDENTIFIER, gettext("Expect superclass name."));
+    if (match(TOKEN_LEFT_PAREN)) {
+        consume(TOKEN_IDENTIFIER, gettext("Expect supertype name."));
         variable(false);
 
-        if (identifiers_equal(&class_name, &parser.previous)) {
-            error(gettext("A class can't inherit from itself."));
+        if (identifiers_equal(&type_name, &parser.previous)) {
+            error(gettext("A type can't inherit from itself."));
         }
+        consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after supertype."));
 
-        // setup super... make a new scope so each class gets local slot for super, preventing collisions
+        // setup super... make a new scope so each type gets local slot for super, preventing collisions
         begin_scope();
         add_local(synthetic_token(token_keyword_names[TOKEN_SUPER]));
         define_variable(0);
 
-        named_variable(class_name, false);
+        named_variable(type_name, false);
         emit_byte(OP_INHERIT);
-        class_compiler.has_superclass = true;
+        type_compiler.has_supertype = true;
     }
 
-    named_variable(class_name, false); // get this back on the stack as a named variable before we compile methods
+    named_variable(type_name, false); // get self back on the stack as a named variable before we compile methods
 
-    consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before class body."));
+    consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before type body."));
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         // could add fields and other things here besides methods
         method();
     }
-    consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after class body."));
+    consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after type body."));
     match(TOKEN_SEMICOLON);
 
-    emit_byte(OP_POP); // done with our class, pop it off the stack
+    emit_byte(OP_POP); // done with our type, pop it off the stack
 
-    if (class_compiler.has_superclass) {
+    if (type_compiler.has_supertype) {
         end_scope();
     }
 
-    // pop off the class compiler
-    current_class = current_class->enclosing;
+    // pop off the type compiler
+    current_type = current_type->enclosing;
 }
 
 static void fun_declaration(void)
@@ -938,7 +939,7 @@ static void for_statement(void)
     consume(TOKEN_LEFT_PAREN, gettext("Expect '(' after 'for'."));
     if (match(TOKEN_SEMICOLON)) {
         // no loop initializer
-    } else if (match(TOKEN_VAR)) {
+    } else if (match(TOKEN_LET)) {
         var_declaration();
     } else {
         expression_statement();
@@ -1075,9 +1076,9 @@ static void synchronize(void)
         if (parser.previous.type == TOKEN_SEMICOLON)
             return;
         switch (parser.current.type) {
-            case TOKEN_CLASS:
-            case TOKEN_FUN:
-            case TOKEN_VAR:
+            case TOKEN_TYPE:
+            case TOKEN_FN:
+            case TOKEN_LET:
             case TOKEN_FOR:
             case TOKEN_IF:
             case TOKEN_WHILE:
@@ -1093,11 +1094,11 @@ static void synchronize(void)
 
 static void declaration(void)
 {
-    if (match(TOKEN_CLASS)) {
-        class_declaration();
-    } else if (match(TOKEN_FUN)) {
+    if (match(TOKEN_TYPE)) {
+        type_declaration();
+    } else if (match(TOKEN_FN)) {
         fun_declaration();
-    } else if (match(TOKEN_VAR)) {
+    } else if (match(TOKEN_LET)) {
         var_declaration();
     } else {
         statement();

@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "debug.h"
-#include "object.h"
+#include "type.h"
 #include "compiler.h"
 #include "scanner.h"
 
@@ -136,7 +136,7 @@ int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         case OP_EXIT: return simple_instruction("OP_EXIT", offset);
         case OP_ASSERT: return jump_instruction("OP_ASSERT", 1, chunk, offset);
-        case OP_CLASS: return constant_instruction("OP_CLASS", chunk, offset);
+        case OP_TYPE: return constant_instruction("OP_TYPE", chunk, offset);
         case OP_INHERIT: return simple_instruction("OP_INHERIT", offset);
         case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
@@ -188,7 +188,7 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_RETURN: return "OP_RETURN";
         case OP_EXIT: return "OP_EXIT";
         case OP_ASSERT: return "OP_ASSERT";
-        case OP_CLASS: return "OP_CLASS";
+        case OP_TYPE: return "OP_TYPE";
         case OP_INHERIT: return "OP_INHERIT";
         case OP_METHOD: return "OP_METHOD";
         case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG";
@@ -243,13 +243,13 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_AND: return "TOKEN_AND";
         case TOKEN_BREAK: return "TOKEN_BREAK";
         case TOKEN_CASE: return "TOKEN_CASE";
-        case TOKEN_CLASS: return "TOKEN_CLASS";
+        case TOKEN_TYPE: return "TOKEN_TYPE";
         case TOKEN_CONTINUE: return "TOKEN_CONTINUE";
         case TOKEN_DEFAULT: return "TOKEN_DEFAULT";
         case TOKEN_ELSE: return "TOKEN_ELSE";
         case TOKEN_FALSE: return "TOKEN_FALSE";
         case TOKEN_FOR: return "TOKEN_FOR";
-        case TOKEN_FUN: return "TOKEN_FUN";
+        case TOKEN_FN: return "TOKEN_FN";
         case TOKEN_IF: return "TOKEN_IF";
         case TOKEN_NIL: return "TOKEN_NIL";
         case TOKEN_OR: return "TOKEN_OR";
@@ -257,9 +257,9 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_RETURN: return "TOKEN_RETURN";
         case TOKEN_SUPER: return "TOKEN_SUPER";
         case TOKEN_SWITCH: return "TOKEN_SWITCH";
-        case TOKEN_THIS: return "TOKEN_THIS";
+        case TOKEN_SELF: return "TOKEN_SELF";
         case TOKEN_TRUE: return "TOKEN_TRUE";
-        case TOKEN_VAR: return "TOKEN_VAR";
+        case TOKEN_LET: return "TOKEN_LET";
         case TOKEN_WHILE: return "TOKEN_WHILE";
         case TOKEN_ERROR: return "TOKEN_ERROR";
         case TOKEN_EOF: return "TOKEN_EOF";
@@ -271,7 +271,7 @@ const char *obj_type_t_to_str(const obj_type_t type)
 {
     switch (type) {
         case OBJ_BOUND_METHOD: return "OBJ_BOUND_METHOD";
-        case OBJ_CLASS: return "OBJ_CLASS";
+        case OBJ_TYPECLASS: return "OBJ_TYPECLASS";
         case OBJ_CLOSURE: return "OBJ_CLOSURE";
         case OBJ_FUNCTION: return "OBJ_FUNCTION";
         case OBJ_INSTANCE: return "OBJ_INSTANCE";
