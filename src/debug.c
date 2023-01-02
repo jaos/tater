@@ -139,6 +139,7 @@ int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_TYPE: return constant_instruction("OP_TYPE", chunk, offset);
         case OP_INHERIT: return simple_instruction("OP_INHERIT", offset);
         case OP_METHOD: return constant_instruction("OP_METHOD", chunk, offset);
+        case OP_FIELD: return constant_instruction("OP_FIELD", chunk, offset);
         case OP_CONSTANT_LONG: return long_constant_instruction("OP_CONSTANT_LONG", chunk, offset);
         case OP_POPN: return byte_instruction("OP_POPN", chunk, offset);
         case OP_DUP: return simple_instruction("OP_DUP", offset);
@@ -191,6 +192,7 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_TYPE: return "OP_TYPE";
         case OP_INHERIT: return "OP_INHERIT";
         case OP_METHOD: return "OP_METHOD";
+        case OP_FIELD: return "OP_FIELD";
         case OP_CONSTANT_LONG: return "OP_CONSTANT_LONG";
         case OP_POPN: return "OP_POPN";
         case OP_DUP: return "OP_DUP";
@@ -218,14 +220,20 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_RIGHT_PAREN: return "TOKEN_RIGHT_PAREN";
         case TOKEN_LEFT_BRACE: return "TOKEN_LEFT_BRACE";
         case TOKEN_RIGHT_BRACE: return "TOKEN_RIGHT_BRACE";
+        case TOKEN_LEFT_BRACKET: return "TOKEN_LEFT_BRACKET";
+        case TOKEN_RIGHT_BRACKET: return "TOKEN_RIGHT_BRACKET";
         case TOKEN_COLON: return "TOKEN_COLON";
         case TOKEN_COMMA: return "TOKEN_COMMA";
         case TOKEN_DOT: return "TOKEN_DOT";
         case TOKEN_MINUS: return "TOKEN_MINUS";
+        case TOKEN_MINUS_MINUS: return "TOKEN_MINUS_MINUS";
         case TOKEN_PLUS: return "TOKEN_PLUS";
+        case TOKEN_PLUS_PLUS: return "TOKEN_PLUS_PLUS";
         case TOKEN_SEMICOLON: return "TOKEN_SEMICOLON";
         case TOKEN_SLASH: return "TOKEN_SLASH";
+        case TOKEN_SLASH_EQUAL: return "TOKEN_SLASH_EQUAL";
         case TOKEN_STAR: return "TOKEN_STAR";
+        case TOKEN_STAR_EQUAL: return "TOKEN_STAR_EQUAL";
         // one or two characters
         case TOKEN_BANG: return "TOKEN_BANG";
         case TOKEN_BANG_EQUAL: return "TOKEN_BANG_EQUAL";
@@ -241,12 +249,14 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_NUMBER: return "TOKEN_NUMBER";
         // keywords
         case TOKEN_AND: return "TOKEN_AND";
+        case TOKEN_ASSERT: return "TOKEN_ASSERT";
         case TOKEN_BREAK: return "TOKEN_BREAK";
         case TOKEN_CASE: return "TOKEN_CASE";
         case TOKEN_TYPE: return "TOKEN_TYPE";
         case TOKEN_CONTINUE: return "TOKEN_CONTINUE";
         case TOKEN_DEFAULT: return "TOKEN_DEFAULT";
         case TOKEN_ELSE: return "TOKEN_ELSE";
+        case TOKEN_EXIT: return "TOKEN_EXIT";
         case TOKEN_FALSE: return "TOKEN_FALSE";
         case TOKEN_FOR: return "TOKEN_FOR";
         case TOKEN_FN: return "TOKEN_FN";
@@ -261,6 +271,7 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_TRUE: return "TOKEN_TRUE";
         case TOKEN_LET: return "TOKEN_LET";
         case TOKEN_WHILE: return "TOKEN_WHILE";
+        case TOKEN_PERROR: return "TOKEN_PERROR";
         case TOKEN_ERROR: return "TOKEN_ERROR";
         case TOKEN_EOF: return "TOKEN_EOF";
         default: return NULL;

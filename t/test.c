@@ -202,6 +202,27 @@ START_TEST(test_vm)
         "for (let i = 0; i < 10;i++) { let f = t1(); let f2 = t1(); let f3 = t1(); continue;}" // popn
         "for (let i = 0; i < 10;i++) { let f = t1(); let f2 = t1(); let f3 = t1(); break;}", // popn
 
+        "type Foo {"
+            "let counter1 = 0;"
+            "let counter2 = 0;"
+            "fn doit1() {"
+                "self.counter1 += 1;"
+                "print(self.counter1);"
+            "}"
+            "fn doit2() {"
+                "self.counter2++;"
+                "print(self.counter2);"
+            "}"
+            "fn doit() {"
+                "self.doit1(); self.doit2();"
+            "}"
+        "}"
+        "type Bar(Foo) {};"
+        "let f = Bar(); f.doit(); f.doit(); f.doit(); f.doit(); assert(f.counter1 == 4); assert(f.counter2 == 4);",
+
+        "type Animals { let Cat = \"cat\"; let Dog = \"dog\"; let Bird = \"bird\";}"
+        "assert(Animals.Cat == \"cat\");",
+
         "is(2, \"not a type\");",
         "assert(is(\"foo\", str));",
         "assert(!is(2, str));",
@@ -219,6 +240,12 @@ START_TEST(test_vm)
         "assert(number(9) == 9);",
         "assert(number(\"1.1\") == 1.1);",
         "assert(number(\"-5\") == -5);",
+
+        "type Foo {}; type Bar(Foo) {}; type Baz(Bar) {};"
+        "let i1 = Baz(); let i2 = Bar(); let i3 = Foo();"
+        "assert(is(i1, Foo) == true); assert(is(i1, Bar) == true); assert(is(i1, Baz) == true);"
+        "assert(is(i2, Foo) == true); assert(is(i2, Bar) == true); assert(is(i2, Baz) == false);"
+        "assert(is(i3, Foo) == true); assert(is(i3, Bar) == false); assert(is(i3, Baz) == false);",
 
         "type Foo {} let f = Foo();"
         "assert(!get_field(f, \"name\"));"
@@ -296,7 +323,7 @@ START_TEST(test_vm)
         "let foo = \"one\"; foo += \" bar\";",
 
         "let p = list(1, 2, 3); assert(p.len() == 3);",
-        "type Foo {init(name, list) { self.name = name; self.list = list;} len() { return self.list.len();}}"
+        "type Foo { fn init(name, list) { self.name = name; self.list = list;} fn len() { return self.list.len();}}"
         "let f = Foo(\"jason\", list(1,2,3));"
         "assert(f.len() == 3);"
         "f.list.append(\"one\");"
@@ -374,46 +401,46 @@ START_TEST(test_vm)
         "type Brioche {} print Brioche; print Brioche();", // chapter 27
         "type Pair {} let pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
 
-        "type Brunch { bacon() {} eggs() {} } let brunch = Brunch(); let eggs = brunch.eggs; eggs();", // chapter 28
+        "type Brunch { fn bacon() {} fn eggs() {} } let brunch = Brunch(); let eggs = brunch.eggs; eggs();", // chapter 28
 
-        "type Scone { topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
+        "type Scone { fn topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
         "let scone = Scone(); scone.topping(\"berries\", \"cream\");", // chapter 28
 
-        "type Person { say_name() {print self.name;} }"
+        "type Person { fn say_name() {print self.name;} }"
         "let me = Person(); me.name = \"test\"; let method = me.say_name; method();", // chapter 28
 
-        "type Nested { method() { fn function() { print self; } function(); } } Nested().method();", // chapter 28
+        "type Nested { fn method() { fn function() { print self; } function(); } } Nested().method();", // chapter 28
 
-        "type Brunch { init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
+        "type Brunch { fn init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
 
         "type CoffeeMaker { "
-            "init(coffee) { self.coffee = coffee; }"
-            "brew() { print \"enjoy \" + self.coffee; self.coffee = nil; }"
+            "fn init(coffee) { self.coffee = coffee; }"
+            "fn brew() { print \"enjoy \" + self.coffee; self.coffee = nil; }"
         "}"
         "let maker = CoffeeMaker(\"coffee and chicory\");"
         "maker.brew();", // chapter 28
 
-        "type Oops { init() { fn f() { print \"not a method\"; } self.field = f; } } let oops = Oops(); oops.field();", // chapter 28
+        "type Oops { fn init() { fn f() { print \"not a method\"; } self.field = f; } } let oops = Oops(); oops.field();", // chapter 28
 
-        "type Doughnut { cook() { print(\"Dunk in the fryer.\"); } }"
-        "type Cruller (Doughnut) { finish() { print(\"Glaze with icing.\"); } }"
+        "type Doughnut { fn cook() { print(\"Dunk in the fryer.\"); } }"
+        "type Cruller (Doughnut) { fn finish() { print(\"Glaze with icing.\"); } }"
         "let c = Cruller(); c.cook(); c.finish();", // chapter 29
 
-        "type A { method() { print(\"A method\");}}"
-        "type B (A) { method() { print(\"B method\");} test() { super.method(); }}"
+        "type A { fn method() { print(\"A method\");}}"
+        "type B (A) { fn method() { print(\"B method\");} fn test() { super.method(); }}"
         "type C (B) {}"
         "C().test();", // chapter 29
 
-        "type A { method() { print \"A\"; } }"
-        "type B (A) { method() { let closure = super.method; closure(); } }" // prints "A"
+        "type A { fn method() { print \"A\"; } }"
+        "type B (A) { fn method() { let closure = super.method; closure(); } }" // prints "A"
         "B().method();", // chapter 29
 
         "type Doughnut {"
-            "cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
-            "finish(ingredient) { print(\"Finish with \" + ingredient); }"
+            "fn cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
+            "fn finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
         "type Cruller (Doughnut) {"
-            "finish(ingredient) {"
+            "fn finish(ingredient) {"
                 // no sprinkles, always icing
                 "super.finish(\"icing\");"
             "}"
@@ -467,13 +494,14 @@ START_TEST(test_vm)
         "{ let a = 1; let a = 2;}",
         "print self;", // chapter 28
         "fn not_a_method() { print self;}", // chapter 28
-        "type CannotReturnFromInitializer { init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
+        "type CannotReturnFromInitializer { fn init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
         "type Foo (Foo) {}", // chapter 29
-        "type NoSuperClass { method() { super.method();}}", // chapter 29
+        "type NoSuperClass { fn method() { super.method();}}", // chapter 29
         "fn NotClass() { super.NotClass(); }", // chapter 29
         "switch(3) { let statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
         "switch(3) { default: true; case 3: print(\"cannot have case after default\"); }",
         "{ break;}",
+        "type NoPropertiesOrMethods { oops_missing_fn() {}}",
         NULL,
     };
     for (int i = 0; compilation_fail_cases[i] != NULL; i++) {
@@ -492,7 +520,7 @@ START_TEST(test_vm)
         "let a = \"foo\"; a = -a;", // operand not a number
         "let a = \"foo\"; a = a + 1;", // operands must be same
         "a = 1;", // set global undefined variable
-        "type OnlyOneArgInit { init(one) {} } let i = OnlyOneArgInit(1, 2);", // chapter 28
+        "type OnlyOneArgInit { fn init(one) {} } let i = OnlyOneArgInit(1, 2);", // chapter 28
         "type NoArgInit {} let i = NoArgInit(1, 2);", // chapter 28
         "let NotClass = \"so not a type\"; type OhNo (NotClass) {}", // chapter 29
         "let a = 1; a = a / 0;", // divbyzero
@@ -532,6 +560,8 @@ START_TEST(test_vm)
         "true.nosuchpropertyonanoninstance;",
         "map(1);",
         "map(\"one\", 1).len(1);",
+        "type Animals { let Cat = \"cat\"; let Dog = \"dog\"; let Bird = \"bird\";} print(Animals.NoSuch);",
+        "type Animals { let Cat = \"cat\"; let Dog = \"dog\"; let Bird = \"bird\";} Animals.Cat = 1;",
         NULL,
     };
     for (int i = 0; runtime_fail_cases[i] != NULL; i++) {
@@ -772,12 +802,16 @@ START_TEST(test_debug)
         const char *op_str __unused__ = token_type_t_to_str(t);
     }
 
+    vm_toggle_gc_stress();
+    vm_toggle_gc_trace();
+    vm_toggle_stack_trace();
+
     // trigger gc
     const char *program =
         "let x = 1; let y = 2; let z = x + y; let z2 = z - 1; let t = true; let f = false; let invalid = !true;"
         "let alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
-        "type Point { init(x,y) { self.x = x; self.y = y;} dostuff() { z = z + x + y; }}"
-        "type SubPoint (Point) { init(x,y) { super.init(x/2,y*10); }} let sp= SubPoint(10, 20); assert(sp.x == 5);"
+        "type Point { fn init(x,y) { self.x = x; self.y = y;} fn dostuff() { z = z + x + y; }}"
+        "type SubPoint (Point) { fn init(x,y) { super.init(x/2,y*10); }} let sp= SubPoint(10, 20); assert(sp.x == 5);"
         "let f1; { let i = 100; fn inner() { print i;} f1 = inner;}"
         "let f2 = Point(-900, -900).dostuff;"
         "let alistlen = alist.len;"
@@ -798,8 +832,6 @@ START_TEST(test_debug)
         "}";
     ck_assert(vm_t_interpret(program) == INTERPRET_OK);
 
-    vm_toggle_gc_trace();
-    vm_toggle_stack_trace();
     const char *programs_with_tracing[] = {
         // https://github.com/munificent/craftingvm_t_interpreters/issues/888
         "fn returnArg(arg){ return arg;}"
@@ -810,16 +842,16 @@ START_TEST(test_debug)
         // OP_CLOSE_UPVALUE https://github.com/munificent/craftingvm_t_interpreters/issues/746
         "let f1; let f2; { let i = 1; fn f() { print i; } f1 = f; } { let j = 2; fn f() { print j; } f2 = f; } f1(); f2();",
 
-        "type A { method() { print \"A\"; } }"
-        "type B (A) { method() { let closure = super.method; closure(); } }" // prints "A"
+        "type A { fn method() { print \"A\"; } }"
+        "type B (A) { fn method() { let closure = super.method; closure(); } }" // prints "A"
         "B().method();", // chapter 29
 
         "type Doughnut {"
-            "cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
-            "finish(ingredient) { print(\"Finish with \" + ingredient); }"
+            "fn cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
+            "fn finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
         "type Cruller (Doughnut) {"
-            "finish(ingredient) {"
+            "fn finish(ingredient) {"
                 // no sprinkles, always icing
                 "super.finish(\"icing\");"
             "}"

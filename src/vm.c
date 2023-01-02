@@ -77,9 +77,9 @@ void vm_define_native(const char *name, const native_fn_t function, const int ar
     vm_pop();
 }
 
-static bool has_field_native(const int arg_count, const value_t *args)
+static bool has_field_native(const int argc, const value_t *args)
 {
-    if (arg_count != 2) {
+    if (argc != 2) {
         return false;
     }
 
@@ -95,9 +95,9 @@ static bool has_field_native(const int arg_count, const value_t *args)
     return true;
 }
 
-static bool is_instance_native(const int arg_count, const value_t *args)
+static bool is_instance_native(const int argc, const value_t *args)
 {
-    if (arg_count != 2) {
+    if (argc != 2) {
         return false;
     }
 
@@ -150,15 +150,24 @@ static bool is_instance_native(const int arg_count, const value_t *args)
     obj_typeobj_t *typeobj = AS_TYPECLASS(args[1]);
     if (instance->typeobj == typeobj) {
         vm_push(TRUE_VAL);
-    } else {
-        vm_push(FALSE_VAL);
+        return true;
+    } else if (instance->typeobj->super != NULL) {
+        obj_typeobj_t *instance_super = instance->typeobj->super;
+        do {
+            if (instance_super == typeobj) {
+                vm_push(TRUE_VAL);
+                return true;
+            }
+            instance_super = instance_super->super;
+        } while (instance_super != NULL);
     }
+    vm_push(FALSE_VAL);
     return true;
 }
 
-static bool get_field_native(const int arg_count, const value_t *args)
+static bool get_field_native(const int argc, const value_t *args)
 {
-    if (arg_count != 2 || !IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
+    if (argc != 2 || !IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
         runtime_error(gettext("get_field requires an object and a string field name."));
         return false;
     }
@@ -170,9 +179,9 @@ static bool get_field_native(const int arg_count, const value_t *args)
     return true;
 }
 
-static bool set_field_native(const int arg_count, const value_t *args)
+static bool set_field_native(const int argc, const value_t *args)
 {
-    if (arg_count != 3 || !IS_INSTANCE(args[0])) {
+    if (argc != 3 || !IS_INSTANCE(args[0])) {
         runtime_error(gettext("set_field requires instance, field name, and value."));
         return false;
     }
@@ -189,9 +198,9 @@ static bool sys_version_native(const int, const value_t *)
     return true;
 }
 
-static bool str_native(const int arg_count, const value_t *args)
+static bool str_native(const int argc, const value_t *args)
 {
-    if (arg_count != 1) {
+    if (argc != 1) {
         vm_push(OBJ_VAL(obj_string_t_copy_from("", 0)));
         return true;
     }
@@ -250,9 +259,9 @@ static bool map_native(const int argc, const value_t *args)
     return true;
 }
 
-static bool number_native(const int arg_count, const value_t *args)
+static bool number_native(const int argc, const value_t *args)
 {
-    if (arg_count != 1) {
+    if (argc != 1) {
         runtime_error(gettext("number requires on argument."));
         return false;
     }
@@ -280,12 +289,12 @@ static bool number_native(const int arg_count, const value_t *args)
     return false;
 }
 
-static bool string_method_invoke(const obj_string_t *method, const int arg_count, const value_t *args)
+static bool string_method_invoke(const obj_string_t *method, const int argc, const value_t *args)
 {
     obj_string_t *str = AS_STRING(args[0]);
 
     if (method->length == 3 && memcmp(method->chars, KEYWORD_LEN, KEYWORD_LEN_LEN) == 0) {
-        if (arg_count != 1) {
+        if (argc != 1) {
             runtime_error(gettext("str.len takes no arguments."));
             return false;
         }
@@ -294,7 +303,7 @@ static bool string_method_invoke(const obj_string_t *method, const int arg_count
     }
 
     else if (method->length == 6 && memcmp(method->chars, "substr", 6) == 0) {
-        if (arg_count != 3 || !IS_OBJ(args[0]) || !IS_STRING(args[0]) || !IS_NUMBER(args[1]) || !IS_NUMBER(args[2])) {
+        if (argc != 3 || !IS_OBJ(args[0]) || !IS_STRING(args[0]) || !IS_NUMBER(args[1]) || !IS_NUMBER(args[2])) {
             runtime_error(gettext("str.substr requires a string argument and a start position and a length."));
             return false;
         }
@@ -316,7 +325,7 @@ static bool string_method_invoke(const obj_string_t *method, const int arg_count
     }
 
     else if (method->length == 9 && memcmp(method->chars, KEYWORD_SUBSCRIPT, KEYWORD_SUBSCRIPT_LEN) == 0) {
-        if (arg_count != 2 || !IS_OBJ(args[0]) || !IS_STRING(args[0]) || !IS_NUMBER(args[1])) {
+        if (argc != 2 || !IS_OBJ(args[0]) || !IS_STRING(args[0]) || !IS_NUMBER(args[1])) {
             runtime_error(gettext("str.subscript requires a string argument and a position."));
             return false;
         }
@@ -337,13 +346,13 @@ static bool string_method_invoke(const obj_string_t *method, const int arg_count
     return false;
 }
 
-static bool list_method_invoke(const obj_string_t *method, const int arg_count, const value_t *args)
+static bool list_method_invoke(const obj_string_t *method, const int argc, const value_t *args)
 {
     obj_list_t *list = AS_LIST(args[0]);
 
     if (method->length == 3) {
         if (memcmp(method->chars, KEYWORD_LEN, KEYWORD_LEN_LEN) == 0) {
-            if (arg_count > 1) {
+            if (argc > 1) {
                 runtime_error(gettext("list.len takes no arguments."));
                 return false;
             }
@@ -351,7 +360,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_GET, KEYWORD_GET_LEN) == 0) {
-            if (arg_count != 2) {
+            if (argc != 2) {
                 runtime_error(gettext("list.get requires a single numerical argument."));
                 return false;
             }
@@ -375,7 +384,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
 
     else if (method->length == 5) {
         if (memcmp(method->chars, KEYWORD_CLEAR, KEYWORD_CLEAR_LEN) == 0) {
-            if (arg_count != 1) {
+            if (argc != 1) {
                 runtime_error(gettext("list.clear requires no arguments."));
                 return false;
             }
@@ -387,7 +396,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
 
     else if (method->length == 6) {
         if (memcmp(method->chars, KEYWORD_APPEND, KEYWORD_APPEND_LEN) == 0) {
-            if (arg_count != 2) {
+            if (argc != 2) {
                 runtime_error(gettext("list.append requires a single argument."));
                 return false;
             }
@@ -401,7 +410,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
                 vm_push(NUMBER_VAL(list->elements.count));
                 return true;
             }
-            if (arg_count != 2) {
+            if (argc != 2) {
                 runtime_error(gettext("list.remove requires a single argument."));
                 return false;
             }
@@ -435,7 +444,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
     }
 
     else if (method->length == 9 && memcmp(method->chars, KEYWORD_SUBSCRIPT, KEYWORD_SUBSCRIPT_LEN) == 0) {
-        if (!(arg_count == 2 || arg_count == 3)) {
+        if (!(argc == 2 || argc == 3)) {
             runtime_error(gettext("list.subscript requires a single index or an index and a value."));
             return false;
         }
@@ -451,7 +460,7 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
             runtime_error(gettext("invalid list.subscript index."));
             return false;
         }
-        if (arg_count == 3) {
+        if (argc == 3) {
             list->elements.values[index] = args[2];
             vm_push(args[2]);
         } else {
@@ -465,13 +474,13 @@ static bool list_method_invoke(const obj_string_t *method, const int arg_count, 
     return false;
 }
 
-static bool map_method_invoke(const obj_string_t *method, const int arg_count, const value_t *args)
+static bool map_method_invoke(const obj_string_t *method, const int argc, const value_t *args)
 {
     obj_map_t *map = AS_MAP(args[0]);
 
     if (method->length == 3) {
         if (memcmp(method->chars, KEYWORD_LEN, KEYWORD_LEN_LEN) == 0) {
-            if (arg_count > 1) {
+            if (argc > 1) {
                 runtime_error(gettext("map.len takes no arguments."));
                 return false;
             }
@@ -479,7 +488,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_GET, KEYWORD_GET_LEN) == 0) {
-            if (arg_count != 2 || !IS_STRING(args[1])) {
+            if (argc != 2 || !IS_STRING(args[1])) {
                 runtime_error(gettext("map.get requires a single string argument."));
                 return false;
             }
@@ -492,7 +501,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_SET, KEYWORD_SET_LEN) == 0) {
-            if (arg_count != 3) {
+            if (argc != 3) {
                 runtime_error(gettext("map.set requires a key and a value argument."));
                 return false;
             }
@@ -504,7 +513,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
     }
 
     else if (method->length == 4 && memcmp(method->chars, KEYWORD_KEYS, KEYWORD_KEYS_LEN) == 0) {
-        if (arg_count > 1) {
+        if (argc > 1) {
             runtime_error(gettext("map.keys takes no arguments."));
             return false;
         }
@@ -521,7 +530,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
 
     else if (method->length == 6) {
         if (memcmp(method->chars, KEYWORD_REMOVE, KEYWORD_REMOVE_LEN) == 0) {
-            if (arg_count != 2 || !IS_STRING(args[1])) {
+            if (argc != 2 || !IS_STRING(args[1])) {
                 runtime_error(gettext("map.remove requires a single string argument."));
                 return false;
             }
@@ -530,7 +539,7 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_VALUES, KEYWORD_VALUES_LEN) == 0) {
-            if (arg_count != 1) {
+            if (argc != 1) {
                 runtime_error(gettext("map.values requires no arguments."));
                 return false;
             }
@@ -547,11 +556,11 @@ static bool map_method_invoke(const obj_string_t *method, const int arg_count, c
     }
 
     else if (method->length == 9 && memcmp(method->chars, KEYWORD_SUBSCRIPT, KEYWORD_SUBSCRIPT_LEN) == 0) {
-        if (!(arg_count == 2 || arg_count == 3)) {
+        if (!(argc == 2 || argc == 3)) {
             runtime_error(gettext("map.subscript requires a single key argument or a key and a value."));
             return false;
         }
-        if (arg_count == 3) {
+        if (argc == 3) {
             table_t_set(&map->table, args[1], args[2]);
             vm_push(args[2]);
             return true;
@@ -732,10 +741,10 @@ static value_t peek(const int distance)
     return vm.stack_top[-1 - distance];
 }
 
-static bool call(obj_closure_t *closure, const int arg_count)
+static bool call(obj_closure_t *closure, const int argc)
 {
-    if (closure->function->arity >= 0 && arg_count != closure->function->arity) {
-        runtime_error(gettext("Expected %d arguments but got %d."), closure->function->arity, arg_count);
+    if (closure->function->arity >= 0 && argc != closure->function->arity) {
+        runtime_error(gettext("Expected %d arguments but got %d."), closure->function->arity, argc);
         return false;
     }
     if (vm.frame_count == FRAMES_MAX) {
@@ -745,50 +754,52 @@ static bool call(obj_closure_t *closure, const int arg_count)
     call_frame_t *frame = &vm.frames[vm.frame_count++];
     frame->closure = closure;
     frame->ip = closure->function->chunk.code;
-    frame->slots = vm.stack_top - arg_count - 1;
+    frame->slots = vm.stack_top - argc - 1;
     return true;
 }
 
-static bool call_value(const value_t callee, const int arg_count)
+static bool call_value(const value_t callee, const int argc)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
             case OBJ_BOUND_METHOD: {
                 obj_bound_method_t *bound_method = AS_BOUND_METHOD(callee);
-                vm.stack_top[-arg_count - 1] = bound_method->receiving_instance; // swap out our instance for "this" referencing
-                return call(bound_method->method, arg_count);
+                vm.stack_top[-argc - 1] = bound_method->receiving_instance; // swap out our instance for "this" referencing
+                return call(bound_method->method, argc);
             }
             case OBJ_BOUND_NATIVE_METHOD: {
                 obj_bound_native_method_t *bound_native_method = AS_BOUND_NATIVE_METHOD(callee);
-                vm.stack_top[-arg_count - 1] = bound_native_method->receiving_instance; // swap out our instance
-                value_t *args = vm.stack_top - arg_count - 1;
-                vm.stack_top -= arg_count + 1;
-                return bound_native_method->function(bound_native_method->name, arg_count + 1, args);
+                vm.stack_top[-argc - 1] = bound_native_method->receiving_instance; // swap out our instance
+                value_t *args = vm.stack_top - argc - 1;
+                vm.stack_top -= argc + 1;
+                return bound_native_method->function(bound_native_method->name, argc + 1, args);
             }
             case OBJ_TYPECLASS: {
                 obj_typeobj_t *typeobj = AS_TYPECLASS(callee);
-                vm.stack_top[-arg_count - 1] = OBJ_VAL(obj_instance_t_allocate(typeobj));
+                obj_instance_t *instance = obj_instance_t_allocate(typeobj);
+                vm.stack_top[-argc - 1] = OBJ_VAL(instance);
+                table_t_copy_to(&typeobj->fields, &instance->fields);
                 value_t initializer;
                 if (table_t_get(&typeobj->methods, OBJ_VAL(vm.init_string), &initializer)) {
-                    return call(AS_CLOSURE(initializer), arg_count);
-                } else if (arg_count != 0) {
-                    runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), arg_count, typeobj->name->chars);
+                    return call(AS_CLOSURE(initializer), argc);
+                } else if (argc != 0) {
+                    runtime_error(gettext("Expected 0 arguments but got %d to initialize %s."), argc, typeobj->name->chars);
                     return false;
                 }
                 return true;
             }
-            case OBJ_CLOSURE: return call(AS_CLOSURE(callee), arg_count);
+            case OBJ_CLOSURE: return call(AS_CLOSURE(callee), argc);
             case OBJ_NATIVE: {
                 const obj_native_t *native = AS_NATIVE(callee);
-                if (native->arity >= 0 && arg_count != native->arity) {
-                    runtime_error(gettext("%s expected %d arguments but got %d."), native->name->chars, native->arity, arg_count);
+                if (native->arity >= 0 && argc != native->arity) {
+                    runtime_error(gettext("%s expected %d arguments but got %d."), native->name->chars, native->arity, argc);
                     return false;
                 }
-                if(!native->function(arg_count, vm.stack_top - arg_count)) {
+                if(!native->function(argc, vm.stack_top - argc)) {
                     return false;
                 }
                 value_t r = vm_pop();
-                vm.stack_top -= arg_count + 1;
+                vm.stack_top -= argc + 1;
                 vm_push(r);
                 return true;
             }
@@ -799,37 +810,37 @@ static bool call_value(const value_t callee, const int arg_count)
     return false;
 }
 
-static bool invoke_from_typeobj(obj_typeobj_t *typeobj, const obj_string_t *name, const int arg_count)
+static bool invoke_from_typeobj(obj_typeobj_t *typeobj, const obj_string_t *name, const int argc)
 {
     value_t method;
     if (!table_t_get(&typeobj->methods, OBJ_VAL(name), &method)) {
         runtime_error(gettext("Undefined property '%s'."), name->chars);
         return false;
     }
-    return call(AS_CLOSURE(method), arg_count);
+    return call(AS_CLOSURE(method), argc);
 }
 
-static bool invoke(const obj_string_t *name, const int arg_count)
+static bool invoke(const obj_string_t *name, const int argc)
 {
-    const value_t receiving_instance = peek(arg_count); // instance is already on the stack for us
+    const value_t receiving_instance = peek(argc); // instance is already on the stack for us
 
     /* dispatch to native helpers*/
     if (IS_STRING(receiving_instance)) {
-        value_t *args = vm.stack_top - arg_count - 1;
-        vm.stack_top -= arg_count + 1;
-        bool rv = string_method_invoke(name, arg_count + 1, args); // leaving arg on the stack
+        value_t *args = vm.stack_top - argc - 1;
+        vm.stack_top -= argc + 1;
+        bool rv = string_method_invoke(name, argc + 1, args); // leaving arg on the stack
         return rv;
     }
     else if (IS_LIST(receiving_instance)) {
-        value_t *args = vm.stack_top - arg_count - 1;
-        vm.stack_top -= arg_count + 1;
-        bool rv = list_method_invoke(name, arg_count + 1, args); // leaving arg on the stack
+        value_t *args = vm.stack_top - argc - 1;
+        vm.stack_top -= argc + 1;
+        bool rv = list_method_invoke(name, argc + 1, args); // leaving arg on the stack
         return rv;
     }
     else if (IS_MAP(receiving_instance)) {
-        value_t *args = vm.stack_top - arg_count - 1;
-        vm.stack_top -= arg_count + 1;
-        bool rv = map_method_invoke(name, arg_count + 1, args); // leaving arg on the stack
+        value_t *args = vm.stack_top - argc - 1;
+        vm.stack_top -= argc + 1;
+        bool rv = map_method_invoke(name, argc + 1, args); // leaving arg on the stack
         return rv;
     }
     // TODO number, bool?
@@ -841,10 +852,10 @@ static bool invoke(const obj_string_t *name, const int arg_count)
         // priority... do not invoke a field that is a function like a method
         value_t function_value;
         if (table_t_get(&instance->fields, OBJ_VAL(name), &function_value)) {
-            vm.stack_top[-arg_count - 1] = function_value; // swap receiving_instance for our function
-            return call_value(function_value, arg_count);
+            vm.stack_top[-argc - 1] = function_value; // swap receiving_instance for our function
+            return call_value(function_value, argc);
         }
-        return invoke_from_typeobj(instance->typeobj, name, arg_count);
+        return invoke_from_typeobj(instance->typeobj, name, argc);
     }
 
     else {
@@ -902,10 +913,18 @@ static void close_upvalues(const value_t *last)
     }
 }
 
+static void define_field(obj_string_t *field_name)
+{
+    value_t default_value = peek(0);
+    obj_typeobj_t *typeobj = AS_TYPECLASS(peek(1)); // left on the stack for us by type_declaration
+    table_t_set(&typeobj->fields, OBJ_VAL(field_name), default_value);
+    vm_pop();
+}
+
 static void define_method(obj_string_t *name)
 {
     value_t method = peek(0);
-    obj_typeobj_t *typeobj = AS_TYPECLASS(peek(1)); // left on the stack for us by class_declaration
+    obj_typeobj_t *typeobj = AS_TYPECLASS(peek(1)); // left on the stack for us by type_declaration
     table_t_set(&typeobj->methods, OBJ_VAL(name), method);
     vm_pop();
 }
@@ -1037,6 +1056,8 @@ static vm_t_interpret_result_t run(void)
                 break;
             }
             case OP_GET_PROPERTY: {
+                frame->ip = ip; // if it calls runtime_error, we need this restored
+
                 // native helpers
                 if (IS_STRING(peek(0))) {
                     obj_string_t *name = READ_STRING();
@@ -1078,16 +1099,35 @@ static vm_t_interpret_result_t run(void)
                     if (!bind_method(instance->typeobj, name)) {
                         return INTERPRET_RUNTIME_ERROR;
                     }
-                } else {
-                    frame->ip = ip;
+
+                }
+
+                // try class fields
+                else if (IS_TYPECLASS(peek(0))) {
+                    obj_typeobj_t *type = AS_TYPECLASS(peek(0));
+                    const obj_string_t *name = READ_STRING();
+                    value_t type_field;
+                    if (table_t_get(&type->fields, OBJ_VAL(name), &type_field)) {
+                        vm_pop(); // type
+                        vm_push(type_field);
+                        break;
+                    }
+                    runtime_error(gettext("%s does not have a %s field."), type->name->chars, name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                else {
                     runtime_error(gettext("Only instances have properties."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
             }
             case OP_SET_PROPERTY: {
-                if (!IS_INSTANCE(peek(1))) {
-                    frame->ip = ip;
+                frame->ip = ip;
+                if (IS_TYPECLASS(peek(1))) {
+                    runtime_error(gettext("Type fields are read only."));
+                    return INTERPRET_RUNTIME_ERROR;
+                } else if (!IS_INSTANCE(peek(1))) {
                     runtime_error(gettext("Only instances have fields."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -1099,6 +1139,7 @@ static vm_t_interpret_result_t run(void)
                 break;
             }
             case OP_GET_SUPER: {
+                frame->ip = ip; // if it calls runtime_error, we need this restored
                 const obj_string_t *method_name = READ_STRING();
                 obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
                 // NOTE this is only for methods, not fields
@@ -1172,9 +1213,9 @@ static vm_t_interpret_result_t run(void)
                 break;
             }
             case OP_CALL: {
-                const int arg_count = READ_BYTE();
+                const int argc = READ_BYTE();
                 frame->ip = ip;
-                if (!call_value(peek(arg_count), arg_count)) {
+                if (!call_value(peek(argc), argc)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
@@ -1183,9 +1224,9 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_INVOKE: { // combined OP_GET_PROPERTY and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
-                const int arg_count = READ_BYTE();
+                const int argc = READ_BYTE();
                 frame->ip = ip;
-                if (!invoke(method_name, arg_count)) {
+                if (!invoke(method_name, argc)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
@@ -1194,10 +1235,10 @@ static vm_t_interpret_result_t run(void)
             }
             case OP_SUPER_INVOKE: { // combined OP_GET_SUPER and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
-                const int arg_count = READ_BYTE();
+                const int argc = READ_BYTE();
                 obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
                 frame->ip = ip;
-                if (!invoke_from_typeobj(super_type_obj, method_name, arg_count)) {
+                if (!invoke_from_typeobj(super_type_obj, method_name, argc)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
@@ -1229,6 +1270,7 @@ static vm_t_interpret_result_t run(void)
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
                     vm_pop();
+                    ip = frame->ip;
                     return INTERPRET_OK;
                 }
                 vm.stack_top = frame->slots;
@@ -1238,6 +1280,7 @@ static vm_t_interpret_result_t run(void)
                 break;
             }
             case OP_EXIT: {
+                frame->ip = ip;
                 const value_t exit_code = vm_pop();
                 if (!IS_NUMBER(exit_code)) {
                     return INTERPRET_RUNTIME_ERROR;
@@ -1260,13 +1303,19 @@ static vm_t_interpret_result_t run(void)
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 obj_typeobj_t *sub_type_obj = AS_TYPECLASS(peek(0));
+                sub_type_obj->super = AS_TYPECLASS(super_type_obj);
                 // initialize the new subclass with copies of the superclass methods, to be optionally overridden later
+                table_t_copy_to(&AS_TYPECLASS(super_type_obj)->fields, &sub_type_obj->fields);
                 table_t_copy_to(&AS_TYPECLASS(super_type_obj)->methods, &sub_type_obj->methods);
                 vm_pop();
                 break;
             }
             case OP_METHOD: {
                 define_method(READ_STRING());
+                break;
+            }
+            case OP_FIELD: {
+                define_field(READ_STRING());
                 break;
             }
             case OP_CONSTANT_LONG: {
@@ -1342,6 +1391,9 @@ static void blacken_object(obj_t *object)
         case OBJ_TYPECLASS: {
             obj_typeobj_t *typeobj = (obj_typeobj_t*)object;
             obj_t_mark((obj_t*)typeobj->name);
+            if (typeobj->super != NULL)
+                obj_t_mark((obj_t*)typeobj->super);
+            table_t_mark(&typeobj->fields);
             table_t_mark(&typeobj->methods);
             break;
         }
@@ -1405,6 +1457,7 @@ static void vm_t_free_object(obj_t *o)
         }
         case OBJ_TYPECLASS: {
             obj_typeobj_t *typeobj = (obj_typeobj_t*)o;
+            table_t_free(&typeobj->fields);
             table_t_free(&typeobj->methods);
             FREE(obj_typeobj_t, o);
             break;
@@ -1434,7 +1487,6 @@ static void vm_t_free_object(obj_t *o)
         }
         case OBJ_STRING: {
             obj_string_t *s = (obj_string_t*)o;
-            //reallocate(o, sizeof(obj_string_t) + s->length + 1, 0);
             FREE_ARRAY(char, s->chars, s->length + 1);
             FREE(obj_string_t, o);
             break;

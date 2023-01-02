@@ -46,6 +46,7 @@ obj_typeobj_t *obj_typeobj_t_allocate(obj_string_t *name)
     obj_typeobj_t *typeobj = ALLOCATE_OBJ(obj_typeobj_t, OBJ_TYPECLASS);
     typeobj->name = name;
     typeobj->super = NULL;
+    table_t_init(&typeobj->fields);
     table_t_init(&typeobj->methods);
     return typeobj;
 }
@@ -258,12 +259,38 @@ void obj_t_print(const value_t value)
         case OBJ_UPVALUE: printf("<upvalue>"); break;
         case OBJ_LIST: {
             obj_list_t *list = AS_LIST(value);
-            printf("<list %d>", list->elements.count);
+            if (list->elements.count > 64) {
+                printf("<list %d>", list->elements.count);
+            } else {
+                printf("[");
+                for (int i = 0; i < list->elements.count; i++) {
+                    if (i > 0) printf(",");
+                    value_t_print(list->elements.values[i]);
+                }
+                printf("]");
+            }
             break;
         }
         case OBJ_MAP: {
             obj_map_t *map = AS_MAP(value);
-            printf("<map %d>", map->table.count);
+            if (map->table.count > 24) {
+                printf("<map %d>", map->table.count);
+            } else {
+                bool comma = false;
+                printf("{");
+                for (int i = 0; i < map->table.capacity; i++) {
+                    entry_t e = map->table.entries[i];
+                    if (IS_EMPTY(e.key)) continue;
+                    if (comma)
+                        printf(",");
+                    else
+                        comma = true;
+                    value_t_print(e.key);
+                    printf(":");
+                    value_t_print(e.value);
+                }
+                printf("}");
+            }
             break;
         }
         default: {

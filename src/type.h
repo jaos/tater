@@ -158,10 +158,12 @@ typedef struct {
     int upvalue_count;
 } obj_closure_t;
 
-typedef struct {
+typedef struct obj_typeobj {
     obj_t obj;
     obj_string_t *name;
+    table_t fields;
     table_t methods;
+    struct obj_typeobj *super;
 } obj_typeobj_t;
 
 typedef struct {

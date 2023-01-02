@@ -552,6 +552,63 @@ static void decrement(const bool)
     emit_byte(OP_ADD);
 }
 
+static bool match_for_load_and_modify(void)
+{
+    if (match(TOKEN_PLUS_EQUAL) ||
+        match(TOKEN_MINUS_EQUAL) ||
+        match(TOKEN_STAR_EQUAL) ||
+        match(TOKEN_SLASH_EQUAL) ||
+        match(TOKEN_PLUS_PLUS) ||
+        match(TOKEN_MINUS_MINUS)
+    )
+        return true;
+    return false;
+}
+
+static void load_and_modify(const uint8_t name, const token_type_t match, const uint8_t get_op, const uint8_t set_op)
+{
+    emit_bytes(get_op, name);
+    switch (match) {
+        case TOKEN_PLUS_EQUAL: expression(); emit_byte(OP_ADD); break;
+        case TOKEN_MINUS_EQUAL: expression(); emit_byte(OP_SUBTRACT); break;
+        case TOKEN_STAR_EQUAL: expression(); emit_byte(OP_MULTIPLY); break;
+        case TOKEN_SLASH_EQUAL: expression(); emit_byte(OP_DIVIDE); break;
+        case TOKEN_PLUS_PLUS:
+        case TOKEN_MINUS_MINUS:
+            emit_constant(NUMBER_VAL(parser.previous.type == TOKEN_PLUS_PLUS ? 1 : -1));
+            emit_byte(OP_ADD);
+            break;
+        default: ;
+    }
+    emit_bytes(set_op, name);
+}
+
+static void named_variable(const token_t name, const bool can_assign)
+{
+    uint8_t get_op, set_op;
+    int arg = resolve_local(current, &name);
+    if (arg != -1) {
+        get_op = OP_GET_LOCAL;
+        set_op = OP_SET_LOCAL;
+    } else if ((arg = resolve_upvalue(current, &name)) != -1){
+        get_op = OP_GET_UPVALUE;
+        set_op = OP_SET_UPVALUE;
+    } else {
+        arg = identifier_constant(&name);
+        get_op = OP_GET_GLOBAL;
+        set_op = OP_SET_GLOBAL;
+    }
+
+    if (can_assign && match(TOKEN_EQUAL)) {
+        expression();
+        emit_bytes(set_op, (uint8_t)arg);
+    } else if (can_assign && match_for_load_and_modify()) {
+        load_and_modify(arg, parser.previous.type, get_op, set_op);
+    } else {
+        emit_bytes(get_op, (uint8_t)arg);
+    }
+}
+
 static void dot(const bool can_assign)
 {
     consume(TOKEN_IDENTIFIER, gettext("Expect property name after '.'."));
@@ -564,6 +621,9 @@ static void dot(const bool can_assign)
         const uint8_t arg_count = argument_list();
         emit_bytes(OP_INVOKE, name);
         emit_byte(arg_count);
+    } else if (can_assign && match_for_load_and_modify()) {
+        named_variable(synthetic_token(token_keyword_names[TOKEN_SELF]), false);
+        load_and_modify(name, parser.previous.type, OP_GET_PROPERTY, OP_SET_PROPERTY);
     } else {
         emit_bytes(OP_GET_PROPERTY, name);
     }
@@ -606,47 +666,6 @@ static void or_expr(const bool) // can_assign
 static void string(const bool)
 {
     emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2)));
-}
-
-static void named_variable(const token_t name, const bool can_assign)
-{
-    uint8_t get_op, set_op;
-    int arg = resolve_local(current, &name);
-    if (arg != -1) {
-        get_op = OP_GET_LOCAL;
-        set_op = OP_SET_LOCAL;
-    } else if ((arg = resolve_upvalue(current, &name)) != -1){
-        get_op = OP_GET_UPVALUE;
-        set_op = OP_SET_UPVALUE;
-    } else {
-        arg = identifier_constant(&name);
-        get_op = OP_GET_GLOBAL;
-        set_op = OP_SET_GLOBAL;
-    }
-
-    if (can_assign && match(TOKEN_EQUAL)) {
-        expression();
-        emit_bytes(set_op, (uint8_t)arg);
-    } else if (can_assign && (match(TOKEN_PLUS_EQUAL) || match(TOKEN_MINUS_EQUAL) || match(TOKEN_STAR_EQUAL) || match(TOKEN_SLASH_EQUAL))) {
-        token_type_t match = parser.previous.type;
-        emit_bytes(get_op, (uint8_t)arg);
-        expression();
-        switch (match) {
-            case TOKEN_PLUS_EQUAL: emit_byte(OP_ADD); break;
-            case TOKEN_MINUS_EQUAL: emit_byte(OP_SUBTRACT); break;
-            case TOKEN_STAR_EQUAL: emit_byte(OP_MULTIPLY); break;
-            case TOKEN_SLASH_EQUAL: emit_byte(OP_DIVIDE); break;
-            default: ;
-        }
-        emit_bytes(set_op, (uint8_t)arg);
-    } else if (can_assign && (match(TOKEN_PLUS_PLUS) || match(TOKEN_MINUS_MINUS))) {
-        emit_bytes(get_op, (uint8_t)arg);
-        emit_constant(NUMBER_VAL(parser.previous.type == TOKEN_PLUS_PLUS ? 1 : -1));
-        emit_byte(OP_ADD);
-        emit_bytes(set_op, (uint8_t)arg);
-    } else {
-        emit_bytes(get_op, (uint8_t)arg);
-    }
 }
 
 static void variable(const bool can_assign)
@@ -716,9 +735,9 @@ const parse_rule_t rules[] = {
     [TOKEN_LEFT_BRACKET]    = {list,        subscript,  PREC_CALL},
     [TOKEN_RIGHT_BRACKET]   = {NULL,        NULL,       PREC_NONE},
     [TOKEN_MINUS]           = {unary,       binary,     PREC_TERM},
-    [TOKEN_MINUS_MINUS]     = {NULL,        decrement,  PREC_TERM},
+    [TOKEN_MINUS_MINUS]     = {NULL,        decrement,  PREC_ASSIGNMENT},
     [TOKEN_PLUS]            = {NULL,        binary,     PREC_TERM},
-    [TOKEN_PLUS_PLUS]       = {NULL,        increment,  PREC_TERM},
+    [TOKEN_PLUS_PLUS]       = {NULL,        increment,  PREC_ASSIGNMENT},
     [TOKEN_SEMICOLON]       = {NULL,        NULL,       PREC_NONE},
     [TOKEN_SLASH]           = {NULL,        binary,     PREC_FACTOR},
     [TOKEN_STAR]            = {NULL,        binary,     PREC_FACTOR},
@@ -770,6 +789,9 @@ static void parse_precedence(const precedence_t precedence)
     while (precedence <= get_rule(parser.current.type)->precedence) {
         advance();
         const parse_fn_t infix_rule = get_rule(parser.previous.type)->infix;
+        if (infix_rule == NULL) {
+            error(gettext("Expect expression."));
+        }
         infix_rule(can_assign);
     }
 
@@ -827,6 +849,18 @@ static void function(function_type_t type)
     }
 }
 
+static void field(void)
+{
+    const uint8_t field_name = parse_variable(gettext("Expect field name."));
+    if (match(TOKEN_EQUAL)) {
+        expression();
+    } else {
+        emit_byte(OP_NIL);
+    }
+    consume(TOKEN_SEMICOLON, gettext("Expect ';' after field declaration."));
+    emit_bytes(OP_FIELD, field_name);
+}
+
 static void method(void)
 {
     consume(TOKEN_IDENTIFIER, gettext("Expect method name."));
@@ -839,6 +873,27 @@ static void method(void)
     function(type);
 
     emit_bytes(OP_METHOD, constant);
+}
+
+static void fun_declaration(void)
+{
+    const uint8_t global = parse_variable(gettext("Expect function name."));
+    mark_initialized(); // so we can support recursion before we compile the body
+    function(TYPE_FUNCTION);
+    define_variable(global);
+}
+
+static void var_declaration(void)
+{
+    const uint8_t global = parse_variable(gettext("Expect variable name."));
+    if (match(TOKEN_EQUAL)) {
+        expression();
+    } else {
+        emit_byte(OP_NIL);
+    }
+
+    consume(TOKEN_SEMICOLON, gettext("Expect ';' after variable declaration."));
+    define_variable(global);
 }
 
 static void type_declaration(void)
@@ -881,7 +936,14 @@ static void type_declaration(void)
     consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before type body."));
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         // could add fields and other things here besides methods
-        method();
+        if (match(TOKEN_LET)) {
+            field();
+        } else if (match(TOKEN_FN)) {
+            method();
+        } else {
+            error(gettext("Expect field or method in the type body."));
+            return;
+        }
     }
     consume(TOKEN_RIGHT_BRACE, gettext("Expect '}' after type body."));
     match(TOKEN_SEMICOLON);
@@ -896,29 +958,12 @@ static void type_declaration(void)
     current_type = current_type->enclosing;
 }
 
-static void fun_declaration(void)
-{
-    const uint8_t global = parse_variable(gettext("Expect function name."));
-    mark_initialized(); // so we can support recursion before we compile the body
-    function(TYPE_FUNCTION);
-    define_variable(global);
-}
-
-static void var_declaration(void)
-{
-    const uint8_t global = parse_variable(gettext("Expect variable name."));
-    if (match(TOKEN_EQUAL)) {
-        expression();
-    } else {
-        emit_byte(OP_NIL);
-    }
-
-    consume(TOKEN_SEMICOLON, gettext("Expect ';' after variable declaration."));
-    define_variable(global);
-}
-
 static void expression_statement(void)
 {
+    // ignore empty expressions
+    if (match(TOKEN_SEMICOLON)) {
+        return;
+    }
     expression();
     consume(TOKEN_SEMICOLON, gettext("Expect ';' after expression."));
     emit_byte(OP_POP);

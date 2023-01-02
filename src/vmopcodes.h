@@ -46,6 +46,7 @@ typedef enum {
     OP_TYPE,
     OP_INHERIT,
     OP_METHOD,
+    OP_FIELD,
     INVALID_OPCODE,
 } op_code_t;
 

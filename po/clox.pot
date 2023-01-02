@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: clox\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-30 21:03-0500\n"
+"POT-Creation-Date: 2023-01-01 22:34-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,10 @@ msgstr ""
 
 #, c-format
 msgid " at end"
+msgstr ""
+
+#, c-format
+msgid "%s does not have a %s field."
 msgstr ""
 
 #, c-format
@@ -41,7 +45,7 @@ msgstr ""
 msgid "== start %s ==\n"
 msgstr ""
 
-msgid "A class can't inherit from itself."
+msgid "A type can't inherit from itself."
 msgstr ""
 
 msgid "Already a variable with this name in this scope."
@@ -71,13 +75,13 @@ msgstr ""
 msgid "Can't use 'continue' outside of a loop."
 msgstr ""
 
-msgid "Can't use 'super' in a class with no superclass."
+msgid "Can't use 'self' outside of a type."
 msgstr ""
 
-msgid "Can't use 'super' outside of a class."
+msgid "Can't use 'super' in a type with no supertype."
 msgstr ""
 
-msgid "Can't use 'this' outside of a class."
+msgid "Can't use 'super' outside of a type."
 msgstr ""
 
 msgid "Cannot initialize a map with an odd number of arguments."
@@ -93,6 +97,10 @@ msgstr ""
 
 #, c-format
 msgid "Could not allocate chunk line storage."
+msgstr ""
+
+#, c-format
+msgid "Could not allocate value array storage."
 msgstr ""
 
 #, c-format
@@ -154,6 +162,9 @@ msgstr ""
 msgid "Expect ')' after parameters."
 msgstr ""
 
+msgid "Expect ')' after supertype."
+msgstr ""
+
 msgid "Expect ')' after value."
 msgstr ""
 
@@ -181,6 +192,9 @@ msgstr ""
 msgid "Expect ';' after expression."
 msgstr ""
 
+msgid "Expect ';' after field declaration."
+msgstr ""
+
 msgid "Expect ';' after loop condition."
 msgstr ""
 
@@ -193,26 +207,29 @@ msgstr ""
 msgid "Expect ';' after variable declaration."
 msgstr ""
 
-#. get this back on the stack as a named variable before we compile methods
-msgid "Expect '{' before class body."
-msgstr ""
-
 msgid "Expect '{' before function body."
 msgstr ""
 
 msgid "Expect '{' before switch cases."
 msgstr ""
 
+#. get self back on the stack as a named variable before we compile methods
+msgid "Expect '{' before type body."
+msgstr ""
+
 msgid "Expect '}' after block."
 msgstr ""
 
-msgid "Expect '}' after class body."
-msgstr ""
-
-msgid "Expect class name."
+msgid "Expect '}' after type body."
 msgstr ""
 
 msgid "Expect expression."
+msgstr ""
+
+msgid "Expect field name."
+msgstr ""
+
+msgid "Expect field or method in the type body."
 msgstr ""
 
 msgid "Expect function name."
@@ -227,10 +244,13 @@ msgstr ""
 msgid "Expect property name after '.'."
 msgstr ""
 
-msgid "Expect superclass method name."
+msgid "Expect supertype method name."
 msgstr ""
 
-msgid "Expect superclass name."
+msgid "Expect supertype name."
+msgstr ""
+
+msgid "Expect type name."
 msgstr ""
 
 msgid "Expect variable name."
@@ -257,9 +277,6 @@ msgid "Invalid assignment target."
 msgstr ""
 
 msgid "Loop body too large."
-msgstr ""
-
-msgid "Map keys can only be strings."
 msgstr ""
 
 #, c-format
@@ -298,7 +315,7 @@ msgstr ""
 msgid "Stack overflow."
 msgstr ""
 
-msgid "Superclass must be a class."
+msgid "Super type must be a type."
 msgstr ""
 
 msgid "This help"
@@ -318,6 +335,9 @@ msgid "Too many local variables in function."
 msgstr ""
 
 msgid "Too much code to jump over."
+msgstr ""
+
+msgid "Type fields are read only."
 msgstr ""
 
 #, c-format
@@ -355,6 +375,9 @@ msgstr ""
 msgid "invalid list.remove index."
 msgstr ""
 
+msgid "invalid list.subscript index."
+msgstr ""
+
 msgid "invalid str.substr end position."
 msgstr ""
 
@@ -379,6 +402,12 @@ msgstr ""
 msgid "list.remove requires a single numerical argument."
 msgstr ""
 
+msgid "list.subscript requires a numerical index."
+msgstr ""
+
+msgid "list.subscript requires a single index or an index and a value."
+msgstr ""
+
 msgid "map.get requires a single string argument."
 msgstr ""
 
@@ -388,10 +417,16 @@ msgstr ""
 msgid "map.len takes no arguments."
 msgstr ""
 
-msgid "map.set failed."
+msgid "map.remove requires a single string argument."
 msgstr ""
 
-msgid "map.set requires a string and a value argument."
+msgid "map.set requires a key and a value argument."
+msgstr ""
+
+msgid "map.subscript requires a single key argument or a key and a value."
+msgstr ""
+
+msgid "map.values requires no arguments."
 msgstr ""
 
 msgid "number argument invalid."
@@ -406,5 +441,9 @@ msgstr ""
 msgid "str.len takes no arguments."
 msgstr ""
 
-msgid "str.substr requires a string argument and a start and end position."
+msgid "str.subscript requires a string argument and a position."
+msgstr ""
+
+msgid ""
+"str.substr requires a string argument and a start position and a length."
 msgstr ""
