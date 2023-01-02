@@ -1,5 +1,5 @@
-#ifndef clox_memory_h
-#define clox_memory_h
+#ifndef tater_memory_h
+#define tater_memory_h
 
 #include "common.h"
 

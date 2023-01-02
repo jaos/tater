@@ -1,5 +1,5 @@
-#ifndef clox_vmopcodes_h
-#define clox_vmopcodes_h
+#ifndef tater_vmopcodes_h
+#define tater_vmopcodes_h
 
 #include "common.h"
 
@@ -32,6 +32,7 @@ typedef enum {
     OP_NOT,
     OP_NEGATE,
     OP_PRINT,
+    OP_ERROR,
     OP_JUMP,
     OP_JUMP_IF_FALSE,
     OP_LOOP,

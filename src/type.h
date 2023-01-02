@@ -1,5 +1,5 @@
-#ifndef clox_object_h
-#define clox_object_h
+#ifndef tater_object_h
+#define tater_object_h
 
 #include "common.h"
 #include "vmopcodes.h"
@@ -210,7 +210,7 @@ obj_map_t *obj_map_t_allocate(void);
 
 obj_string_t *obj_string_t_copy_own(char *chars, const int length);
 obj_string_t *obj_string_t_copy_from(const char *chars, const int length);
-void obj_t_print(const value_t value);
+void obj_t_print(FILE *stream, const value_t value);
 obj_string_t *obj_t_to_obj_string_t(const value_t value);
 void obj_t_mark(obj_t *obj);
 
@@ -223,7 +223,7 @@ bool value_t_equal(const value_t a, const value_t b);
 void value_list_t_init(value_list_t *array);
 void value_list_t_add(value_list_t *array, const value_t value);
 void value_list_t_free(value_list_t *array);
-void value_t_print(const value_t value);
+void value_t_print(FILE *stream, const value_t value);
 obj_string_t *value_t_to_obj_string_t(const value_t value);
 uint32_t value_t_hash(const value_t value);
 void value_t_mark(value_t value);
@@ -234,7 +234,7 @@ bool table_t_set(table_t *table, value_t key, const value_t value);
 bool table_t_get(table_t *table, const value_t key, value_t *value);
 bool table_t_delete(table_t *table, const value_t key);
 obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, const int length, const uint32_t hash);
-void table_t_remove_white(table_t *table);
+void table_t_remove_unmarked(table_t *table);
 void table_t_mark(table_t *table);
 void table_t_copy_to(const table_t *from, table_t *to);
 

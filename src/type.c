@@ -163,12 +163,12 @@ obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot)
     return upvalue;
 }
 
-static void print_function(const obj_function_t *function)
+static void print_function(FILE *stream, const obj_function_t *function)
 {
     if (function->name == NULL) {
-        printf("<script>"); // or main ?
+        fprintf(stream, "<script>"); // or main ?
     } else {
-        printf("<fn %s(%d)>", function->name->chars, function->arity);
+        fprintf(stream, "<fn %s(%d)>", function->name->chars, function->arity);
     }
 }
 
@@ -245,51 +245,53 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
     return obj_string_t_copy_from(buffer, strlen(buffer));
 }
 
-void obj_t_print(const value_t value)
+void obj_t_print(FILE *stream, const value_t value)
 {
+    if (stream == NULL) stream = stdout;
+
     switch (OBJ_TYPE(value)) {
-        case OBJ_BOUND_METHOD: print_function(AS_BOUND_METHOD(value)->method->function); break;
-        case OBJ_BOUND_NATIVE_METHOD: printf("<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars); break;
-        case OBJ_TYPECLASS: printf("<type %s>", AS_TYPECLASS(value)->name->chars); break;
-        case OBJ_CLOSURE: print_function(AS_CLOSURE(value)->function); break;
-        case OBJ_FUNCTION: print_function(AS_FUNCTION(value)); break;
-        case OBJ_INSTANCE: printf("<type %s instance %p>", AS_INSTANCE(value)->typeobj->name->chars, (void*)AS_OBJ(value)); break;
-        case OBJ_NATIVE: printf("<native fn %s>", AS_NATIVE(value)->name->chars); break;
-        case OBJ_STRING: printf("%s", AS_CSTRING(value)); break;
-        case OBJ_UPVALUE: printf("<upvalue>"); break;
+        case OBJ_BOUND_METHOD: print_function(stream, AS_BOUND_METHOD(value)->method->function); break;
+        case OBJ_BOUND_NATIVE_METHOD: fprintf(stream, "<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars); break;
+        case OBJ_TYPECLASS: fprintf(stream, "<type %s>", AS_TYPECLASS(value)->name->chars); break;
+        case OBJ_CLOSURE: print_function(stream, AS_CLOSURE(value)->function); break;
+        case OBJ_FUNCTION: print_function(stream, AS_FUNCTION(value)); break;
+        case OBJ_INSTANCE: fprintf(stream, "<type %s instance %p>", AS_INSTANCE(value)->typeobj->name->chars, (void*)AS_OBJ(value)); break;
+        case OBJ_NATIVE: fprintf(stream, "<native fn %s>", AS_NATIVE(value)->name->chars); break;
+        case OBJ_STRING: fprintf(stream, "%s", AS_CSTRING(value)); break;
+        case OBJ_UPVALUE: fprintf(stream, "<upvalue>"); break;
         case OBJ_LIST: {
             obj_list_t *list = AS_LIST(value);
             if (list->elements.count > 64) {
-                printf("<list %d>", list->elements.count);
+                fprintf(stream, "<list %d>", list->elements.count);
             } else {
-                printf("[");
+                fprintf(stream, "[");
                 for (int i = 0; i < list->elements.count; i++) {
-                    if (i > 0) printf(",");
-                    value_t_print(list->elements.values[i]);
+                    if (i > 0) fprintf(stream, ",");
+                    value_t_print(stream, list->elements.values[i]);
                 }
-                printf("]");
+                fprintf(stream, "]");
             }
             break;
         }
         case OBJ_MAP: {
             obj_map_t *map = AS_MAP(value);
             if (map->table.count > 24) {
-                printf("<map %d>", map->table.count);
+                fprintf(stream, "<map %d>", map->table.count);
             } else {
                 bool comma = false;
-                printf("{");
+                fprintf(stream, "{");
                 for (int i = 0; i < map->table.capacity; i++) {
                     entry_t e = map->table.entries[i];
                     if (IS_EMPTY(e.key)) continue;
                     if (comma)
-                        printf(",");
+                        fprintf(stream, ",");
                     else
                         comma = true;
-                    value_t_print(e.key);
-                    printf(":");
-                    value_t_print(e.value);
+                    value_t_print(stream, e.key);
+                    fprintf(stream, ":");
+                    value_t_print(stream, e.value);
                 }
-                printf("}");
+                fprintf(stream, "}");
             }
             break;
         }
@@ -379,14 +381,15 @@ obj_string_t *value_t_to_obj_string_t(const value_t value)
     return obj_string_t_copy_from(buffer, strlen(buffer));
 }
 
-void value_t_print(const value_t value)
+void value_t_print(FILE *stream, const value_t value)
 {
+    if (stream == NULL) stream = stdout;
     switch (value.type) {
-        case VAL_BOOL: printf(AS_BOOL(value) ? "true" : "false"); break;
-        case VAL_NIL: printf("nil"); break;
-        case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
-        case VAL_OBJ: obj_t_print(value); break;
-        case VAL_EMPTY: printf("<empty>"); break;
+        case VAL_BOOL: fprintf(stream, AS_BOOL(value) ? "true" : "false"); break;
+        case VAL_NIL: fprintf(stream, "nil"); break;
+        case VAL_NUMBER: fprintf(stream, "%g", AS_NUMBER(value)); break;
+        case VAL_OBJ: obj_t_print(stream, value); break;
+        case VAL_EMPTY: fprintf(stream, "<empty>"); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
 }
@@ -525,7 +528,7 @@ obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, c
     }
 }
 
-void table_t_remove_white(table_t *table)
+void table_t_remove_unmarked(table_t *table)
 {
     for (int i = 0; i < table->capacity; i++) {
         entry_t *entry = &table->entries[i];
@@ -631,7 +634,7 @@ void obj_t_mark(obj_t *obj)
 
     if (vm.flags & VM_FLAG_GC_TRACE) {
         printf("%p mark ", (void*)obj);
-        value_t_print(OBJ_VAL(obj));
+        value_t_print(stdout, OBJ_VAL(obj));
         printf("\n");
     }
 

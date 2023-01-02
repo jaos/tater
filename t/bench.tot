@@ -1,4 +1,4 @@
-#!./build/src/clox
+#!./build/src/tater
 
 type Zoo {
   fn init() {

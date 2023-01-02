@@ -1,1 +1,1 @@
-i18n.gettext('clox', preset: 'glib', args: ['-s', '-C', '--no-location'])
+i18n.gettext('tater', preset: 'glib', args: ['-s', '-C', '--no-location'])

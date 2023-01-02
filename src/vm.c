@@ -666,7 +666,7 @@ void vm_inherit_env(void)
 }
 
 static void mark_array(value_list_t *array);
-static void blacken_object(obj_t *object);
+static void mark_objects(obj_t *object);
 static void vm_t_free_object(obj_t *o);
 static void mark_roots(void);
 static void trace_references(void);
@@ -682,7 +682,7 @@ void vm_collect_garbage(void)
 
     mark_roots();
     trace_references();
-    table_t_remove_white(&vm.strings);
+    table_t_remove_unmarked(&vm.strings);
     sweep();
 
     vm.next_garbage_collect = vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
@@ -845,7 +845,7 @@ static bool invoke(const obj_string_t *name, const int argc)
     }
     // TODO number, bool?
 
-    // otherwise lox class
+    // otherwise native type
     else if (IS_INSTANCE(receiving_instance)) {
         obj_instance_t *instance = AS_INSTANCE(receiving_instance);
 
@@ -979,7 +979,7 @@ static vm_t_interpret_result_t run(void)
             printf("                    ");
             for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
                 printf("[ ");
-                value_t_print(*slot);
+                value_t_print(stdout, *slot);
                 printf(" ]");
             }
             printf("\n");
@@ -1082,7 +1082,7 @@ static vm_t_interpret_result_t run(void)
                 }
                 // TODO number, bool?
 
-                // otherwise lox
+                // otherwise native type
                 else if (IS_INSTANCE(peek(0))) {
                     obj_instance_t *instance = AS_INSTANCE(peek(0));
                     const obj_string_t *name = READ_STRING();
@@ -1192,8 +1192,13 @@ static vm_t_interpret_result_t run(void)
                 break;
             }
             case OP_PRINT: {
-                value_t_print(vm_pop());
+                value_t_print(stdout, vm_pop());
                 printf("\n");
+                break;
+            }
+            case OP_ERROR: {
+                value_t_print(stderr, vm_pop());
+                fprintf(stderr, "\n");
                 break;
             }
             case OP_JUMP: {
@@ -1367,11 +1372,11 @@ static void mark_array(value_list_t *array)
     }
 }
 
-static void blacken_object(obj_t *object)
+static void mark_objects(obj_t *object)
 {
     if (vm.flags & VM_FLAG_GC_TRACE) {
-        printf("%p blacken ", (void*)object);
-        value_t_print(OBJ_VAL(object));
+        printf("%p marking ", (void*)object);
+        value_t_print(stdout, OBJ_VAL(object));
         printf("\n");
     }
 
@@ -1535,7 +1540,7 @@ static void trace_references(void)
 {
     while (vm.gray_count > 0) {
         obj_t *object = vm.gray_stack[--vm.gray_count];
-        blacken_object(object);
+        mark_objects(object);
     }
 }
 

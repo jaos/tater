@@ -1,4 +1,4 @@
-name: clox CI
+name: tater CI
 
 on:
   push:

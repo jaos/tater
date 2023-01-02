@@ -1,6 +1,6 @@
-# clox
+# tater
 
-C based Lox VM working through https://craftinginterpreters.com/
+Simple scripting language based upon the great work of (Robert Nystrom)[https://craftinginterpreters.com/]
 
 ## Building
 
@@ -18,19 +18,19 @@ meson test -C build && ninja coverage-html -C build
 Run the REPL
 
 ```sh
-meson devenv -C build ./src/clox
+meson devenv -C build ./src/tater
 ```
 
 Run the benchmark
 
 ```sh
-meson devenv -C build ./src/clox $PWD/t/bench.lox
+meson devenv -C build ./src/tater $PWD/t/bench.tot
 ```
 
 ## Translations
 
 ```sh
 # edit po/LINGUAS etc
-meson compile clox-pot -C build
-meson compile clox-update-po -C build
+meson compile tater-pot -C build
+meson compile tater-update-po -C build
 ```

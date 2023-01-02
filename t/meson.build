@@ -7,7 +7,7 @@ test_path = join_paths(meson.project_source_root(), 't')
 
 check = dependency('check', required: false)
 if check.found()
-  testapp = executable('testapp', test_sources, link_with: [libclox], dependencies: check, install: false)
+  testapp = executable('testapp', test_sources, link_with: [libtater], dependencies: check, install: false)
   test('testsuite', testapp, is_parallel: true, workdir: test_path, env: [])
 endif
-test('clitest', find_program('clitests.sh'), args: [clox.full_path()], depends: [clox])
+test('clitest', find_program('clitests.sh'), args: [tater.full_path()], depends: [tater])

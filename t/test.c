@@ -5,7 +5,7 @@
 
 START_TEST(test_chunk)
 {
-    vm_t_init(); // now chunk and vm are tied together
+    vm_t_init();
     chunk_t chunk;
     chunk_t_init(&chunk);
 
@@ -341,10 +341,10 @@ START_TEST(test_vm)
         "if (!false and true) { print \"yep\"; }",
         "for(let i = 0; i < 5; i = i + 1) { print i;}",
         "let counter = 0; for(1; counter < 5; counter = counter + 1) { print counter;}",
-        "fn a() { print 1;} a();", // chapter 24
-        "print clock();", // chapter 24
-        "fn mk() {let l = \"local\"; fn inner() {print l;}return inner;} let closure = mk(); closure();", // chapter 25
-        "fn outer() {let x = 1; x = 2;fn inner() {print x;} inner(); } outer();", // chapter 25
+        "fn a() { print 1;} a();",
+        "print clock();",
+        "fn mk() {let l = \"local\"; fn inner() {print l;}return inner;} let closure = mk(); closure();",
+        "fn outer() {let x = 1; x = 2;fn inner() {print x;} inner(); } outer();",
         "fn novalue() { return; } novalue();",
 
         "fn outer(){"
@@ -358,7 +358,7 @@ START_TEST(test_vm)
             "}"
             "print \"return from outer\";"
             "return middle;"
-        "} let mid = outer(); let in = mid(); in();", // chapter 25
+        "} let mid = outer(); let in = mid(); in();",
 
         "let globalSet; "
         "let globalGet; "
@@ -371,7 +371,7 @@ START_TEST(test_vm)
         "} "
         "main(); "
         "globalSet(); "
-        "globalGet();", // chapter 25
+        "globalGet();",
 
         "fn makeClosure() {\n"
         "    let a = \"data\";\n"
@@ -382,7 +382,7 @@ START_TEST(test_vm)
         "    let closure = makeClosure();\n"
         "    // GC here.\n"
         "    closure();\n"
-        "}\n", // chapter 26
+        "}\n",
 
         // https://github.com/munificent/craftingvm_t_interpreters/issues/888
         "fn returnArg(arg){ return arg;}"
@@ -390,7 +390,6 @@ START_TEST(test_vm)
         "fn printArg(arg){print arg;}"
         "returnFunCallWithArg(printArg, \"hello world\");",
 
-        // OP_CLOSE_UPVALUE https://github.com/munificent/craftingvm_t_interpreters/issues/746
         "let f1; let f2; { let i = 1; fn f() { print i; } f1 = f; } { let j = 2; fn f() { print j; } f2 = f; } f1(); f2();",
 
         // trigger gc
@@ -398,53 +397,52 @@ START_TEST(test_vm)
         "fn lots_of_stuff() { let a = \"asdfasdfasdfasdfasdafsdfasdfasdfafs\"; let b = \"asdfsdfasdfasfdafsdfas\"; return a+b;}"
         "for (let i = 0; i < 1000; i = i + 1) { let r = lots_of_stuff(); print(r); print(x+y+z);}",
 
-        "type Brioche {} print Brioche; print Brioche();", // chapter 27
-        "type Pair {} let pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;", // chapter 27
+        "type Brioche {} print Brioche; print Brioche();",
+        "type Pair {} let pair = Pair(); pair.first = 1; pair.second = 2; print pair.first + pair.second;",
 
-        "type Brunch { fn bacon() {} fn eggs() {} } let brunch = Brunch(); let eggs = brunch.eggs; eggs();", // chapter 28
+        "type Meal { fn bacon() {} fn eggs() {} } let brunch = Meal(); let eggs = brunch.eggs; eggs();",
 
         "type Scone { fn topping(first, second) { print \"scone with \" + first + \" and \" + second; }}"
-        "let scone = Scone(); scone.topping(\"berries\", \"cream\");", // chapter 28
+        "let scone = Scone(); scone.topping(\"berries\", \"cream\");",
 
         "type Person { fn say_name() {print self.name;} }"
-        "let me = Person(); me.name = \"test\"; let method = me.say_name; method();", // chapter 28
+        "let me = Person(); me.name = \"test\"; let method = me.say_name; method();",
 
-        "type Nested { fn method() { fn function() { print self; } function(); } } Nested().method();", // chapter 28
+        "type Nested { fn method() { fn function() { print self; } function(); } } Nested().method();",
 
-        "type Brunch { fn init(food, drink) {} } Brunch(\"eggs\", \"coffee\");", // chapter 28
+        "type Brew { fn init(ingredient1, ingredient2) {} } Brew(\"grains\", \"hops\");",
 
-        "type CoffeeMaker { "
-            "fn init(coffee) { self.coffee = coffee; }"
-            "fn brew() { print \"enjoy \" + self.coffee; self.coffee = nil; }"
+        "type Beer { "
+            "fn init(hops) { self.hops = hops; }"
+            "fn brew() { print \"enjoy \" + self.hops; self.hops = nil; }"
         "}"
-        "let maker = CoffeeMaker(\"coffee and chicory\");"
-        "maker.brew();", // chapter 28
+        "let maker = Beer(\"hops and grains\");"
+        "maker.brew();",
 
-        "type Oops { fn init() { fn f() { print \"not a method\"; } self.field = f; } } let oops = Oops(); oops.field();", // chapter 28
+        "type Oops { fn init() { fn f() { print \"not a method\"; } self.field = f; } } let oops = Oops(); oops.field();",
 
-        "type Doughnut { fn cook() { print(\"Dunk in the fryer.\"); } }"
-        "type Cruller (Doughnut) { fn finish() { print(\"Glaze with icing.\"); } }"
-        "let c = Cruller(); c.cook(); c.finish();", // chapter 29
+        "type PlainBagel { fn cook() { print(\"put it in the toaster.\"); } }"
+        "type EverythingBagel (PlainBagel) { fn finish() { print(\"Glaze with icing.\"); } }"
+        "let c = EverythingBagel(); c.cook(); c.finish();",
 
         "type A { fn method() { print(\"A method\");}}"
         "type B (A) { fn method() { print(\"B method\");} fn test() { super.method(); }}"
         "type C (B) {}"
-        "C().test();", // chapter 29
+        "C().test();",
 
         "type A { fn method() { print \"A\"; } }"
         "type B (A) { fn method() { let closure = super.method; closure(); } }" // prints "A"
-        "B().method();", // chapter 29
+        "B().method();",
 
-        "type Doughnut {"
-            "fn cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
+        "type PlainBagel {"
+            "fn cook() { print(\"put it in the toaster.\"); self.finish(\"cream cheese\"); }"
             "fn finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
-        "type Cruller (Doughnut) {"
+        "type EverythingBagel (PlainBagel) {"
             "fn finish(ingredient) {"
-                // no sprinkles, always icing
-                "super.finish(\"icing\");"
+                "super.finish(\"sea salt\");"
             "}"
-        "}", // chapter 29
+        "}",
 
         NULL,
     };
@@ -492,12 +490,12 @@ START_TEST(test_vm)
         "if true ){}",
         " 1 = 3;",
         "{ let a = 1; let a = 2;}",
-        "print self;", // chapter 28
-        "fn not_a_method() { print self;}", // chapter 28
-        "type CannotReturnFromInitializer { fn init() { return 1; } } CannotReturnFromInitializer(); ", // chapter 28
-        "type Foo (Foo) {}", // chapter 29
-        "type NoSuperClass { fn method() { super.method();}}", // chapter 29
-        "fn NotClass() { super.NotClass(); }", // chapter 29
+        "print self;",
+        "fn not_a_method() { print self;}",
+        "type CannotReturnFromInitializer { fn init() { return 1; } } CannotReturnFromInitializer(); ",
+        "type Foo (Foo) {}",
+        "type NoSuperClass { fn method() { super.method();}}",
+        "fn NotClass() { super.NotClass(); }",
         "switch(3) { let statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
         "switch(3) { default: true; case 3: print(\"cannot have case after default\"); }",
         "{ break;}",
@@ -520,9 +518,9 @@ START_TEST(test_vm)
         "let a = \"foo\"; a = -a;", // operand not a number
         "let a = \"foo\"; a = a + 1;", // operands must be same
         "a = 1;", // set global undefined variable
-        "type OnlyOneArgInit { fn init(one) {} } let i = OnlyOneArgInit(1, 2);", // chapter 28
-        "type NoArgInit {} let i = NoArgInit(1, 2);", // chapter 28
-        "let NotClass = \"so not a type\"; type OhNo (NotClass) {}", // chapter 29
+        "type OnlyOneArgInit { fn init(one) {} } let i = OnlyOneArgInit(1, 2);",
+        "type NoArgInit {} let i = NoArgInit(1, 2);",
+        "let NotClass = \"so not a type\"; type OhNo (NotClass) {}",
         "let a = 1; a = a / 0;", // divbyzero
         "let f = 1; f.foo = 1;", // only instances have property
         "let f = 1; f.foo(1);", // only instances have methods
@@ -635,7 +633,7 @@ START_TEST(test_value)
     value_list_t_add(&a, NIL_VAL);
     value_list_t_add(&a, EMPTY_VAL);
     for (int i = 0; i < a.count; i++) {
-        value_t_print(a.values[i]);
+        value_t_print(stdout, a.values[i]);
     }
     value_list_t_free(&a);
 
@@ -844,18 +842,17 @@ START_TEST(test_debug)
 
         "type A { fn method() { print \"A\"; } }"
         "type B (A) { fn method() { let closure = super.method; closure(); } }" // prints "A"
-        "B().method();", // chapter 29
+        "B().method();",
 
-        "type Doughnut {"
-            "fn cook() { print(\"Dunk in the fryer.\"); self.finish(\"sprinkles\"); }"
+        "type PlainBagel {"
+            "fn cook() { print(\"put it in the toaster.\"); self.finish(\"cream cheese\"); }"
             "fn finish(ingredient) { print(\"Finish with \" + ingredient); }"
         "}"
-        "type Cruller (Doughnut) {"
+        "type EverythingBagel (PlainBagel) {"
             "fn finish(ingredient) {"
-                // no sprinkles, always icing
-                "super.finish(\"icing\");"
+                "super.finish(\"sea salt\");"
             "}"
-        "}", // chapter 29
+        "}",
         NULL,
     };
     for (int p = 0; programs_with_tracing[p] != NULL; p++) {
@@ -893,7 +890,7 @@ START_TEST(test_env) {
 
 int main(const int argc, const char *argv[])
 {
-    const char *suite_name = "clox";
+    const char *suite_name = "tater";
 
     int number_failed;
     Suite *s = suite_create(suite_name);

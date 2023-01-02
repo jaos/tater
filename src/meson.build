@@ -16,5 +16,5 @@ sources = [
     'vmopcodes.h',
 ]
 
-libclox = library('libclox', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')
-clox = executable('clox', sources + ['main.c'], dependencies: [readline])
+libtater = library('libtater', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')
+tater = executable('tater', sources + ['main.c'], dependencies: [readline])

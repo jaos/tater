@@ -1064,6 +1064,13 @@ static void print_statement(void)
     emit_byte(OP_PRINT);
 }
 
+static void perror_statement(void)
+{
+    expression();
+    consume(TOKEN_SEMICOLON, gettext("Expect ';' after value."));
+    emit_byte(OP_ERROR);
+}
+
 static void return_statement(void)
 {
     if (current->type == TYPE_SCRIPT) {
@@ -1128,6 +1135,7 @@ static void synchronize(void)
             case TOKEN_IF:
             case TOKEN_WHILE:
             case TOKEN_PRINT:
+            case TOKEN_PERROR:
             case TOKEN_RETURN:
                 return;
             default:
@@ -1295,6 +1303,8 @@ static void statement(void)
 {
     if (match(TOKEN_PRINT)) {
         print_statement();
+    } else if (match(TOKEN_PERROR)) {
+        perror_statement();
     } else if (match(TOKEN_FOR)) {
         for_statement();
     } else if (match(TOKEN_IF)) {

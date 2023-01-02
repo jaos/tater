@@ -20,7 +20,7 @@ static int constant_instruction(const char *name, const chunk_t *chunk, const in
     const uint8_t constant = chunk->code[offset + 1];
     printf("%-16s %4d '", name, constant);
     assert(chunk->constants.count >= constant);
-    value_t_print(chunk->constants.values[constant]);
+    value_t_print(stdout, chunk->constants.values[constant]);
     printf("'\n");
     return offset + 2;
 }
@@ -32,7 +32,7 @@ static int invoke_instruction(const char *name, const chunk_t *chunk, const int 
     const uint8_t arg_count = chunk->code[offset + 2];
     printf("%-16s (%d args) %4d '", name, arg_count, constant);
     assert(chunk->constants.count >= constant);
-    value_t_print(chunk->constants.values[constant]);
+    value_t_print(stdout, chunk->constants.values[constant]);
     printf("'\n");
     return offset + 3;
 }
@@ -68,7 +68,7 @@ static int long_constant_instruction(const char *name, const chunk_t *chunk, con
         (chunk->code[offset + 2] << 8) |
         (chunk->code[offset + 3] << 16);
     printf("%-16s %4d '", name, constant);
-    value_t_print(chunk->constants.values[constant]);
+    value_t_print(stdout, chunk->constants.values[constant]);
     printf("'\n");
     return offset + 4;
 }
@@ -111,6 +111,7 @@ int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_NOT: return simple_instruction("OP_NOT", offset);
         case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
         case OP_PRINT: return simple_instruction("OP_PRINT", offset);
+        case OP_ERROR: return simple_instruction("OP_ERROR", offset);
         case OP_JUMP: return jump_instruction("OP_JUMP", 1, chunk, offset);
         case OP_JUMP_IF_FALSE: return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
         case OP_LOOP: return jump_instruction("OP_LOOP", -1, chunk, offset);
@@ -121,7 +122,7 @@ int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
             offset++;
             uint8_t constant = chunk->code[offset++];
             printf("%-16s %4d ", "OP_CLOSURE", constant);
-            value_t_print(chunk->constants.values[constant]);
+            value_t_print(stdout, chunk->constants.values[constant]);
             printf("\n");
 
             obj_function_t *function = AS_FUNCTION(chunk->constants.values[constant]);
@@ -178,6 +179,7 @@ const char *op_code_t_to_str(const op_code_t op)
         case OP_NOT: return "OP_NOT";
         case OP_NEGATE: return "OP_NEGATE";
         case OP_PRINT: return "OP_PRINT";
+        case OP_ERROR: return "OP_ERROR";
         case OP_JUMP: return "OP_JUMP";
         case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE";
         case OP_LOOP: return "OP_LOOP";

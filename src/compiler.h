@@ -1,5 +1,5 @@
-#ifndef clox_compiler_h
-#define clox_compiler_h
+#ifndef tater_compiler_h
+#define tater_compiler_h
 
 #include <stdbool.h>
 #include "type.h"

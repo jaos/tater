@@ -178,6 +178,7 @@ static token_type_t identifier_type(void)
                 switch (scanner.start[1]) {
                     case 'l': return check_keyword(2, 2, "se", TOKEN_ELSE);
                     case 'x': return check_keyword(2, 2, "it", TOKEN_EXIT);
+                    case 'r': return check_keyword(2, 3, "ror", TOKEN_PERROR);
                     default: ; // default returned below
                 }
             }

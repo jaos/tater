@@ -1,5 +1,5 @@
-#ifndef clox_debug_h
-#define clox_debug_h
+#ifndef tater_debug_h
+#define tater_debug_h
 
 #include "type.h"
 #include "scanner.h"

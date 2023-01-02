@@ -13,8 +13,8 @@
 #include "vm.h"
 #include "vmopcodes.h"
 
-#define CLOX_PROMPT "clox> "
-#define CLOX_HISTORY_FILE ".clox_history"
+#define TATER_PROMPT "tater> "
+#define TATER_HISTORY_FILE ".tater_history"
 
 static char *complete(const char *input, const int state __unused__)
 {
@@ -47,7 +47,7 @@ static int repl(void)
     char history_path[255] = {0};
     char *home = getenv("HOME");
     if (home != NULL) {
-        if (snprintf(history_path, 255, "%s/%s", home, CLOX_HISTORY_FILE) == -1) {
+        if (snprintf(history_path, 255, "%s/%s", home, TATER_HISTORY_FILE) == -1) {
             exit(EXIT_FAILURE);
         }
         FILE *h = fopen(history_path, "a");
@@ -70,7 +70,7 @@ static int repl(void)
     for (;;) {
         char *line = NULL;
         if (is_a_tty) {
-            line = readline(CLOX_PROMPT);
+            line = readline(TATER_PROMPT);
         } else {
             size_t getline_len __unused__ = 0;
             ssize_t getline_size = getline(&line, &getline_len, stdin);

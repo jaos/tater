@@ -1,5 +1,5 @@
-#ifndef clox_vm_h
-#define clox_vm_h
+#ifndef tater_vm_h
+#define tater_vm_h
 
 #include "type.h"
 #include "vmopcodes.h"

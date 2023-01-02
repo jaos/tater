@@ -1,5 +1,5 @@
-#ifndef clox_test_common_h
-#define clox_test_common_h
+#ifndef tater_test_common_h
+#define tater_test_common_h
 
 #include <stdlib.h>
 #include <stdio.h>
