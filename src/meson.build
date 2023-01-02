@@ -16,5 +16,8 @@ sources = [
     'vmopcodes.h',
 ]
 
-libtater = library('libtater', sources, install: false, version: meson.project_version(), soversion: 0, name_prefix: '')
-tater = executable('tater', sources + ['main.c'], dependencies: [readline])
+libtatertot = library('libtatertot', sources, install: true, version: meson.project_version(), soversion: 0, name_prefix: '')
+tater = executable('tater', sources + ['main.c'], dependencies: [readline], install: true)
+
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(libtatertot, name: 'libtatertot', description: 'Library for tater, a simple scripting language.')

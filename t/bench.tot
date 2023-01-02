@@ -1,33 +1,34 @@
 #!./build/src/tater
 
-type Zoo {
-  fn init() {
-    self.aardvark = 1;
-    self.baboon = 1;
-    self.cat = 1;
-    self.donkey = 1;
-    self.elephant = 1;
-    self.fox = 1;
-  }
-  fn ant() { return self.aardvark; }
-  fn banana() { return self.baboon; }
-  fn tuna() { return self.cat; }
-  fn hay() { return self.donkey; }
-  fn grass() { return self.elephant; }
-  fn mouse() { return self.fox; }
+type Work {
+    fn init() {
+        self.type_one = 1;
+        self.type_two = 1;
+        self.type_three = 1;
+        self.type_four = 1;
+        self.type_five = 1;
+        self.type_six = 1;
+    }
+    fn type_one_run() { return self.type_one; }
+    fn type_two_run() { return self.type_two; }
+    fn type_three_run() { return self.type_three; }
+    fn type_four_run() { return self.type_four; }
+    fn type_five_run() { return self.type_five; }
+    fn type_six_run() { return self.type_six; }
 }
 
-let zoo = Zoo();
+let work = Work();
 let sum = 0;
 let start = clock();
+
 while (sum < 100000000) {
-  sum = sum + zoo.ant()
-    + zoo.banana()
-    + zoo.tuna()
-    + zoo.hay()
-    + zoo.grass()
-    + zoo.mouse();
+    sum = sum + work.type_one_run()
+        + work.type_two_run()
+        + work.type_three_run()
+        + work.type_four_run()
+        + work.type_five_run()
+        + work.type_six_run();
 }
 
-print clock() - start;
-print sum;
+print(clock() - start);
+print(sum);

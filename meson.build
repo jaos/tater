@@ -65,7 +65,7 @@ lflags = ['-Wl,-z,defs',
 ]
 add_project_link_arguments(cc.get_supported_link_arguments(lflags), language: 'c')
 
-if get_option('debuglog').enabled()
+if get_option('debugging').enabled()
   add_global_arguments('-DDEBUG', language : 'c')
 endif
 add_project_arguments('-DVERSION="' + meson.project_version() + '"', language: 'c')
@@ -73,3 +73,12 @@ add_project_arguments('-DVERSION="' + meson.project_version() + '"', language: '
 subdir('po')
 subdir('src')
 subdir('t')
+
+datadocs = [
+  'COPYING',
+  'README.md',
+]
+
+install_data_dir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name() + '-' + meson.project_version())
+install_data(datadocs, install_dir: install_data_dir)
+install_subdir('data/vim', install_dir: install_data_dir)

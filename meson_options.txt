@@ -1,1 +1,1 @@
-option('debuglog', type: 'feature', description: 'turn on debug logging')
+option('debugging', type: 'feature', description: 'turn on debugging')

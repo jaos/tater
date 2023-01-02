@@ -1,4 +1,7 @@
-__pycache__
 *.swp
+*~
 **/tags
 .ccls-cache
+*.orig
+build
+callgrind.out.*
