@@ -1,14 +1,12 @@
 #!./build/src/tater
 
 type Work {
-    fn init() {
-        self.type_one = 1;
-        self.type_two = 1;
-        self.type_three = 1;
-        self.type_four = 1;
-        self.type_five = 1;
-        self.type_six = 1;
-    }
+    let type_one = 1;
+    let type_two = 1;
+    let type_three = 1;
+    let type_four = 1;
+    let type_five = 1;
+    let type_six = 1;
     fn type_one_run() { return self.type_one; }
     fn type_two_run() { return self.type_two; }
     fn type_three_run() { return self.type_three; }
@@ -22,7 +20,7 @@ let sum = 0;
 let start = clock();
 
 while (sum < 100000000) {
-    sum = sum + work.type_one_run()
+    sum += work.type_one_run()
         + work.type_two_run()
         + work.type_three_run()
         + work.type_four_run()
