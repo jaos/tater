@@ -270,7 +270,7 @@ static obj_function_t *compiler_t_end(const bool debug)
     emit_return();
     table_t_free(&current->string_constants);
     obj_function_t *function = current->function;
-    if (debug || parser.had_error) {
+    if (debug && parser.had_error) {
         chunk_t_disassemble(current_chunk(), function->name != NULL ? function->name->chars : "<script>");
     }
     current = current->enclosing;
@@ -638,12 +638,67 @@ static void load_and_modify(const uint8_t name, const token_type_t match, const 
         case TOKEN_SLASH_EQUAL: expression(); emit_byte(OP_DIVIDE); break;
         case TOKEN_PLUS_PLUS:
         case TOKEN_MINUS_MINUS:
-            emit_constant(NUMBER_VAL(parser.previous.type == TOKEN_PLUS_PLUS ? 1 : -1));
+            emit_constant(NUMBER_VAL(match == TOKEN_PLUS_PLUS ? 1 : -1));
             emit_byte(OP_ADD);
             break;
         default: ;
     }
     emit_bytes(set_op, name);
+}
+
+static void subscript_modify_in_place(const int slot, const uint8_t get_op)
+{
+    uint8_t arg_count = 0;
+    expression();
+    token_t saved_expression = parser.previous;
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+    arg_count++;
+
+    // if we have a load and modify coming
+    if (match_for_load_and_modify()) {
+        // save it off
+        const token_t match = parser.previous;
+
+        // emit another invoke to load the current value to modify
+        emit_bytes(get_op, (uint8_t)slot);
+        if (saved_expression.type == TOKEN_STRING) {
+            parser.previous = saved_expression;
+            string(true);
+        } else if (saved_expression.type == TOKEN_NUMBER) {
+            parser.previous = saved_expression;
+            number(true);
+        } else {
+            error(gettext("Invalid subscript."));
+        }
+        token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
+        const uint8_t subscript = identifier_constant(&subscript_token);
+        emit_bytes(OP_INVOKE, subscript);
+        emit_byte(arg_count);
+
+        switch (match.type) {
+            case TOKEN_PLUS_EQUAL: expression(); emit_byte(OP_ADD); break;
+            case TOKEN_MINUS_EQUAL: expression(); emit_byte(OP_SUBTRACT); break;
+            case TOKEN_STAR_EQUAL: expression(); emit_byte(OP_MULTIPLY); break;
+            case TOKEN_SLASH_EQUAL: expression(); emit_byte(OP_DIVIDE); break;
+            case TOKEN_PLUS_PLUS:
+            case TOKEN_MINUS_MINUS:
+                emit_constant(NUMBER_VAL(match.type == TOKEN_PLUS_PLUS ? 1 : -1));
+                emit_byte(OP_ADD);
+                break;
+            default: ;
+
+        }
+        arg_count++;
+    }
+    else if (match(TOKEN_EQUAL)) {
+        expression();
+        arg_count++;
+    }
+
+    token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
+    const uint8_t subscript = identifier_constant(&subscript_token);
+    emit_bytes(OP_INVOKE, subscript);
+    emit_byte(arg_count);
 }
 
 static void named_variable(const token_t name, const bool can_assign)
@@ -667,6 +722,9 @@ static void named_variable(const token_t name, const bool can_assign)
         emit_bytes(set_op, (uint8_t)arg);
     } else if (can_assign && match_for_load_and_modify()) {
         load_and_modify(arg, parser.previous.type, get_op, set_op);
+    } else if (can_assign && match(TOKEN_LEFT_BRACKET)) {
+        emit_bytes(get_op, (uint8_t)arg);
+        subscript_modify_in_place(arg, get_op);
     } else {
         emit_bytes(get_op, (uint8_t)arg);
     }
@@ -687,6 +745,9 @@ static void dot(const bool can_assign)
     } else if (can_assign && match_for_load_and_modify()) {
         named_variable(synthetic_token(token_keyword_names[TOKEN_SELF]), false);
         load_and_modify(name, parser.previous.type, OP_GET_PROPERTY, OP_SET_PROPERTY);
+    } else if (can_assign && match(TOKEN_LEFT_BRACKET)) {
+        emit_bytes(OP_GET_PROPERTY, (uint8_t)name);
+        subscript_modify_in_place(name, OP_GET_PROPERTY);
     } else {
         emit_bytes(OP_GET_PROPERTY, name);
     }

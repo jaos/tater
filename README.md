@@ -2,6 +2,8 @@
 
 Simple scripting language based upon the great work of [Robert Nystrom](https://craftinginterpreters.com/)
 
+`example.tot`:
+
 ```tater
 #!/usr/bin/tater
 
@@ -20,7 +22,10 @@ type WorkCounter {
 
     fn work(locations) {
         for (let i = 0; i < locations.len(); i++) {
+            self.counter++;
+
             let work = locations[i];
+            print(self.name + ", location counter " + str(self.counter));
             print(work);
             let start_point = work["start"];
             let end_point = work["end"];
@@ -30,7 +35,7 @@ type WorkCounter {
                     print("setting up residential drone.");
                     // start flying
                     while (start_point[0] < end_point[0]) {
-                        start_point[0] = start_point[0] + 1; # simulation
+                        start_point[0]++; # simulation
                     }
                 }
                 case WorkSites.COMMERCIAL: {

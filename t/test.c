@@ -293,6 +293,10 @@ START_TEST(test_vm)
         "let a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
         "let a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\");",
 
+        "let counters = [0]; counters[0]++; assert(counters[0] == 1);",
+        "let counters = {\"start\": 0}; counters[\"start\"]++; assert(counters[\"start\"] == 1);",
+        "type Foo { let counter = 0; fn increment() { self.counter++;}}; let f = Foo(); f.increment(); assert(f.counter == 1);",
+
         "let a = [{\"name\": \"foo\", \"counter\": 11}, {\"name\": \"bar\", \"counter\": 22}];"
         "assert(a[0][\"counter\"] == 11); assert(a[1][\"counter\"] == 22); assert(a[0][\"name\"] + a[1][\"name\"] == \"foobar\");",
 
