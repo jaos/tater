@@ -17,6 +17,7 @@
  */
 
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -949,7 +950,7 @@ static void define_method(obj_string_t *name)
 
 static bool is_falsey(const value_t value)
 {
-    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value)) || (IS_NUMBER(value) && AS_NUMBER(value) == 0);
 }
 
 static void concatenate(void)
@@ -989,6 +990,17 @@ static vm_t_interpret_result_t run(void)
         const double b = AS_NUMBER(vm_pop()); \
         const double a = AS_NUMBER(vm_pop()); \
         vm_push(value_type_wrapper(a op b)); \
+    } while (false)
+#define BINARY_OP_BIT(value_type_wrapper, op) \
+    do { \
+        if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+            frame->ip = ip; \
+            runtime_error(gettext("Operands must be numbers.")); \
+            return INTERPRET_RUNTIME_ERROR; \
+        } \
+        const double b = AS_NUMBER(vm_pop()); \
+        const double a = AS_NUMBER(vm_pop()); \
+        vm_push(value_type_wrapper((double)((long long)a op (long long)b))); \
     } while (false)
 
     // TODO revisit with jump table, computed goto, or direct threaded code techniques
@@ -1199,6 +1211,24 @@ static vm_t_interpret_result_t run(void)
                 BINARY_OP(NUMBER_VAL, /); break;
             }
             case OP_NOT: vm_push(BOOL_VAL(is_falsey(vm_pop()))); break;
+            case OP_BITWISE_NOT: vm_push(NUMBER_VAL((double)(~(long long)AS_NUMBER(vm_pop())))); break;
+            case OP_MOD: {
+                if (IS_NUMBER(peek(0)) && AS_NUMBER(peek(0)) == 0) {
+                    frame->ip = ip;
+                    runtime_error(gettext("Illegal divide by zero."));
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                const double a = AS_NUMBER(vm_pop());
+                const double b = AS_NUMBER(vm_pop());
+                const double r = fmod(a,b);
+                vm_push(NUMBER_VAL(r));
+                break;
+            }
+            case OP_BITWISE_OR: BINARY_OP_BIT(NUMBER_VAL, |); break;
+            case OP_BITWISE_AND: BINARY_OP_BIT(NUMBER_VAL, &); break;
+            case OP_BITWISE_XOR: BINARY_OP_BIT(NUMBER_VAL, ^); break;
+            case OP_SHIFT_LEFT: BINARY_OP_BIT(NUMBER_VAL, <<); break;
+            case OP_SHIFT_RIGHT: BINARY_OP_BIT(NUMBER_VAL, >>); break;
             case OP_NEGATE: {
                 if (!IS_NUMBER(peek(0))) {
                     frame->ip = ip;

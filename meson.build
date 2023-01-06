@@ -12,10 +12,11 @@ project('tater', 'c',
     ],
 )
 
+cc = meson.get_compiler('c')
 i18n = import('i18n')
 readline = dependency('readline')
+libm = cc.find_library('m')
 
-cc = meson.get_compiler('c')
 cflags = [
   '-Wshadow',
   '-Wstrict-overflow',

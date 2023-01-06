@@ -337,9 +337,42 @@ token_t scanner_t_scan_token(void)
         // one or two characters
         case '!': return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '=': return make_token(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-        case '<': return make_token(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-        case '>': return make_token(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+        case '<': {
+            const char next = peek();
+            switch (next) {
+                case '<': advance(); return make_token(match('=') ? TOKEN_SHIFT_LEFT_EQUAL : TOKEN_SHIFT_LEFT);
+                case '=': advance(); return make_token(TOKEN_LESS_EQUAL);
+                default: return make_token(TOKEN_LESS);
+            }
+        }
+        case '>': {
+            const char next = peek();
+            switch (next) {
+                case '>': advance(); return make_token(match('=') ? TOKEN_SHIFT_RIGHT_EQUAL : TOKEN_SHIFT_RIGHT);
+                case '=': advance(); return make_token(TOKEN_GREATER_EQUAL);
+                default: return make_token(TOKEN_GREATER);
+            }
+        }
         case '"': return string();
+        case '|': {
+            const char next = peek();
+            switch (next) {
+                case '|': advance(); return make_token(TOKEN_OR);
+                case '=': advance(); return make_token(TOKEN_OR_EQUAL);
+                default: return make_token(TOKEN_BIT_OR);
+            }
+        }
+        case '&': {
+            const char next = peek();
+            switch (next) {
+                case '&': advance(); return make_token(TOKEN_AND);
+                case '=': advance(); return make_token(TOKEN_AND_EQUAL);
+                default: return make_token(TOKEN_BIT_AND);
+            }
+        }
+        case '%': return make_token(TOKEN_MOD);
+        case '~': return make_token(TOKEN_BIT_NOT);
+        case '^': return make_token(match('=') ? TOKEN_XOR_EQUAL : TOKEN_BIT_XOR);
         default: return error_token(gettext("Unexpected character."));
     }
 }

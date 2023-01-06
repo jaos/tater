@@ -123,7 +123,7 @@ START_TEST(test_scanner)
     } while (next.type != TOKEN_EOF);
 
     const char *invalid_sources[] = {
-        "~",
+        "@",
         NULL,
     };
     for (int i = 0; invalid_sources[i] != NULL; i++) {
@@ -263,6 +263,12 @@ START_TEST(test_vm)
         "assert(0xdeadbeef == 3735928559);",
         "assert(0b11111101 == 253);",
         "assert(0o10 == 8);",
+        "assert(5 | 6 == 7); let a = 5; a |= 6; assert(a == 7);",
+        "assert(5 & 6 == 4); let a = 5; a &= 6; assert(a == 4);",
+        "assert(~2 == -3);",
+        "assert(5 ^ 3 == 6); let a = 5; a ^= 3; assert(a == 6);",
+        "assert(128 >> 4 == 8); let a = 128; a >>= 4; assert(a == 8);",
+        "assert(128 << 4 == 2048); let a = 128; a <<= 4; assert(a == 2048);",
 
         "type Foo {}; type Bar(Foo) {}; type Baz(Bar) {};"
         "let i1 = Baz(); let i2 = Bar(); let i3 = Foo();"

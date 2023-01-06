@@ -126,7 +126,14 @@ int chunk_t_disassemble_instruction(const chunk_t *chunk, int offset)
         case OP_SUBTRACT: return simple_instruction("OP_SUBTRACT", offset);
         case OP_MULTIPLY: return simple_instruction("OP_MULTIPLY", offset);
         case OP_DIVIDE: return simple_instruction("OP_DIVIDE", offset);
+        case OP_BITWISE_OR: return simple_instruction("OP_BITWISE_OR", offset);
+        case OP_BITWISE_AND: return simple_instruction("OP_BITWISE_AND", offset);
+        case OP_BITWISE_XOR: return simple_instruction("OP_BITWISE_XOR", offset);
+        case OP_BITWISE_NOT: return simple_instruction("OP_BITWISE_NOT", offset);
+        case OP_SHIFT_LEFT: return simple_instruction("OP_SHIFT_LEFT", offset);
+        case OP_SHIFT_RIGHT: return simple_instruction("OP_SHIFT_RIGHT", offset);
         case OP_NOT: return simple_instruction("OP_NOT", offset);
+        case OP_MOD: return simple_instruction("OP_MOD", offset);
         case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
         case OP_PRINT: return simple_instruction("OP_PRINT", offset);
         case OP_ERROR: return simple_instruction("OP_ERROR", offset);
@@ -249,10 +256,15 @@ const char *token_type_t_to_str(const token_type_t type)
         case TOKEN_MINUS_MINUS: return "TOKEN_MINUS_MINUS";
         case TOKEN_PLUS: return "TOKEN_PLUS";
         case TOKEN_PLUS_PLUS: return "TOKEN_PLUS_PLUS";
+        case TOKEN_MOD: return "TOKEN_MOD";
         case TOKEN_SEMICOLON: return "TOKEN_SEMICOLON";
         case TOKEN_SLASH: return "TOKEN_SLASH";
         case TOKEN_SLASH_EQUAL: return "TOKEN_SLASH_EQUAL";
         case TOKEN_STAR: return "TOKEN_STAR";
+        case TOKEN_BIT_AND: return "TOKEN_BIT_AND";
+        case TOKEN_BIT_OR: return "TOKEN_BIT_OR";
+        case TOKEN_BIT_NOT: return "TOKEN_BIT_NOT";
+        case TOKEN_BIT_XOR: return "TOKEN_BIT_XOR";
         case TOKEN_STAR_EQUAL: return "TOKEN_STAR_EQUAL";
         // one or two characters
         case TOKEN_BANG: return "TOKEN_BANG";

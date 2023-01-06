@@ -27,13 +27,17 @@ typedef enum {
     TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
     TOKEN_COLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
     TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
-    // one or two characters
+    TOKEN_BIT_AND, TOKEN_BIT_OR, TOKEN_BIT_NOT, TOKEN_BIT_XOR,
+    // several characters
     TOKEN_BANG, TOKEN_BANG_EQUAL,
     TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
     TOKEN_GREATER, TOKEN_GREATER_EQUAL,
     TOKEN_LESS, TOKEN_LESS_EQUAL,
     TOKEN_PLUS_EQUAL, TOKEN_MINUS_EQUAL, TOKEN_STAR_EQUAL, TOKEN_SLASH_EQUAL,
+    TOKEN_XOR_EQUAL, TOKEN_AND_EQUAL, TOKEN_OR_EQUAL,
     TOKEN_MINUS_MINUS, TOKEN_PLUS_PLUS,
+    TOKEN_SHIFT_LEFT, TOKEN_SHIFT_RIGHT, TOKEN_SHIFT_LEFT_EQUAL, TOKEN_SHIFT_RIGHT_EQUAL,
+    TOKEN_MOD,
     // literals
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
     // keywords
@@ -61,6 +65,10 @@ static const char *const token_keyword_names[] = {
     [TOKEN_SEMICOLON] = ";",
     [TOKEN_SLASH] = "/",
     [TOKEN_STAR] = "*",
+    [TOKEN_BIT_AND] = "&",
+    [TOKEN_BIT_OR] = "|",
+    [TOKEN_BIT_NOT] = "~",
+    [TOKEN_BIT_XOR] = "^",
     // one or two characters
     [TOKEN_BANG] = "!",
     [TOKEN_BANG_EQUAL] = "!=",
@@ -74,8 +82,16 @@ static const char *const token_keyword_names[] = {
     [TOKEN_MINUS_EQUAL] = "-=",
     [TOKEN_STAR_EQUAL] = "*=",
     [TOKEN_SLASH_EQUAL] = "/=",
+    [TOKEN_XOR_EQUAL] = "^=",
+    [TOKEN_AND_EQUAL] = "&=",
+    [TOKEN_OR_EQUAL] = "|=",
     [TOKEN_MINUS_MINUS] = "--",
     [TOKEN_PLUS_PLUS] = "++",
+    [TOKEN_SHIFT_LEFT] = "<<",
+    [TOKEN_SHIFT_RIGHT] = ">>",
+    [TOKEN_SHIFT_LEFT_EQUAL] = "<<=",
+    [TOKEN_SHIFT_RIGHT_EQUAL] = ">>=",
+    [TOKEN_MOD] = "&",
     // literals
     [TOKEN_IDENTIFIER] = "<identifier>",
     [TOKEN_STRING] = "string",
@@ -107,6 +123,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_PERROR] = "error",
     [TOKEN_ERROR] = "error",
     [TOKEN_EOF] = "<EOF>",
+    "&&", // equiv to TOKEN_AND
+    "||", // equiv to TOKEN_OR
     "list",
     "map",
     NULL,
