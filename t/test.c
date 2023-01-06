@@ -258,6 +258,11 @@ START_TEST(test_vm)
         "assert(number(9) == 9);",
         "assert(number(\"1.1\") == 1.1);",
         "assert(number(\"-5\") == -5);",
+        "assert(1_000_000 == 1000000);",
+        "assert(1 000 000 == 1000000);",
+        "assert(0xdeadbeef == 3735928559);",
+        "assert(0b11111101 == 253);",
+        "assert(0o10 == 8);",
 
         "type Foo {}; type Bar(Foo) {}; type Baz(Bar) {};"
         "let i1 = Baz(); let i2 = Bar(); let i3 = Foo();"

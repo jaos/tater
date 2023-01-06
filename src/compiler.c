@@ -570,6 +570,51 @@ static void decrement(const bool)
     emit_byte(OP_ADD);
 }
 
+static void number(const bool)
+{
+    bool cleaned = false;
+    char *str = NULL;
+
+    if (memchr(parser.previous.start, '_', parser.previous.length) != NULL || memchr(parser.previous.start, ' ', parser.previous.length) != NULL) {
+        const char *n = parser.previous.start;
+        str = malloc(sizeof *str * parser.previous.length);
+        int offset = 0;
+        for (int i = 0; i < parser.previous.length; i++) {
+            if (n[i] != '_' && n[i] != ' ') {
+                str[offset] = n[i];
+                offset++;
+            }
+        }
+        cleaned = true;
+        str[offset] = '\0';
+    }
+
+    if (str == NULL)
+        str = (char *)parser.previous.start;
+
+    if (str[0] == '0' && str[1] == 'x') {
+        double value = (double)strtoll(str, NULL, 16);
+        emit_constant(NUMBER_VAL(value));
+    } else if (str[0] == '0' && str[1] == 'b') {
+        double value = (double)strtoll(str + 2, NULL, 2);
+        emit_constant(NUMBER_VAL(value));
+    } else if (str[0] == '0' && str[1] == 'o') {
+        double value = (double)strtoll(str + 2, NULL, 8);
+        emit_constant(NUMBER_VAL(value));
+    } else {
+        const double value = strtod(str, NULL);
+        emit_constant(NUMBER_VAL(value));
+    }
+
+    if (cleaned)
+        free(str);
+}
+
+static void string(const bool)
+{
+    emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2)));
+}
+
 static bool match_for_load_and_modify(void)
 {
     if (match(TOKEN_PLUS_EQUAL) ||
@@ -663,12 +708,6 @@ static void grouping(const bool)
     consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after expression."));
 }
 
-static void number(const bool)
-{
-    const double value = strtod(parser.previous.start, NULL);
-    emit_constant(NUMBER_VAL(value));
-}
-
 static void or_expr(const bool) // can_assign
 {
     const int else_jump = emit_jump(OP_JUMP_IF_FALSE);
@@ -679,11 +718,6 @@ static void or_expr(const bool) // can_assign
 
     parse_precedence(PREC_OR);
     patch_jump(end_jump);
-}
-
-static void string(const bool)
-{
-    emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void variable(const bool can_assign)

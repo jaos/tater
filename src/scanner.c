@@ -136,14 +136,44 @@ static bool is_digit(const char c)
 {
     return c >= '0' && c <= '9';
 }
+static bool is_hexdigit(const char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
 
 static token_t number(void)
 {
+    bool is_hex = false;
+
     while (is_digit(peek())) advance();
     if (peek() == '.' && is_digit(peek_next())) {
         advance();
     }
-    while (is_digit(peek())) advance();
+    if (peek() == '_' && is_digit(peek_next())) {
+        advance();
+    }
+    if (peek() == 'x' && is_hexdigit(peek_next())) {
+        is_hex = true;
+        advance();
+    }
+    if (peek() == 'b' && is_digit(peek_next())) {
+        advance();
+    }
+    if (peek() == ' ' && is_hexdigit(peek_next())) {
+        advance();
+    }
+    if (peek() == 'o' && is_digit(peek_next())) {
+        advance();
+    }
+    if (is_hex)
+        while (is_hexdigit(peek()) || peek() == '_' || peek() == ' ') {
+            advance();
+        }
+    else {
+        while (is_digit(peek()) || peek() == '_' || peek() == ' ') {
+            advance();
+        }
+    }
     return make_token(TOKEN_NUMBER);
 }
 

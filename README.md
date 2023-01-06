@@ -6,9 +6,9 @@ Simple scripting language based upon the great work of [Robert Nystrom](https://
 #!/usr/bin/tater
 
 type WorkSites {
-    let RESIDENTIAL = 1;
-    let COMMERCIAL = 2;
-    let INDUSTRIAL = 3;
+    let RESIDENTIAL = 0x1;
+    let COMMERCIAL = 0x2;
+    let INDUSTRIAL = 0x4;
 }
 
 type WorkCounter {
@@ -44,11 +44,12 @@ type WorkCounter {
     }
 }
 
+let b = true;
 let wc = WorkCounter("phase1");
 let workorder = [
     {"start": [900,100], "end": [920, 80], "site": WorkSites.RESIDENTIAL},
-    {"start": [1360,1800], "end": [1390, 2000], "site": WorkSites.COMMERCIAL},
-    {"start": [3490,3400], "end": [3700, 3550], "site": WorkSites.INDUSTRIAL}
+    {"start": [1_360,1_800], "end": [1_390, 2_000], "site": WorkSites.COMMERCIAL},
+    {"start": [3_490,3_400], "end": [3_700, 3_550], "site": WorkSites.INDUSTRIAL}
 ];
 
 wc.work(workorder);
