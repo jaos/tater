@@ -257,10 +257,10 @@ static bool map_native(const int argc, const value_t *args)
         obj_map_t *map = obj_map_t_allocate();
         vm_push(OBJ_VAL(map));
         for (int i = 0; i < from_map->table.capacity; i++) {
-            entry_t entry = from_map->table.entries[i];
-            if (IS_EMPTY(entry.key))
+            table_entry_t table_entry = from_map->table.entries[i];
+            if (IS_EMPTY(table_entry.key))
                 continue;
-            table_t_set(&map->table, entry.key, entry.value);
+            table_t_set(&map->table, table_entry.key, table_entry.value);
         }
         return true;
     }
@@ -539,9 +539,9 @@ static bool map_method_invoke(const obj_string_t *method, const int argc, const 
         obj_list_t *keys = obj_list_t_allocate();
         vm_push(OBJ_VAL(keys));
         for (int i = 0; i < map->table.capacity; i++) {
-            entry_t entry = map->table.entries[i];
-            if (!IS_EMPTY(entry.key)) {
-                value_list_t_add(&keys->elements, entry.key);
+            table_entry_t table_entry = map->table.entries[i];
+            if (!IS_EMPTY(table_entry.key)) {
+                value_list_t_add(&keys->elements, table_entry.key);
             }
         }
         return true;
@@ -565,9 +565,9 @@ static bool map_method_invoke(const obj_string_t *method, const int argc, const 
             obj_list_t *values = obj_list_t_allocate();
             vm_push(OBJ_VAL(values));
             for (int i = 0; i < map->table.capacity; i++) {
-                entry_t entry = map->table.entries[i];
-                if (!IS_EMPTY(entry.key)) {
-                    value_list_t_add(&values->elements, entry.value);
+                table_entry_t table_entry = map->table.entries[i];
+                if (!IS_EMPTY(table_entry.key)) {
+                    value_list_t_add(&values->elements, table_entry.value);
                 }
             }
             return true;

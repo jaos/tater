@@ -300,7 +300,7 @@ void obj_t_print(FILE *stream, const value_t value)
                 bool comma = false;
                 fprintf(stream, "{");
                 for (int i = 0; i < map->table.capacity; i++) {
-                    entry_t e = map->table.entries[i];
+                    table_entry_t e = map->table.entries[i];
                     if (IS_EMPTY(e.key)) continue;
                     if (comma)
                         fprintf(stream, ",");
@@ -424,27 +424,27 @@ void table_t_init(table_t *table)
 
 void table_t_free(table_t *table)
 {
-    FREE_ARRAY(entry_t, table->entries, table->capacity);
+    FREE_ARRAY(table_entry_t, table->entries, table->capacity);
     table_t_init(table);
 }
 
-static entry_t *find_entry(entry_t *entries, const int capacity, const value_t key)
+static table_entry_t *find_table_entry(table_entry_t *entries, const int capacity, const value_t key)
 {
     uint32_t index = value_t_hash(key) & (capacity - 1);
-    entry_t *tombstone = NULL;
+    table_entry_t *tombstone = NULL;
 
     for (;;) {
-        entry_t *entry = &entries[index];
-        if (IS_EMPTY(entry->key)) {
-            if (IS_NIL(entry->value)) {
-                return tombstone != NULL ? tombstone : entry;
+        table_entry_t *table_entry = &entries[index];
+        if (IS_EMPTY(table_entry->key)) {
+            if (IS_NIL(table_entry->value)) {
+                return tombstone != NULL ? tombstone : table_entry;
             } else {
                 if (tombstone == NULL) {
-                    tombstone = entry;
+                    tombstone = table_entry;
                 }
             }
-        } else if (value_t_equal(entry->key, key)) {
-            return entry;
+        } else if (value_t_equal(table_entry->key, key)) {
+            return table_entry;
         }
         index = (index + 1) & (capacity - 1);
     }
@@ -454,32 +454,32 @@ bool table_t_get(table_t *table, const value_t key, value_t *value)
 {
     if (table->count == 0)
         return false;
-    entry_t *entry = find_entry(table->entries, table->capacity, key);
-    if (IS_EMPTY(entry->key))
+    table_entry_t *table_entry = find_table_entry(table->entries, table->capacity, key);
+    if (IS_EMPTY(table_entry->key))
         return false;
-    *value = entry->value;
+    *value = table_entry->value;
     return true;
 }
 
 static void adjust_capacity(table_t *table, const int capacity)
 {
-    entry_t *entries = ALLOCATE(entry_t, capacity);
+    table_entry_t *entries = ALLOCATE(table_entry_t, capacity);
     for (int i = 0; i < capacity; i++) {
         entries[i].key = EMPTY_VAL;
         entries[i].value = NIL_VAL;
     }
     table->count = 0;
     for (int i = 0; i < table->capacity; i++) {
-        entry_t *entry = &table->entries[i];
-        if (IS_EMPTY(entry->key))
+        table_entry_t *table_entry = &table->entries[i];
+        if (IS_EMPTY(table_entry->key))
             continue;
-        entry_t *dest = find_entry(entries, capacity, entry->key);
-        dest->key = entry->key;
-        dest->value = entry->value;
+        table_entry_t *dest = find_table_entry(entries, capacity, table_entry->key);
+        dest->key = table_entry->key;
+        dest->value = table_entry->value;
         table->count++;
     }
 
-    FREE_ARRAY(entry_t, table->entries, table->capacity);
+    FREE_ARRAY(table_entry_t, table->entries, table->capacity);
     table->entries = entries;
     table->capacity = capacity;
 }
@@ -491,13 +491,13 @@ bool table_t_set(table_t *table, const value_t key, const value_t value)
         adjust_capacity(table, capacity);
     }
 
-    entry_t *entry = find_entry(table->entries, table->capacity, key);
-    const bool is_new_key = IS_EMPTY(entry->key);
-    if (is_new_key && IS_NIL(entry->value))
+    table_entry_t *table_entry = find_table_entry(table->entries, table->capacity, key);
+    const bool is_new_key = IS_EMPTY(table_entry->key);
+    if (is_new_key && IS_NIL(table_entry->value))
         table->count++; // we only increment if not a tombstone
 
-    entry->key = key;
-    entry->value = value;
+    table_entry->key = key;
+    table_entry->value = value;
     return is_new_key;
 }
 
@@ -506,22 +506,22 @@ bool table_t_delete(table_t *table, const value_t key)
     if (table->count == 0)
         return false;
 
-    entry_t *entry = find_entry(table->entries, table->capacity, key);
-    if (IS_EMPTY(entry->key))
+    table_entry_t *table_entry = find_table_entry(table->entries, table->capacity, key);
+    if (IS_EMPTY(table_entry->key))
         return false;
 
-    // place a tombstone entry
-    entry->key = EMPTY_VAL;
-    entry->value = NIL_VAL;
+    // place a tombstone table_entry
+    table_entry->key = EMPTY_VAL;
+    table_entry->value = NIL_VAL;
     return true;
 }
 
 void table_t_copy_to(const table_t *from, table_t *to)
 {
     for (int i = 0; i < from->capacity; i++) {
-        const entry_t *entry = &from->entries[i];
-        if (!IS_EMPTY(entry->key)) {
-            table_t_set(to, entry->key, entry->value);
+        const table_entry_t *table_entry = &from->entries[i];
+        if (!IS_EMPTY(table_entry->key)) {
+            table_t_set(to, table_entry->key, table_entry->value);
         }
     }
 }
@@ -533,12 +533,12 @@ obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, c
 
     uint32_t index = hash & (table->capacity - 1);
     for (;;) {
-        entry_t *entry = &table->entries[index];
+        table_entry_t *table_entry = &table->entries[index];
 
-        if (IS_EMPTY(entry->key)) {
+        if (IS_EMPTY(table_entry->key)) {
             return NULL;
         }
-        obj_string_t *string = AS_STRING(entry->key);
+        obj_string_t *string = AS_STRING(table_entry->key);
         if (string->hash == hash && string->length == length && memcmp(string->chars, chars, length) == 0) {
             return string;
         }
@@ -550,9 +550,9 @@ obj_string_t *table_t_find_key_by_str(const table_t *table, const char *chars, c
 void table_t_remove_unmarked(table_t *table)
 {
     for (int i = 0; i < table->capacity; i++) {
-        entry_t *entry = &table->entries[i];
-        if (!IS_EMPTY(entry->key) && IS_OBJ(entry->key) && !AS_OBJ(entry->key)->is_marked) {
-            table_t_delete(table, entry->key);
+        table_entry_t *table_entry = &table->entries[i];
+        if (!IS_EMPTY(table_entry->key) && IS_OBJ(table_entry->key) && !AS_OBJ(table_entry->key)->is_marked) {
+            table_t_delete(table, table_entry->key);
         }
     }
 }
@@ -560,9 +560,9 @@ void table_t_remove_unmarked(table_t *table)
 void table_t_mark(table_t *table)
 {
     for (int i = 0; i < table->capacity; i++) {
-        entry_t *entry = &table->entries[i];
-        value_t_mark(entry->key);
-        value_t_mark(entry->value);
+        table_entry_t *table_entry = &table->entries[i];
+        value_t_mark(table_entry->key);
+        value_t_mark(table_entry->value);
     }
 }
 

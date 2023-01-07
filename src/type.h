@@ -136,12 +136,12 @@ typedef struct {
 typedef struct {
     value_t key;
     value_t value;
-} entry_t;
+} table_entry_t;
 
 typedef struct {
     int count;
     int capacity;
-    entry_t *entries;
+    table_entry_t *entries;
 } table_t;
 
 typedef struct {
