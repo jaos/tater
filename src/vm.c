@@ -1386,7 +1386,7 @@ static vm_t_interpret_result_t run(void)
             default:
                 DEBUG_LOGGER("Unhandled default for instruction %d, %s\n",
                     instruction,
-                    op_code_t_to_str(instruction)
+                    op_code_name[instruction]
                 );
                 exit(EXIT_FAILURE);
         }
@@ -1497,7 +1497,7 @@ static void mark_objects(obj_t *object)
 static void vm_t_free_object(obj_t *o)
 {
     if (vm.flags & VM_FLAG_GC_TRACE) {
-        printf("%p free type %s\n", (void*)o, obj_type_t_to_str(o->type));
+        printf("%p free type %s\n", (void*)o, obj_type_names[o->type]);
     }
     switch (o->type) {
         case OBJ_BOUND_METHOD: {

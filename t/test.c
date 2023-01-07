@@ -78,7 +78,6 @@ START_TEST(test_scanner)
     scanner_t_init(source);
     for (int idx = 0;results[idx].type != TOKEN_EOF;idx++) {
         token_t t = scanner_t_scan_token();
-        const char *token_type_str __unused__ = token_type_t_to_str(t.type);
         ck_assert_msg(t.type == results[idx].type, "Expected %d, got %d\n", results[idx].type, t.type);
         ck_assert(memcmp(t.start, results[idx].start, t.length) == 0);
         ck_assert(t.length == results[idx].length);
@@ -106,7 +105,6 @@ START_TEST(test_scanner)
     };
     for (int idx = 0;results2[idx].type != TOKEN_EOF;idx++) {
         token_t t = scanner_t_scan_token();
-        const char *token_type_str __unused__ = token_type_t_to_str(t.type);
 
         ck_assert_msg(t.type == results2[idx].type, "Expected %d, got %d\n", results2[idx].type, t.type);
         ck_assert(memcmp(t.start, results2[idx].start, t.length) == 0);
@@ -118,7 +116,6 @@ START_TEST(test_scanner)
     scanner_t_init(source);
     token_t next = scanner_t_scan_token();
     do {
-        const char *token_type_str __unused__ = token_type_t_to_str(next.type);
         next = scanner_t_scan_token();
     } while (next.type != TOKEN_EOF);
 
@@ -625,7 +622,6 @@ START_TEST(test_native)
     vm_push(OBJ_VAL(name));
     obj_native_t *native_fn = obj_native_t_allocate(native_getpid, name, 0);
     vm_push(OBJ_VAL(native_fn));
-    obj_type_t_to_str(((obj_t*)native_fn)->type); // debugging
 
     vm_t_free();
 }
@@ -639,12 +635,6 @@ START_TEST(test_value)
     ck_assert(value_t_hash(NIL_VAL) == 7);
     ck_assert(value_t_hash(EMPTY_VAL) == 0);
     ck_assert(value_t_hash(NUMBER_VAL(9)) == 1076101120);
-
-    value_type_t_to_str(VAL_BOOL);
-    value_type_t_to_str(VAL_NIL);
-    value_type_t_to_str(VAL_NUMBER);
-    value_type_t_to_str(VAL_OBJ);
-    value_type_t_to_str(VAL_EMPTY);
 
     ck_assert(value_t_equal(NUMBER_VAL(100), NUMBER_VAL(100)));
     ck_assert(!value_t_equal(NUMBER_VAL(100), NUMBER_VAL(200)));
@@ -790,13 +780,6 @@ START_TEST(test_object)
     obj_list_t *list = obj_list_t_allocate();
     vm_push(OBJ_VAL(list));
 
-    // debugging
-    obj_type_t_to_str(((obj_t*)typeobj_name)->type);
-    obj_type_t_to_str(((obj_t*)typeobj)->type);
-    obj_type_t_to_str(((obj_t*)instance)->type);
-    obj_type_t_to_str(((obj_t*)function)->type);
-    obj_type_t_to_str(((obj_t*)closure)->type);
-
     // FREE(obj_string_t, str); // no free b/c of gc might be running
     // FREE(obj_string_t, p1); // no free b/c of gc might be running
     // FREE(obj_string_t, p2); // no free b/c of gc might be running
@@ -825,13 +808,6 @@ START_TEST(test_debug)
     chunk_t_disassemble_instruction(&chunk, 3);
 
     chunk_t_free(&chunk);
-
-    for (op_code_t op = OP_CONSTANT; op < INVALID_OPCODE; op++) {
-        const char *op_str __unused__ = op_code_t_to_str(op);
-    }
-    for (token_type_t t = TOKEN_LEFT_PAREN; t <= TOKEN_EOF; t++) {
-        const char *op_str __unused__ = token_type_t_to_str(t);
-    }
 
     vm_toggle_gc_stress();
     vm_toggle_gc_trace();

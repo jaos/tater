@@ -38,7 +38,7 @@ static obj_t *allocate_object(const size_t size, const obj_type_t type)
     object->next = vm.objects; // add to our vm's linked list of objects so we always have a reference to it
     vm.objects = object;
     if (vm.flags & VM_FLAG_GC_TRACE) {
-        printf("%p allocate %zu for %s\n", (void*)object, size, obj_type_t_to_str(type));
+        printf("%p allocate %zu for %s\n", (void*)object, size, obj_type_names[type]);
     }
     return object;
 }
@@ -182,10 +182,10 @@ obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot)
     return upvalue;
 }
 
-static void print_function(FILE *stream, const obj_function_t *function)
+static void obj_function_t_print(FILE *stream, const obj_function_t *function)
 {
     if (function->name == NULL) {
-        fprintf(stream, "<script>"); // or main ?
+        fprintf(stream, "<main>");
     } else {
         fprintf(stream, "<fn %s(%d)>", function->name->chars, function->arity);
     }
@@ -269,11 +269,11 @@ void obj_t_print(FILE *stream, const value_t value)
     if (stream == NULL) stream = stdout;
 
     switch (OBJ_TYPE(value)) {
-        case OBJ_BOUND_METHOD: print_function(stream, AS_BOUND_METHOD(value)->method->function); break;
+        case OBJ_BOUND_METHOD: obj_function_t_print(stream, AS_BOUND_METHOD(value)->method->function); break;
         case OBJ_BOUND_NATIVE_METHOD: fprintf(stream, "<nativemethod %s>", AS_BOUND_NATIVE_METHOD(value)->name->chars); break;
         case OBJ_TYPECLASS: fprintf(stream, "<type %s>", AS_TYPECLASS(value)->name->chars); break;
-        case OBJ_CLOSURE: print_function(stream, AS_CLOSURE(value)->function); break;
-        case OBJ_FUNCTION: print_function(stream, AS_FUNCTION(value)); break;
+        case OBJ_CLOSURE: obj_function_t_print(stream, AS_CLOSURE(value)->function); break;
+        case OBJ_FUNCTION: obj_function_t_print(stream, AS_FUNCTION(value)); break;
         case OBJ_INSTANCE: fprintf(stream, "<type %s instance %p>", AS_INSTANCE(value)->typeobj->name->chars, (void*)AS_OBJ(value)); break;
         case OBJ_NATIVE: fprintf(stream, "<native fn %s>", AS_NATIVE(value)->name->chars); break;
         case OBJ_STRING: fprintf(stream, "%s", AS_CSTRING(value)); break;
@@ -406,7 +406,7 @@ void value_t_print(FILE *stream, const value_t value)
     switch (value.type) {
         case VAL_BOOL: fprintf(stream, AS_BOOL(value) ? "true" : "false"); break;
         case VAL_NIL: fprintf(stream, "nil"); break;
-        case VAL_NUMBER: fprintf(stream, "%g", AS_NUMBER(value)); break;
+        case VAL_NUMBER: fprintf(stream, "%.16g", AS_NUMBER(value)); break;
         case VAL_OBJ: obj_t_print(stream, value); break;
         case VAL_EMPTY: fprintf(stream, "<empty>"); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);

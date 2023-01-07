@@ -82,6 +82,20 @@ typedef enum {
     OBJ_BOUND_NATIVE_METHOD,
 } obj_type_t;
 
+static const char *const obj_type_names[] = {
+    [OBJ_BOUND_METHOD] = "OBJ_BOUND_METHOD",
+    [OBJ_TYPECLASS] = "OBJ_TYPECLASS",
+    [OBJ_CLOSURE] = "OBJ_CLOSURE",
+    [OBJ_FUNCTION] = "OBJ_FUNCTION",
+    [OBJ_INSTANCE] = "OBJ_INSTANCE",
+    [OBJ_NATIVE] = "OBJ_NATIVE",
+    [OBJ_STRING] = "OBJ_STRING",
+    [OBJ_UPVALUE] = "OBJ_UPVALUE",
+    [OBJ_LIST] = "OBJ_LIST",
+    [OBJ_MAP] = "OBJ_MAP",
+    [OBJ_BOUND_NATIVE_METHOD] = "OBJ_BOUND_NATIVE_METHOD",
+};
+
 typedef struct obj_t {
     obj_type_t type;
     bool is_marked;
@@ -102,6 +116,14 @@ typedef enum {
     VAL_OBJ,
     VAL_EMPTY,
 } value_type_t;
+
+static const char *const value_type_names[] = {
+    [VAL_BOOL] = "VAL_BOOL",
+    [VAL_NIL] = "VAL_NIL",
+    [VAL_NUMBER] = "VAL_NUMBER",
+    [VAL_OBJ] = "VAL_OBJ",
+    [VAL_EMPTY] = "VAL_EMPTY",
+};
 
 typedef struct {
     value_type_t type;
