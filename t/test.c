@@ -287,14 +287,14 @@ START_TEST(test_vm)
         "assert(str(nil) == \"nil\");",
         "assert(\"foo\".substr(0,2) == \"fo\");",
         "assert(\"foo\".substr(-2,2) == \"oo\");",
-        "let a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\");",
+        "let a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\"); assert(in(\"f\", a)); assert(!in(\"z\", a));",
 
         "let a = list(1,2,3); assert(a.len() == 3); a.clear(); assert(a.len() == 0); a.append(45); assert(a.len() == 1);",
         "let a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
         "let a = list(); a.remove(0); assert(a.len() == 0);",
         "let a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
         "let a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
-        "let a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\");",
+        "let a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\"); assert(in(1, a)); assert(!in(4, a));",
 
         "let counters = [0]; counters[0]++; assert(counters[0] == 1);",
         "let counters = {\"start\": 0}; counters[\"start\"]++; assert(counters[\"start\"] == 1);",
@@ -306,7 +306,7 @@ START_TEST(test_vm)
         "let m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
         "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);",
         "map(1, \"one\").len();",
-        "let a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\");",
+        "let a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\"); assert(in(1, a)); assert(!in(3, a));",
 
         "let a = map(); for (let i = 0; i < 255; i++) { a.set(\"testcase\" + str(i), str(i * 255)); }"
         "for (let i = 0; i < 255; i++) { assert(a[\"testcase\" + str(i)] == str(i * 255)); }",

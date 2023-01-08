@@ -184,6 +184,52 @@ static bool is_instance_native(const int argc, const value_t *args)
     return true;
 }
 
+static bool contains_native(const int argc, const value_t *args)
+{
+    if (argc != 2) {
+        runtime_error(gettext("in requires a value and an object."));
+        return false;
+    }
+
+    if (IS_STRING(args[0]) && IS_STRING(args[1])) {
+        obj_string_t *args_0 = AS_STRING(args[0]);
+        obj_string_t *args_1 = AS_STRING(args[1]);
+        if (args_0->length == 1) {
+            vm_push((strchr(args_1->chars, args_0->chars[0]) != NULL) ? TRUE_VAL : FALSE_VAL);
+        } else {
+            vm_push((strstr(args_1->chars, args_0->chars) != NULL) ? TRUE_VAL : FALSE_VAL);
+        }
+        return true;
+    }
+    else if (IS_LIST(args[1])) {
+        obj_list_t *list = AS_LIST(args[1]);
+        value_t found = FALSE_VAL;
+        for (int i = 0; i < list->elements.count; i++) {
+            if (value_t_equal(args[0], list->elements.values[i])) {
+                found = TRUE_VAL;
+                break;
+            }
+        }
+        vm_push(found);
+        return true;
+    }
+    else if (IS_MAP(args[1])) {
+        obj_map_t *map = AS_MAP(args[1]);
+        value_t found = FALSE_VAL;
+        value_t v;
+        if (table_t_get(&map->table, args[0], &v)) {
+            found = TRUE_VAL;
+        }
+        vm_push(found);
+        return true;
+    }
+
+    else {
+        runtime_error(gettext("Invalid operands for in."));
+        return false;
+    }
+}
+
 static bool get_field_native(const int argc, const value_t *args)
 {
     if (argc != 2 || !IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
@@ -626,6 +672,7 @@ void vm_t_init(void)
     vm_define_native("list", list_native, -1);
     vm_define_native("number", number_native, -1);
     vm_define_native("map", map_native, -1);
+    vm_define_native("in", contains_native, 2);
 }
 
 void vm_set_argc_argv(const int argc, const char *argv[])

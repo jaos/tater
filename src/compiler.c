@@ -473,6 +473,14 @@ static void and_expr(const bool) // can_assign
     patch_jump(end_jump);
 }
 
+static token_t synthetic_token(const char *text)
+{
+    token_t token;
+    token.start = text;
+    token.length = strlen(text);
+    return token;
+}
+
 static void binary(const bool)
 {
     token_type_t operator_type = parser.previous.type;
@@ -503,14 +511,6 @@ static void call(const bool)
 {
     const uint8_t arg_count = argument_list();
     emit_bytes(OP_CALL, arg_count);
-}
-
-static token_t synthetic_token(const char *text)
-{
-    token_t token;
-    token.start = text;
-    token.length = strlen(text);
-    return token;
 }
 
 static void map(const bool)

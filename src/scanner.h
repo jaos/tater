@@ -45,6 +45,7 @@ typedef enum {
     TOKEN_DEFAULT, TOKEN_ELSE, TOKEN_EXIT, TOKEN_FALSE, TOKEN_FOR, TOKEN_FN,
     TOKEN_IF, TOKEN_NIL, TOKEN_OR, TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER,
     TOKEN_SWITCH, TOKEN_SELF, TOKEN_TRUE, TOKEN_LET, TOKEN_WHILE, TOKEN_PERROR,
+    TOKEN_IN, TOKEN_IS,
 
     TOKEN_ERROR, TOKEN_EOF,
 } token_type_t;
@@ -121,6 +122,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_LET] = "let",
     [TOKEN_WHILE] = "while",
     [TOKEN_PERROR] = "error",
+    [TOKEN_IN] = "in",
+    [TOKEN_IS] = "is",
     [TOKEN_ERROR] = "error",
     [TOKEN_EOF] = "<EOF>",
     "&&", // equiv to TOKEN_AND
