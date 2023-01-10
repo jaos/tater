@@ -23,8 +23,11 @@
 #include <string.h>
 #include <unistd.h>
 
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wstrict-prototypes"
 #include <readline/readline.h>
 #include <readline/history.h>
+# pragma GCC diagnostic pop
 
 #include "common.h"
 #include "debug.h"

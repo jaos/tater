@@ -70,6 +70,8 @@ static void runtime_error(const char *format, ...)
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wformat"
 # pragma GCC diagnostic ignored "-Wformat-security"
+# pragma GCC diagnostic ignored "-Wstrict-prototypes"
+# pragma GCC diagnostic ignored "-Wformat-nonliteral"
     vfprintf(stderr, format, args); // Flawfinder: disable
 # pragma GCC diagnostic pop
     va_end(args);

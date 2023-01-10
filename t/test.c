@@ -17,7 +17,12 @@
  */
 
 #include <unistd.h>
+# pragma GCC diagnostic push
+#ifdef __clang__
+# pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#endif
 #include <check.h>
+# pragma GCC diagnostic pop
 
 #include "common.h"
 
