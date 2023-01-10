@@ -68,7 +68,7 @@ Requires:
 * libcheck (build time, unit tests)
 
 ```sh
-meson build -Ddebugging=enabled -Db_coverage=true --prefix=/usr --sysconfdir=/etc
+meson setup build -Ddebugging=enabled -Db_coverage=true --prefix=/usr --sysconfdir=/etc
 meson compile -C build
 ```
 
