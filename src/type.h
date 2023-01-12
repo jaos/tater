@@ -32,6 +32,7 @@
 #define IS_STRING(value) is_obj_type(value, OBJ_STRING)
 #define IS_LIST(value) is_obj_type(value, OBJ_LIST)
 #define IS_MAP(value) is_obj_type(value, OBJ_MAP)
+#define IS_FILE(value) is_obj_type(value, OBJ_FILE)
 
 #define AS_BOUND_METHOD(value) ((obj_bound_method_t*)AS_OBJ(value))
 #define AS_TYPECLASS(value) ((obj_typeobj_t*)AS_OBJ(value))
@@ -46,6 +47,7 @@
 #define AS_CSTRING(value) (((obj_string_t*)AS_OBJ(value))->chars)
 #define AS_LIST(value) (((obj_list_t*)AS_OBJ(value)))
 #define AS_MAP(value) (((obj_map_t*)AS_OBJ(value)))
+#define AS_FILE(value) (((obj_file_t*)AS_OBJ(value)))
 
 #define IS_BOOL(value)   ((value).type == VAL_BOOL)
 #define IS_NIL(value)    ((value).type == VAL_NIL)
@@ -80,6 +82,7 @@ typedef enum {
     OBJ_LIST,
     OBJ_MAP,
     OBJ_BOUND_NATIVE_METHOD,
+    OBJ_FILE,
 } obj_type_t;
 
 static const char *const obj_type_names[] = {
@@ -94,6 +97,7 @@ static const char *const obj_type_names[] = {
     [OBJ_LIST] = "OBJ_LIST",
     [OBJ_MAP] = "OBJ_MAP",
     [OBJ_BOUND_NATIVE_METHOD] = "OBJ_BOUND_NATIVE_METHOD",
+    [OBJ_FILE] = "OBJ_FILE",
 };
 
 typedef struct obj_t {
@@ -236,6 +240,13 @@ typedef struct {
     table_t table;
 } obj_map_t;
 
+typedef struct {
+    obj_t obj;
+    obj_string_t *path;
+    obj_string_t *mode;
+    int fd;
+} obj_file_t;
+
 obj_bound_method_t *obj_bound_method_t_allocate(value_t receiving_instance, obj_closure_t *method);
 obj_bound_native_method_t * obj_bound_native_method_t_allocate(value_t receiving_instance, obj_string_t *name, native_method_fn_t function);
 obj_function_t *obj_function_t_allocate(void);
@@ -246,9 +257,10 @@ obj_typeobj_t *obj_typeobj_t_allocate(obj_string_t *name);
 obj_instance_t *obj_instance_t_allocate(obj_typeobj_t *typeobj);
 obj_list_t *obj_list_t_allocate(void);
 obj_map_t *obj_map_t_allocate(void);
+obj_file_t *obj_file_t_allocate(obj_string_t *path, obj_string_t *mode);
 
-obj_string_t *obj_string_t_copy_own(char *chars, const int length);
-obj_string_t *obj_string_t_copy_from(const char *chars, const int length);
+obj_string_t *obj_string_t_copy_own(char *chars, const int length, const bool intern);
+obj_string_t *obj_string_t_copy_from(const char *chars, const int length, const bool intern);
 void obj_t_print(FILE *stream, const value_t value);
 obj_string_t *obj_t_to_obj_string_t(const value_t value);
 void obj_t_mark(obj_t *obj);

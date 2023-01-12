@@ -15,9 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-
-
 #include <assert.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -92,6 +91,39 @@ obj_map_t *obj_map_t_allocate(void)
     return map;
 }
 
+obj_file_t *obj_file_t_allocate(obj_string_t *path, obj_string_t *mode)
+{
+    obj_file_t *file = ALLOCATE_OBJ(obj_file_t, OBJ_FILE);
+
+    int flags = 0;
+    if (index(mode->chars, 'a') != NULL)
+        flags |= O_APPEND;
+    if (index(mode->chars, 'w') != NULL) {
+        flags |= O_CREAT;
+        if (index(mode->chars, 'a') == NULL)
+            flags |= O_TRUNC;
+    }
+    if (index(mode->chars, 'r') != NULL && index(mode->chars, 'w') == NULL)
+        flags |= O_RDONLY;
+    else if (index(mode->chars, 'r') != NULL && index(mode->chars, 'w') != NULL)
+        flags |= O_RDWR;
+    else if (index(mode->chars, 'r') == NULL && index(mode->chars, 'w') != NULL)
+        flags |= O_WRONLY;
+
+    int fd = open(path->chars, flags, S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH);
+    if (fd == -1) {
+        perror(path->chars);
+        exit(EXIT_FAILURE);
+    }
+
+    file->fd = fd;
+    file->path = path;
+    file->mode = mode;
+
+    return file;
+}
+
+
 obj_closure_t *obj_closure_t_allocate(obj_function_t *function)
 {
     obj_upvalue_t **upvalues = ALLOCATE(obj_upvalue_t*, function->upvalue_count);
@@ -124,15 +156,17 @@ obj_native_t *obj_native_t_allocate(native_fn_t function, const obj_string_t *na
     return native;
 }
 
-static obj_string_t *allocate_string(char *chars, const int length, const uint32_t hash) {
+static obj_string_t *allocate_string(char *chars, const int length, const uint32_t hash, const bool intern) {
     obj_string_t *string = ALLOCATE_OBJ(obj_string_t, OBJ_STRING);
     string->length = length;
     string->chars = chars;
     string->hash = hash;
 
-    vm_push(OBJ_VAL(string));
-    table_t_set(&vm.strings, OBJ_VAL(string), NIL_VAL);
-    vm_pop();
+    if (intern) {
+        vm_push(OBJ_VAL(string));
+        table_t_set(&vm.strings, OBJ_VAL(string), NIL_VAL);
+        vm_pop();
+    }
 
     return string;
 }
@@ -147,7 +181,7 @@ static uint32_t hash_string(const char *key, const int length)
     return hash;
 }
 
-obj_string_t *obj_string_t_copy_own(char *chars, const int length)
+obj_string_t *obj_string_t_copy_own(char *chars, const int length, const bool intern)
 {
     const uint32_t hash = hash_string(chars, length);
     obj_string_t *interned = table_t_find_key_by_str(&vm.strings, chars, length, hash);
@@ -156,10 +190,10 @@ obj_string_t *obj_string_t_copy_own(char *chars, const int length)
         return interned;
     }
 
-    return allocate_string(chars, length, hash);
+    return allocate_string(chars, length, hash, intern);
 }
 
-obj_string_t *obj_string_t_copy_from(const char *chars, const int length)
+obj_string_t *obj_string_t_copy_from(const char *chars, const int length, const bool intern)
 {
     const uint32_t hash = hash_string(chars, length);
     obj_string_t *interned = table_t_find_key_by_str(&vm.strings, chars, length, hash);
@@ -170,7 +204,7 @@ obj_string_t *obj_string_t_copy_from(const char *chars, const int length)
     char *str = ALLOCATE(char, length + 1);
     memcpy(str, chars, length);
     str[length] = '\0';
-    return allocate_string(str, length, hash);
+    return allocate_string(str, length, hash, intern);
 }
 
 obj_upvalue_t *obj_upvalue_t_allocate(value_t *slot)
@@ -256,12 +290,21 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
             snprintf(buffer, 255, "<map %d>", map->table.count);
             break;
         }
+        case OBJ_FILE: {
+            obj_file_t *f = AS_FILE(value);
+            if (f->fd == -1) {
+                snprintf(buffer, 255, "<file closed>");
+            } else {
+                snprintf(buffer, 255, "<file %s(%s)>", f->path->chars, f->mode->chars);
+            }
+            break;
+        }
         default: {
             DEBUG_LOGGER("Unhandled default for object type %d (%p)\n", OBJ_TYPE(value), (void *)&value);
             exit(EXIT_FAILURE);
         }
     }
-    return obj_string_t_copy_from(buffer, strlen(buffer));
+    return obj_string_t_copy_from(buffer, strlen(buffer), true);
 }
 
 void obj_t_print(FILE *stream, const value_t value)
@@ -311,6 +354,15 @@ void obj_t_print(FILE *stream, const value_t value)
                     value_t_print(stream, e.value);
                 }
                 fprintf(stream, "}");
+            }
+            break;
+        }
+        case OBJ_FILE: {
+            obj_file_t *f = AS_FILE(value);
+            if (f->fd == -1) {
+                fprintf(stream, "<file closed>");
+            } else {
+                fprintf(stream, "<file %s(%s)>", f->path->chars, f->mode->chars);
             }
             break;
         }
@@ -397,7 +449,7 @@ obj_string_t *value_t_to_obj_string_t(const value_t value)
         case VAL_EMPTY: snprintf(buffer, 255, "<empty>"); break;
         default: DEBUG_LOGGER("Unhandled default\n",); exit(EXIT_FAILURE);
     }
-    return obj_string_t_copy_from(buffer, strlen(buffer));
+    return obj_string_t_copy_from(buffer, strlen(buffer), true);
 }
 
 void value_t_print(FILE *stream, const value_t value)

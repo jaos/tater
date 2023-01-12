@@ -30,6 +30,8 @@ type WorkCounter {
             let start_point = work["start"];
             let end_point = work["end"];
 
+            let log = file("work-" + str(self.counter) + ".data", "w");
+
             switch (work["site"]) {
                 case WorkSites.RESIDENTIAL: {
                     print("setting up residential drone.");
@@ -37,14 +39,19 @@ type WorkCounter {
                     while (start_point[0] < end_point[0]) {
                         start_point[0]++; # simulation
                     }
+                    log.write("residential complete\n");
                 }
                 case WorkSites.COMMERCIAL: {
                     # more here
+                    log.write("commercial todo\n");
                 }
                 case WorkSites.INDUSTRIAL: {
                     # more here
+                    log.write("industrial todo\n");
                 }
             }
+
+            log.close();
         }
     }
 }

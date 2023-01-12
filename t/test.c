@@ -331,6 +331,10 @@ START_TEST(test_vm)
 
         "let counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
 
+        "let f = file(\"test.tmp\", \"w\"); assert(f); assert(f.size() == 0); f.write(\"testing\"); f.close();"
+        "let f = file(\"test.tmp\", \"r\"); assert(f.size() == 7); let v = f.read(1); assert(v == \"t\"); v += f.read(); f.close(); assert(v == \"testing\");"
+        "let f = file(\"test.tmp\", \"r\"); assert(f); assert(f.readline() == \"testing\"); f.close();",
+
         "let s1 = 0; let s2 = 0; let s3 = 0;"
         "fn outer(){"
             "let x = 100; "
@@ -623,7 +627,7 @@ START_TEST(test_native)
     ck_assert_int_gt(AS_NUMBER(v), 0);
     ck_assert(vm_t_interpret("print(getpid());") == INTERPRET_OK);
 
-    const obj_string_t *name = obj_string_t_copy_from("getpid", 6);
+    const obj_string_t *name = obj_string_t_copy_from("getpid", 6, true);
     vm_push(OBJ_VAL(name));
     obj_native_t *native_fn = obj_native_t_allocate(native_getpid, name, 0);
     vm_push(OBJ_VAL(native_fn));
@@ -648,7 +652,7 @@ START_TEST(test_value)
     ck_assert(value_t_equal(NIL_VAL, NIL_VAL));
     ck_assert(value_t_equal(EMPTY_VAL, EMPTY_VAL));
 
-    value_t o = OBJ_VAL(obj_string_t_copy_from("test_value", 10));
+    value_t o = OBJ_VAL(obj_string_t_copy_from("test_value", 10, true));
     vm_push(OBJ_VAL(&o));
     ck_assert(value_t_equal(o, o));
     ck_assert(value_t_hash(o));
@@ -676,11 +680,11 @@ START_TEST(test_table)
     table_t_init(&t);
 
 
-    obj_string_t *key1 = obj_string_t_copy_from("test_table1", 11);
+    obj_string_t *key1 = obj_string_t_copy_from("test_table1", 11, true);
     vm_push(OBJ_VAL(key1));
-    obj_string_t *key2 = obj_string_t_copy_from("test_table2", 11);
+    obj_string_t *key2 = obj_string_t_copy_from("test_table2", 11, true);
     vm_push(OBJ_VAL(key2));
-    obj_string_t *key3 = obj_string_t_copy_from("test_table3", 11);
+    obj_string_t *key3 = obj_string_t_copy_from("test_table3", 11, true);
     vm_push(OBJ_VAL(key3));
 
     ck_assert(strncmp(key1->chars, key2->chars, key1->length) != 0);
@@ -725,13 +729,13 @@ START_TEST(test_table)
     for (int i = 0; i < 8192; i++) {
         char buffer[255];
         int wrote = snprintf(buffer, 255, "item%dforhash", i);
-        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote, true));
         ck_assert(table_t_set(&big, key, NUMBER_VAL(i)));
     }
     for (int i = 0; i < 8192; i++) {
         char buffer[255];
         int wrote = snprintf(buffer, 255, "item%dforhash", i);
-        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote, true));
         value_t rv;
         ck_assert(table_t_get(&big, key, &rv));
         ck_assert(AS_NUMBER(rv) == i);
@@ -742,7 +746,7 @@ START_TEST(test_table)
     for (int i = 0; i < 8192; i++) {
         char buffer[255];
         int wrote = snprintf(buffer, 255, "item%dforhash", i);
-        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote));
+        value_t key = OBJ_VAL(obj_string_t_copy_from(buffer, wrote, true));
         value_t from_big;
         value_t from_bigcopy;
         ck_assert(table_t_get(&big, key, &from_big));
@@ -759,14 +763,14 @@ START_TEST(test_object)
 {
     vm_t_init();
 
-    obj_string_t *str = obj_string_t_copy_from("foobar", 6);
+    obj_string_t *str = obj_string_t_copy_from("foobar", 6, true);
     vm_push(OBJ_VAL(str));
     ck_assert(str->length == 6);
     ck_assert_msg(strncmp(str->chars, "foobar", str->length) == 0, "comparing [%s] failed\n", str->chars);
 
-    obj_string_t *p1 = obj_string_t_copy_from("foo", 3);
+    obj_string_t *p1 = obj_string_t_copy_from("foo", 3, true);
     vm_push(OBJ_VAL(p1));
-    obj_string_t *p2 = obj_string_t_copy_from("bar", 3);
+    obj_string_t *p2 = obj_string_t_copy_from("bar", 3, true);
     vm_push(OBJ_VAL(p2));
 
     obj_function_t *function = obj_function_t_allocate();
@@ -774,7 +778,7 @@ START_TEST(test_object)
     obj_closure_t *closure = obj_closure_t_allocate(function);
     vm_push(OBJ_VAL(closure));
 
-    obj_string_t *typeobj_name = obj_string_t_copy_from("TestObjectTestCase", 18);
+    obj_string_t *typeobj_name = obj_string_t_copy_from("TestObjectTestCase", 18, true);
     vm_push(OBJ_VAL(typeobj_name));
     obj_typeobj_t *typeobj = obj_typeobj_t_allocate(typeobj_name);
     vm_push(OBJ_VAL(typeobj));

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tater\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-01-05 23:09-0500\n"
+"POT-Creation-Date: 2023-01-11 23:41-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -264,6 +264,9 @@ msgstr ""
 msgid "Expected 0 arguments but got %d to initialize %s."
 msgstr ""
 
+msgid "Failed to read file size."
+msgstr ""
+
 msgid "Failed to ready history file"
 msgstr ""
 
@@ -276,10 +279,20 @@ msgstr ""
 msgid "Invalid assignment target."
 msgstr ""
 
+msgid "Invalid file descriptor."
+msgstr ""
+
+msgid "Invalid operands for in."
+msgstr ""
+
 msgid "Invalid subscript."
 msgstr ""
 
 msgid "Loop body too large."
+msgstr ""
+
+#, c-format
+msgid "No such file method %.*s"
 msgstr ""
 
 #, c-format
@@ -369,7 +382,37 @@ msgstr ""
 msgid "[line %d] Error"
 msgstr ""
 
+msgid "failed to close file."
+msgstr ""
+
+msgid "file requires a path and a mode."
+msgstr ""
+
+msgid "file.close takes no arguments."
+msgstr ""
+
+msgid "file.read failed to allocate read buffer."
+msgstr ""
+
+msgid "file.read failed to read."
+msgstr ""
+
+msgid "file.read requires a number of size to read."
+msgstr ""
+
+msgid "file.readline failed to read."
+msgstr ""
+
+msgid "file.size requires no arguments."
+msgstr ""
+
+msgid "file.write requires a string to write."
+msgstr ""
+
 msgid "get_field requires an object and a string field name."
+msgstr ""
+
+msgid "in requires a value and an object."
 msgstr ""
 
 msgid "invalid list.get index."

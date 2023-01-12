@@ -252,7 +252,7 @@ static void compiler_t_init(compiler_t *compiler, const function_type_t type)
     current = compiler;
 
     if (type != TYPE_SCRIPT) {
-        current->function->name = obj_string_t_copy_from(parser.previous.start, parser.previous.length);
+        current->function->name = obj_string_t_copy_from(parser.previous.start, parser.previous.length, true);
     }
 
     local_t *local = &current->locals[current->local_count++];
@@ -317,7 +317,7 @@ static void parse_precedence(const precedence_t precedence);
 
 static uint8_t identifier_constant(const token_t *name)
 {
-    obj_string_t *constant_str = obj_string_t_copy_from(name->start, name->length);
+    obj_string_t *constant_str = obj_string_t_copy_from(name->start, name->length, true);
     value_t existing_index;
     if (table_t_get(&current->string_constants, OBJ_VAL(constant_str), &existing_index)) {
         return (uint8_t)AS_NUMBER(existing_index);
@@ -620,7 +620,7 @@ static void number(const bool)
 
 static void string(const bool)
 {
-    emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2)));
+    emit_constant(OBJ_VAL(obj_string_t_copy_from(parser.previous.start + 1, parser.previous.length - 2, true)));
 }
 
 static bool match_for_load_and_modify(void)
@@ -1443,7 +1443,7 @@ static void assert_statement(void)
 
     char errbuf[255];
     snprintf(errbuf, 255, "[line %d] Assertion failed", parser.current.line);
-    obj_string_t *constant_str = obj_string_t_copy_from(errbuf, strlen(errbuf));
+    obj_string_t *constant_str = obj_string_t_copy_from(errbuf, strlen(errbuf), true);
     emit_bytes(OP_CONSTANT, make_constant(OBJ_VAL(constant_str)));
     emit_byte(OP_PRINT);
 
