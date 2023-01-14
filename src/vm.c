@@ -131,11 +131,17 @@ static bool is_instance_native(const int argc, const value_t *args)
     if (!IS_STRING(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "str", 3) == 0) {
         vm_push(FALSE_VAL); return true;
     }
-    if (IS_LIST(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "list", 3) == 0) {
+    if (IS_LIST(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "list", 4) == 0) {
         vm_push(TRUE_VAL); return true;
     }
-    if (!IS_LIST(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "list", 3) == 0) {
+    if (!IS_LIST(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "list", 4) == 0) {
         vm_push(FALSE_VAL); return true;
+    }
+    if (!IS_BOOL(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "bool", 4) == 0) {
+        vm_push(FALSE_VAL); return true;
+    }
+    if (IS_BOOL(args[0]) && IS_NATIVE(args[1]) && memcmp(AS_NATIVE(args[1])->name->chars, "bool", 4) == 0) {
+        vm_push(TRUE_VAL); return true;
     }
     if (IS_NIL(args[0]) && IS_NIL(args[1])) {
         vm_push(TRUE_VAL); return true;
@@ -287,12 +293,6 @@ static bool list_native(const int argc, const value_t *args)
 {
     obj_list_t *list = obj_list_t_allocate();
     vm_push(OBJ_VAL(list));
-    if (argc == 1 && IS_LIST(args[0])) {
-        for (int i = 0 ; i < argc; i++) {
-            value_list_t_add(&list->elements, args[i]);
-        }
-        return true;
-    }
     for (int i = 0 ; i < argc; i++) {
         value_list_t_add(&list->elements, args[i]);
     }
@@ -355,6 +355,77 @@ static bool number_native(const int argc, const value_t *args)
     }
 
     runtime_error(gettext("number argument invalid."));
+    return false;
+}
+
+static bool bool_native(const int argc, const value_t *args)
+{
+    if (argc != 1) {
+        runtime_error(gettext("bool requires on argument."));
+        return false;
+    }
+
+    if (IS_BOOL(args[0])) {
+        vm_push(args[0]);
+        return true;
+    }
+
+    else if (IS_NUMBER(args[0])) {
+        if (fabs(AS_NUMBER(args[0])) == 0)
+            vm_push(FALSE_VAL);
+        else
+            vm_push(TRUE_VAL);
+        return true;
+    }
+
+    else if (IS_STRING(args[0])) {
+        obj_string_t *s = AS_STRING(args[0]);
+        if (s->length == 0) {
+            vm_push(FALSE_VAL);
+        } else {
+            if (strncasecmp(s->chars, "false", s->length) == 0)
+                vm_push(FALSE_VAL);
+            else
+                vm_push(TRUE_VAL);
+        }
+        return true;
+    }
+
+    else if (IS_NIL(args[0]) || IS_EMPTY(args[0])) {
+        vm_push(FALSE_VAL);
+        return true;
+    }
+
+    else if (IS_LIST(args[0])) {
+        if (AS_LIST(args[0])->elements.count > 0)
+            vm_push(TRUE_VAL);
+        else
+            vm_push(FALSE_VAL);
+        return true;
+    }
+
+    else if (IS_MAP(args[0])) {
+        if (AS_MAP(args[0])->table.count > 0)
+            vm_push(TRUE_VAL);
+        else
+            vm_push(FALSE_VAL);
+        return true;
+    }
+
+    else if (IS_FILE(args[0])) {
+        if (AS_FILE(args[0])->fd != -1)
+            vm_push(TRUE_VAL);
+        else
+            vm_push(FALSE_VAL);
+        return true;
+    }
+
+    else if (IS_OBJ(args[0])) { // all obj types
+        vm_push(TRUE_VAL);
+        return true;
+    }
+
+    runtime_error("invalid bool expression.");
     return false;
 }
 
@@ -553,7 +624,14 @@ static bool map_method_invoke(const obj_string_t *method, const int argc, const 
                 runtime_error(gettext("map.len takes no arguments."));
                 return false;
             }
-            vm_push(NUMBER_VAL(map->table.count));
+            size_t count = 0;
+            for (int i = 0; i < map->table.capacity; i++) {
+                table_entry_t table_entry = map->table.entries[i];
+                if (!IS_EMPTY(table_entry.key)) {
+                    count++;
+                }
+            }
+            vm_push(NUMBER_VAL(count));
             return true;
         }
         else if (memcmp(method->chars, KEYWORD_GET, KEYWORD_GET_LEN) == 0) {
@@ -599,8 +677,8 @@ static bool map_method_invoke(const obj_string_t *method, const int argc, const 
 
     else if (method->length == 6) {
         if (memcmp(method->chars, KEYWORD_REMOVE, KEYWORD_REMOVE_LEN) == 0) {
-            if (argc != 2 || !IS_STRING(args[1])) {
-                runtime_error(gettext("map.remove requires a single string argument."));
+            if (argc != 2) {
+                runtime_error(gettext("map.remove requires a single key argument."));
                 return false;
             }
             table_t_delete(&map->table, args[1]);
@@ -672,6 +750,8 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
     #define FILE_SIZE_METHOD_LEN 4
     #define FILE_READ_METHOD "read"
     #define FILE_READ_METHOD_LEN 4
+    #define FILE_TELL_METHOD "tell"
+    #define FILE_TELL_METHOD_LEN 4
     if (method->length == 4) {
         if (memcmp(method->chars, FILE_SIZE_METHOD, FILE_SIZE_METHOD_LEN) == 0) {
             if (argc != 1) {
@@ -706,7 +786,7 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
                     return false;
                 }
                 buff[read_size] = '\0';
-                obj_string_t *file_buf = obj_string_t_copy_own(buff, read_size, false);
+                obj_string_t *file_buf = obj_string_t_copy_own(buff, read_size, false); // no interning
                 vm_push(OBJ_VAL(file_buf));
                 return true;
             }
@@ -726,10 +806,19 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
                     return false;
                 }
                 buff[read_size] = '\0';
-                obj_string_t *file_buf = obj_string_t_copy_own(buff, read_size, false);
+                obj_string_t *file_buf = obj_string_t_copy_own(buff, read_size, false); // no interning
                 vm_push(OBJ_VAL(file_buf));
                 return true;
             }
+        }
+        else if (memcmp(method->chars, FILE_TELL_METHOD, FILE_TELL_METHOD_LEN) == 0) {
+            if (argc != 1) {
+                runtime_error(gettext("file.tell requires no arguments."));
+                return false;
+            }
+            off_t position = lseek(file->fd, 0, SEEK_CUR);
+            vm_push(NUMBER_VAL(position));
+            return true;
         }
     }
 
@@ -745,6 +834,7 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
             }
             obj_string_t *str = AS_STRING(args[1]);
 
+            off_t fixed_up = 0;
             ssize_t written = 0;
             char *control_char = strchr(str->chars, '\\');
             if (control_char == NULL) {
@@ -757,13 +847,13 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
                 while (*s) {
                     if (*(s+1) && s[0] == '\\') {
                         switch (s[1]) {
-                            case 'a': written += write(file->fd, "\a", 1) + 1; break;
-                            case 'b': written += write(file->fd, "\b", 1) + 1; break;
-                            case 'f': written += write(file->fd, "\f", 1) + 1; break;
-                            case 'n': written += write(file->fd, "\n", 1) + 1; break;
-                            case 'r': written += write(file->fd, "\r", 1) + 1; break;
-                            case 't': written += write(file->fd, "\t", 1) + 1; break;
-                            case 'v': written += write(file->fd, "\v", 1) + 1; break;
+                            case 'a': written += write(file->fd, "\a", 1) + 1; fixed_up++; break;
+                            case 'b': written += write(file->fd, "\b", 1) + 1; fixed_up++; break;
+                            case 'f': written += write(file->fd, "\f", 1) + 1; fixed_up++; break;
+                            case 'n': written += write(file->fd, "\n", 1) + 1; fixed_up++; break;
+                            case 'r': written += write(file->fd, "\r", 1) + 1; fixed_up++; break;
+                            case 't': written += write(file->fd, "\t", 1) + 1; fixed_up++; break;
+                            case 'v': written += write(file->fd, "\v", 1) + 1; fixed_up++; break;
                             default: written += write(file->fd, s, 2);
                         }
                     } else {
@@ -776,7 +866,7 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
                     s = str->chars + written;
                 }
             }
-            vm_push(NUMBER_VAL(str->length));
+            vm_push(NUMBER_VAL(written - fixed_up));
             return true;
         }
         else if (memcmp(method->chars, FILE_CLOSE_METHOD, FILE_CLOSE_METHOD_LEN) == 0) {
@@ -800,17 +890,25 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
     #define FILE_READLINE_METHOD_BUFSIZE 4096
     else if (method->length == 8) {
         if (memcmp(method->chars, FILE_READLINE_METHOD, FILE_READLINE_METHOD_LEN) == 0) {
-            size_t total_to_read = 0;
+            off_t start_offset = lseek(file->fd, 0, SEEK_CUR);
+            if (start_offset == -1) {
+                perror(file->path->chars);
+                runtime_error(gettext("file.readline failed to read."));
+                return false;
+            }
+            off_t total_to_read = 0;
 
+            // find the newline
             while (1) {
                 char buff[FILE_READLINE_METHOD_BUFSIZE] = {0};
                 ssize_t read_size = read(file->fd, buff, FILE_READLINE_METHOD_BUFSIZE);
                 if (read_size == -1) {
+                    perror(file->path->chars);
                     runtime_error(gettext("file.readline failed to read."));
                     return false;
                 }
                 if (read_size == 0 && total_to_read == 0) {
-                    vm_push(NIL_VAL);
+                    vm_push(OBJ_VAL(obj_string_t_copy_from("", 0, true)));
                     return true;
                 }
                 if (read_size == 0)
@@ -818,7 +916,7 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
 
                 char *newline = memchr(buff, '\n', read_size);
                 if (newline != NULL) {
-                    total_to_read += newline - buff + 1;
+                    total_to_read += newline - buff;
                     break;
                 } else {
                     total_to_read += read_size;
@@ -827,23 +925,51 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
 
             char *thus_far_buffer = malloc(sizeof *thus_far_buffer * total_to_read + 1);
             if (thus_far_buffer == NULL) {
+                perror(file->path->chars);
                 runtime_error(gettext("file.read failed to allocate read buffer."));
                 return false;
             }
-            lseek(file->fd, 0, SEEK_SET);
+
+            // go back, read it in and skip the newline
+            if (lseek(file->fd, start_offset, SEEK_SET) == -1) {
+                perror(file->path->chars);
+                runtime_error(gettext("file.readline failed to read."));
+                return false;
+            }
             ssize_t thus_far_read = read(file->fd, thus_far_buffer, total_to_read);
             if (thus_far_read == -1) {
+                perror(file->path->chars);
                 runtime_error(gettext("file.readline failed to read."));
                 return false;
             }
             thus_far_buffer[total_to_read] = '\0';
-            lseek(file->fd, total_to_read + 1, SEEK_SET);
-            obj_string_t *file_buf = obj_string_t_copy_own(thus_far_buffer, total_to_read, false);
+            if (lseek(file->fd, 1, SEEK_CUR) == -1) {
+                perror(file->path->chars);
+                runtime_error(gettext("file.readline failed to read."));
+                return false;
+            }
+
+            obj_string_t *file_buf = obj_string_t_copy_own(thus_far_buffer, total_to_read, false); // no interning
             vm_push(OBJ_VAL(file_buf));
             return true;
 
         }
     }
+
+    #define FILE_REWIND_METHOD "rewind"
+    #define FILE_REWIND_METHOD_LEN 6
+    else if (method->length == 6) {
+        if (memcmp(method->chars, FILE_REWIND_METHOD, FILE_REWIND_METHOD_LEN) == 0) {
+            if (lseek(file->fd, 0, SEEK_SET) == -1) {
+                perror(file->path->chars);
+                runtime_error(gettext("file.rewind failed."));
+                return false;
+            }
+            vm_push(NIL_VAL);
+            return true;
+        }
+    }
+
     runtime_error(gettext("No such file method %.*s"), method->length, method->chars);
     return false;
 }
@@ -873,8 +999,9 @@ void vm_t_init(void)
     vm_define_native("get_field", get_field_native, 2);
     vm_define_native("set_field", set_field_native, 3);
     vm_define_native("str", str_native, -1);
+    vm_define_native("bool", bool_native, 1);
     vm_define_native("list", list_native, -1);
-    vm_define_native("number", number_native, -1);
+    vm_define_native("number", number_native, 1);
     vm_define_native("map", map_native, -1);
     vm_define_native("in", contains_native, 2);
     vm_define_native("file", file_native, 2);
@@ -1208,7 +1335,7 @@ static void define_method(obj_string_t *name)
 
 static bool is_falsey(const value_t value)
 {
-    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value)) || (IS_NUMBER(value) && AS_NUMBER(value) == 0);
+    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value)) || (IS_NUMBER(value) && fabs(AS_NUMBER(value)) == 0);
 }
 
 static void concatenate(void)
@@ -1492,8 +1619,8 @@ static vm_t_interpret_result_t run(void)
                     runtime_error(gettext("Illegal divide by zero."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                const double a = AS_NUMBER(vm_pop());
                 const double b = AS_NUMBER(vm_pop());
+                const double a = AS_NUMBER(vm_pop());
                 const double r = fmod(a,b);
                 vm_push(NUMBER_VAL(r));
                 DISPATCH();

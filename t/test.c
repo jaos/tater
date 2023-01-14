@@ -217,6 +217,7 @@ START_TEST(test_vm)
         "type Foo {} type Bar {} let f = Foo(); print(is(f, Foo)); print(is(f, Bar)); print(has_field(f, \"nosuch\")); f.name = \"foo\"; print(has_field(f, \"name\"));",
 
         "print(sys_version());",
+        "error(sys_version());",
 
         "fn t1() { let i = 2; fn inner() { return i;} return inner;}"
         "for (let i = 0; i < 10;i++) { let f = t1(); let f2 = t1(); let f3 = t1(); continue;}" // popn
@@ -248,12 +249,21 @@ START_TEST(test_vm)
         "assert(!is(2, str));",
         "assert(is(list(), list));",
         "assert(!is(nil, list));",
+        "assert(is(map(), map));",
+        "assert(!is(nil, map));",
         "assert(is(nil, nil));",
+        "assert(!is(5, nil));",
         "assert(is(2, number));",
         "assert(is(2.0, number));",
         "assert(!is(nil, number));",
         "assert(!is(\"foo\", number));",
         "assert(!is(\"foo\", number));",
+        "assert(is(true, true));",
+        "assert(is(true, bool));",
+        "assert(is(false, false));",
+        "assert(is(false, bool));",
+        "assert(!is(5, true));",
+        "assert(!is(5, bool));",
         "assert(number(true) == 1);",
         "assert(number(false) == 0);",
         "assert(number(nil) == 0);",
@@ -271,6 +281,24 @@ START_TEST(test_vm)
         "assert(5 ^ 3 == 6); let a = 5; a ^= 3; assert(a == 6);",
         "assert(128 >> 4 == 8); let a = 128; a >>= 4; assert(a == 8);",
         "assert(128 << 4 == 2048); let a = 128; a <<= 4; assert(a == 2048);",
+        "assert(25 % 5 == 0);",
+
+        "assert(bool(1) == true);"
+        "assert(bool(0) == false);"
+        "assert(bool(\"true\") == true);"
+        "assert(bool(\"false\") == false);"
+        "assert(bool(\"\") == false);"
+        "assert(bool(nil) == false);",
+        "assert(bool(true) == true);",
+        "assert(bool(false) == false);",
+        "fn foo() {}; assert(bool(foo) == true);",
+        "type Foo {}; assert(bool(Foo) == true); assert(bool(Foo()) == true);",
+        "assert(bool(bool) == true);",
+        "assert(bool(map()) == false);",
+        "assert(bool({1:1}) == true);",
+        "assert(bool(list()) == false);",
+        "assert(bool(list(1,2,3)) == true);",
+        "let f = file(\"bool.tmp\", \"wa\"); assert(bool(f) == true); f.close(); assert(bool(f) == false);",
 
         "type Foo {}; type Bar(Foo) {}; type Baz(Bar) {};"
         "let i1 = Baz(); let i2 = Bar(); let i3 = Foo();"
@@ -290,9 +318,15 @@ START_TEST(test_vm)
         "assert(str(1) == \"1\");",
         "assert(str(true) == \"true\");",
         "assert(str(nil) == \"nil\");",
+        "assert(str(list) == \"<native fn list>\");",
+        "assert(str(list()) == \"<list 0>\");",
+        "assert(str(map()) == \"<map 0>\");",
+        "let v = \"foo\"; assert(str(v) == \"foo\");",
+        "let f = file(\"f_as_str\", \"w\"); assert(str(f) == \"<file f_as_str(w)>\"); f.close(); assert(str(f) == \"<file closed>\");",
+        "let f = file(\"f_as_str\", \"r\"); assert(str(f) == \"<file f_as_str(r)>\"); f.close(); assert(str(f) == \"<file closed>\");",
         "assert(\"foo\".substr(0,2) == \"fo\");",
         "assert(\"foo\".substr(-2,2) == \"oo\");",
-        "let a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\"); assert(in(\"f\", a)); assert(!in(\"z\", a));",
+        "let a = \"foobar\"; assert(a[0] == \"f\"); assert(a[-1] == \"r\"); assert(in(\"f\", a)); assert(in(\"oob\", a)); assert(!in(\"z\", a));",
 
         "let a = list(1,2,3); assert(a.len() == 3); a.clear(); assert(a.len() == 0); a.append(45); assert(a.len() == 1);",
         "let a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
@@ -309,7 +343,9 @@ START_TEST(test_vm)
         "assert(a[0][\"counter\"] == 11); assert(a[1][\"counter\"] == 22); assert(a[0][\"name\"] + a[1][\"name\"] == \"foobar\");",
 
         "let m = map(\"one\", 1, \"two\", 2); assert(m.len() == 2); assert(m.keys().len() == 2); assert(m.values().len() == 2);"
-        "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);",
+        "assert(m.get(\"one\") == 1); assert(m.get(\"two\") == 2); assert(m[\"two\"] == 2); assert(m.get(\"nosuch\") == nil); assert(m[\"nosuch\"] == nil);"
+        "m[3] = \"three\"; assert(m.len() == 3); assert(m.values().len() == 3); assert(m.keys().len() == 3); m.remove(3);"
+        "assert(m.len() == 2); assert(m.values().len() == 2); assert(m.keys().len() == 2); let l = m.len; assert(l() == 2);",
         "map(1, \"one\").len();",
         "let a = map({1:2, \"two\": \"two\"}); assert(a[1] == 2); assert(a[\"two\"] == \"two\"); assert(in(1, a)); assert(!in(3, a));",
 
@@ -333,7 +369,7 @@ START_TEST(test_vm)
         "type Foo { let field1 = \"field1\"; }; type Bar(Foo) { let field1 = \"overridden\"; let field2 = \"field2\";}; let v = Bar(); assert(v.field1 == \"overridden\"); assert(v.field2 == \"field2\");",
 
         // TODO bug in switch when defining builtins in the case scope
-        // "type Foo { fn work(value) { switch(value) { case \"file\": { let f = file(\"/tmp/file\", \"w\"); f.write(\"file test\n\"); f.close(); } default: { print(\"unknown\"); } } } };"
+        // "type Foo { fn work(value) { switch(value) { case \"file\": { let f = file(\"tmp_file\", \"w\"); f.write(\"file test\n\"); f.close(); } default: { print(\"unknown\"); } } } };"
         // "let f = Foo(); f.work(\"file\");",
         // this works as expected
         "type Foo { fn work(value) { let f = file(\"tmp_file\", \"w\"); switch(value) { case \"file\": { f.write(\"file test\n\"); } default: { print(\"unknown\"); } }  f.close(); } };"
@@ -341,9 +377,42 @@ START_TEST(test_vm)
 
         "let counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
 
+        "let f = file(\"test.tmp\", \"w\"); f.write(\"testing\"); f.write(\"some\\nmore\"); f.close();",
         "let f = file(\"test.tmp\", \"w\"); assert(f); assert(f.size() == 0); f.write(\"testing\"); f.close();"
         "let f = file(\"test.tmp\", \"r\"); assert(f.size() == 7); let v = f.read(1); assert(v == \"t\"); v += f.read(); f.close(); assert(v == \"testing\");"
         "let f = file(\"test.tmp\", \"r\"); assert(f); assert(f.readline() == \"testing\"); f.close();",
+        "let f = file(\"test.tmp\", \"wa\"); f.write(\"\\t\"); f.write(\"\\a\"); f.write(\"\\b\"); f.write(\"\\r\"); f.write(\"\\v\"); f.write(\"\\f\"); f.write(\"\\\\\"); f.close();",
+        "let f = file(\"test.tmp\", \"w\"); f.close(); f = file(\"test.tmp\", \"r\"); assert(f.readline() == \"\"); f.close();",
+
+        "let f = file(\"test.tmp\", \"w\"); f.write(\"this is line 1\\n\\nline two was empty, line 3\\nline 4\\nfinally line 5\\n\"); assert(f.tell() == 65); f.close();"
+        "let f = file(\"test.tmp\", \"r\");"
+        "print(f);"
+        "assert(f.tell() == 0);"
+        "assert(f.readline() == \"this is line 1\");"
+        "assert(f.tell() == 15);"
+        "assert(f.readline() == \"\");"
+        "assert(f.tell() == 15 + 1);"
+        "assert(f.readline() == \"line two was empty, line 3\");"
+        "assert(f.tell() == 15 + 1 + 27);"
+        "assert(f.readline() == \"line 4\");"
+        "assert(f.tell() == 15 + 1 + 27 + 7);"
+        "assert(f.readline() == \"finally line 5\");"
+        "assert(f.tell() == 15 + 1 + 27 + 7 + 15);"
+        "f.rewind();"
+        "assert(f.tell() == 0);"
+        "assert(f.readline() == \"this is line 1\");"
+        "assert(f.tell() == 15);"
+        "f.close();"
+        "print(f);",
+
+        "let f = file(\"rwtest.tmp\", \"w\"); f.close();" // truncate
+        "let f = file(\"rwtest.tmp\", \"wr\"); assert(f.tell() == 0);"
+        "assert(f.write(\"line1\n\") == 6); assert(f.read(1) == \"\"); f.rewind();"
+        "assert(f.readline() == \"line1\"); assert(f.tell() == 6); f.close();"
+        "f = file(\"rwtest.tmp\", \"wr\"); assert(f.tell() == 0);"
+        "assert(f.readline() == \"line1\"); assert(f.tell() == 6);"
+        "f.write(\"line2\n\"); assert(f.tell() == 12);"
+        "f.rewind(); assert(f.readline() == \"line1\"); assert(f.readline() == \"line2\"); f.close();",
 
         "let s1 = 0; let s2 = 0; let s3 = 0;"
         "fn outer(){"
@@ -369,9 +438,13 @@ START_TEST(test_vm)
         "a -= 0; assert(a == 12);"
         "a += 0; assert(a == 12);"
         "a *= 0; assert(a == 0);",
+        "assert(1++ == 2);",
+        "assert(1-- == 0);",
         "let foo = \"one\"; foo += \" bar\";",
 
-        "let p = list(1, 2, 3); assert(p.len() == 3);",
+        "let p = list(1, 2, 3); assert(p.len() == 3); p[0] += 5; p[0] *= 3; p[0] /= 9; p[0] -= 1; assert(p[0] == 1);"
+        "p[0] <<= 8; p[0] >>= 4; p[0] |= 2; p[0] &= 3; p[0] ^= 3; assert(p[0] == 1);",
+
         "type Foo { fn init(name, list) { self.name = name; self.list = list;} fn len() { return self.list.len();}}"
         "let f = Foo(\"jason\", list(1,2,3));"
         "assert(f.len() == 3);"
@@ -548,6 +621,9 @@ START_TEST(test_vm)
         "switch(3) { let statement_not_allowed_here = true; case 0: print(0); case 1: print(1); case 2: print(2); default: true; }",
         "switch(3) { default: true; case 3: print(\"cannot have case after default\"); }",
         "{ break;}",
+        "list(1,2,3)[];",
+        "map(1, 100, 2, 200)[];",
+        "map()[1,2];",
         "type NoPropertiesOrMethods { oops_missing_fn() {}}",
         NULL,
     };
@@ -573,6 +649,7 @@ START_TEST(test_vm)
         "let a = 1; a = a / 0;", // divbyzero
         "let f = 1; f.foo = 1;", // only instances have property
         "let f = 1; f.foo(1);", // only instances have methods
+        "5 % 0;",
         "type Foo {} let f = Foo(); f.nosuchproperty();",
         "type Foo {} let f = Foo(); let invalid = f.nosuchproperty;",
         "is();",
@@ -595,6 +672,8 @@ START_TEST(test_vm)
         "\"foo\".substr(-10,1);",
         "\"foo\".substr(0);",
         "\"foo\".substr(0,10);",
+        "\"foo\"[\"f\"];",
+        "\"foo\"[10];",
         "\"foo\".len(1);",
         "list().len(1);",
         "list().get();",
@@ -604,8 +683,25 @@ START_TEST(test_vm)
         "list(1,2,3).remove(true);",
         "list(1,2,3).remove();",
         "list(1).remove(2);",
+        "list(1,2,3)[\"foo\"];",
+        "list(1,2,3).nosuchmethod();",
+        "list(1,2,3)[100];",
         "true.nosuchpropertyonanoninstance;",
         "map(1);",
+        "map(1, 100, 2, 200).get();",
+        "map(1, 100, 2, 200).set();",
+        "map(1, 100, 2, 200).keys(\"noargaccepted\");",
+        "map().values(1);",
+        "map().keys(1);",
+        "in();",
+        "in(1);",
+        "in(1, 5);",
+        "in(1, 5, 5);",
+        "bool();",
+        "bool(1,2,3);",
+        "let f = file(\"fail.tmp\", \"w\"); f.write();",
+        "let f = file(\"fail.tmp\", \"w\"); f.nosuchmethod();",
+        "let f = file(\"fail.tmp\", \"w\"); f.close(\"gratuitousarg\");",
         "map(\"one\", 1).len(1);",
         "type Animals { let Cat = \"cat\"; let Dog = \"dog\"; let Bird = \"bird\";} print(Animals.NoSuch);",
         "type Animals { let Cat = \"cat\"; let Dog = \"dog\"; let Bird = \"bird\";} Animals.Cat = 1;",
@@ -834,8 +930,10 @@ START_TEST(test_debug)
 
     // trigger gc
     const char *program =
+        "let log = file(\"gc.tmp\", \"w\"); log.write(\"200\");"
         "let x = 1; let y = 2; let z = x + y; let z2 = z - 1; let t = true; let f = false; let invalid = !true;"
         "let alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
+        "type Bit { let v = 0; fn init() { self.v = (((((0x4 | 0x8) & 0x64) ^ 0x2) >> 2) << 6) % 63; } }; let bit = Bit(); assert(bit.v == 1); assert(~bit.v == -2);"
         "type Point { fn init(x,y) { self.x = x; self.y = y;} fn dostuff() { z = z + x + y; }}"
         "type SubPoint (Point) { fn init(x,y) { super.init(x/2,y*10); }} let sp= SubPoint(10, 20); assert(sp.x == 5);"
         "let f1; { let i = 100; fn inner() { print i;} f1 = inner;}"
@@ -855,7 +953,8 @@ START_TEST(test_debug)
         "for (let i = 0; i < 1000; i = i + 1) {"
             "let r = lots_of_stuff();"
             "print(r);"
-        "}";
+        "}"
+        "log.close();";
     ck_assert(vm_t_interpret(program) == INTERPRET_OK);
 
     const char *programs_with_tracing[] = {

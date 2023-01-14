@@ -100,7 +100,7 @@ obj_file_t *obj_file_t_allocate(obj_string_t *path, obj_string_t *mode)
         flags |= O_APPEND;
     if (index(mode->chars, 'w') != NULL) {
         flags |= O_CREAT;
-        if (index(mode->chars, 'a') == NULL)
+        if (index(mode->chars, 'a') == NULL && index(mode->chars, 'r') == NULL)
             flags |= O_TRUNC;
     }
     if (index(mode->chars, 'r') != NULL && index(mode->chars, 'w') == NULL)
