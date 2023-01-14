@@ -329,6 +329,16 @@ START_TEST(test_vm)
             "}"
         "}",
 
+        "type Foo { let field1 = \"field1\"; }; type Bar(Foo) { let field2 = \"field2\";}; let v = Bar(); assert(v.field1 == \"field1\"); assert(v.field2 == \"field2\");",
+        "type Foo { let field1 = \"field1\"; }; type Bar(Foo) { let field1 = \"overridden\"; let field2 = \"field2\";}; let v = Bar(); assert(v.field1 == \"overridden\"); assert(v.field2 == \"field2\");",
+
+        // TODO bug in switch when defining builtins in the case scope
+        // "type Foo { fn work(value) { switch(value) { case \"file\": { let f = file(\"/tmp/file\", \"w\"); f.write(\"file test\n\"); f.close(); } default: { print(\"unknown\"); } } } };"
+        // "let f = Foo(); f.work(\"file\");",
+        // this works as expected
+        "type Foo { fn work(value) { let f = file(\"tmp_file\", \"w\"); switch(value) { case \"file\": { f.write(\"file test\n\"); } default: { print(\"unknown\"); } }  f.close(); } };"
+        "let f = Foo(); f.work(\"file\");",
+
         "let counter = 1; while (counter < 10) { counter = counter + 1;} assert(counter == 10);",
 
         "let f = file(\"test.tmp\", \"w\"); assert(f); assert(f.size() == 0); f.write(\"testing\"); f.close();"

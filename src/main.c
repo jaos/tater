@@ -37,7 +37,7 @@
 #define TATER_PROMPT "tater> "
 #define TATER_HISTORY_FILE ".tater_history"
 
-static char *complete(const char *input, const int state __unused__)
+static char *complete(const char *input, const int state)
 {
     static int list_index, len;
     if (!state) {
@@ -55,7 +55,7 @@ static char *complete(const char *input, const int state __unused__)
     return NULL;
 }
 
-static char **completer(const char *input __unused__, const int start __unused__, const int end __unused__)
+static char **completer(const char *input, const int start __unused__, const int end __unused__)
 {
     rl_attempted_completion_over = 1;
     return rl_completion_matches(input, complete);
@@ -93,7 +93,7 @@ static int repl(void)
         if (is_a_tty) {
             line = readline(TATER_PROMPT);
         } else {
-            size_t getline_len __unused__ = 0;
+            size_t getline_len = 0;
             ssize_t getline_size = getline(&line, &getline_len, stdin);
             if (getline_size == -1) {
                 line = NULL;

@@ -99,6 +99,7 @@ static parser_t parser;
 static compiler_t *current = NULL;
 static type_compiler_t *current_type = NULL;
 static int compiler_count = 0;
+static bool compiler_debug = false;
 
 #define MAX_COMPILERS 1024
 #define MAX_PARAMETERS 255
@@ -271,13 +272,13 @@ static obj_function_t *compiler_t_end(const bool debug)
 {
     emit_return();
     table_t_free(&current->string_constants);
-    obj_function_t *function = current->function;
-    if (debug && parser.had_error) {
-        chunk_t_disassemble(current_chunk(), function->name != NULL ? function->name->chars : "<script>");
+    obj_function_t *function_obj = current->function;
+    if (debug || parser.had_error) {
+        chunk_t_disassemble(current_chunk(), function_obj->name != NULL ? function_obj->name->chars : "<main>");
     }
     current = current->enclosing;
     compiler_count--;
-    return function;
+    return function_obj;
 }
 
 static void begin_scope(void)
@@ -475,7 +476,7 @@ static void and_expr(const bool) // can_assign
 
 static token_t synthetic_token(const char *text)
 {
-    token_t token;
+    token_t token = {0};
     token.start = text;
     token.length = strlen(text);
     return token;
@@ -675,7 +676,7 @@ static void subscript_modify_in_place(const int slot, const uint8_t get_op)
     // if we have a load and modify coming
     if (match_for_load_and_modify()) {
         // save it off
-        const token_t match = parser.previous;
+        const token_t match_token = parser.previous;
 
         // emit another invoke to load the current value to modify
         emit_bytes(get_op, (uint8_t)slot);
@@ -689,11 +690,11 @@ static void subscript_modify_in_place(const int slot, const uint8_t get_op)
             error(gettext("Invalid subscript."));
         }
         token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
-        const uint8_t subscript = identifier_constant(&subscript_token);
-        emit_bytes(OP_INVOKE, subscript);
+        const uint8_t subscript_v = identifier_constant(&subscript_token);
+        emit_bytes(OP_INVOKE, subscript_v);
         emit_byte(arg_count);
 
-        switch (match.type) {
+        switch (match_token.type) {
             case TOKEN_PLUS_EQUAL: expression(); emit_byte(OP_ADD); break;
             case TOKEN_MINUS_EQUAL: expression(); emit_byte(OP_SUBTRACT); break;
             case TOKEN_STAR_EQUAL: expression(); emit_byte(OP_MULTIPLY); break;
@@ -705,7 +706,7 @@ static void subscript_modify_in_place(const int slot, const uint8_t get_op)
             case TOKEN_SHIFT_RIGHT_EQUAL: expression(); emit_byte(OP_SHIFT_RIGHT); break;
             case TOKEN_PLUS_PLUS:
             case TOKEN_MINUS_MINUS:
-                emit_constant(NUMBER_VAL(match.type == TOKEN_PLUS_PLUS ? 1 : -1));
+                emit_constant(NUMBER_VAL(match_token.type == TOKEN_PLUS_PLUS ? 1 : -1));
                 emit_byte(OP_ADD);
                 break;
             default: ;
@@ -719,8 +720,8 @@ static void subscript_modify_in_place(const int slot, const uint8_t get_op)
     }
 
     token_t subscript_token = synthetic_token(KEYWORD_SUBSCRIPT);
-    const uint8_t subscript = identifier_constant(&subscript_token);
-    emit_bytes(OP_INVOKE, subscript);
+    const uint8_t subscript_v = identifier_constant(&subscript_token);
+    emit_bytes(OP_INVOKE, subscript_v);
     emit_byte(arg_count);
 }
 
@@ -944,6 +945,7 @@ static void parse_precedence(const precedence_t precedence)
         const parse_fn_t infix_rule = get_rule(parser.previous.type)->infix;
         if (infix_rule == NULL) {
             error(gettext("Expect expression."));
+            return;
         }
         infix_rule(can_assign);
     }
@@ -993,7 +995,7 @@ static void function(function_type_t type)
     consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before function body."));
     block();
 
-    obj_function_t *function = compiler_t_end(false); // no end_scope required here
+    obj_function_t *function = compiler_t_end(compiler_debug); // no end_scope required here
     emit_bytes(OP_CLOSURE, make_constant(OBJ_VAL(function)));
 
     for (int i = 0; i < function->upvalue_count; i++) {
@@ -1004,7 +1006,8 @@ static void function(function_type_t type)
 
 static void field(void)
 {
-    const uint8_t field_name = parse_variable(gettext("Expect field name."));
+    consume(TOKEN_IDENTIFIER, gettext("Expect field name."));
+    const uint8_t field_name = identifier_constant(&parser.previous);
     if (match(TOKEN_EQUAL)) {
         expression();
     } else {
@@ -1494,6 +1497,7 @@ obj_function_t *compiler_t_compile(const char *source, const bool debug)
 
     parser.had_error = false;
     parser.panic_mode = false;
+    compiler_debug = debug;
 
     advance();
 
@@ -1501,8 +1505,8 @@ obj_function_t *compiler_t_compile(const char *source, const bool debug)
         declaration();
     }
 
-    obj_function_t *function = compiler_t_end(debug);
-    return parser.had_error ? NULL : function;
+    obj_function_t *function_obj = compiler_t_end(debug);
+    return parser.had_error ? NULL : function_obj;
 }
 
 void compiler_t_mark_roots(void)

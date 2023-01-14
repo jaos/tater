@@ -36,6 +36,7 @@ cflags = [
   '-Wformat-nonliteral',
   '-Wformat-overflow=2',
   '-Wformat-security',
+  '-Wformat-truncation',
   '-Wformat=2',
   '-Wimplicit-function-declaration',
   '-Wimplicit-fallthrough=3',
@@ -45,6 +46,7 @@ cflags = [
   '-Wlogical-op',
   '-Wmaybe-uninitialized',
   '-Wmissing-field-initializers',
+  '-Wmissing-declarations',
   '-Wnull-dereference',
   '-Wold-style-definition',
   '-Wparentheses',
@@ -55,6 +57,11 @@ cflags = [
   '-Wswitch-default',
   '-Wtrampolines',
   '-Wundef',
+  '-Wshadow',
+  '-Wwrite-strings',
+  '-Wduplicated-branches',
+  '-Wduplicated-cond',
+  '-Wno-common',
 ]
 add_project_arguments(cc.get_supported_arguments(cflags), language: 'c')
 add_project_link_arguments(cc.get_supported_link_arguments(cflags), language: 'c')

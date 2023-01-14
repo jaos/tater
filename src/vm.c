@@ -662,7 +662,7 @@ static bool file_native(const int argc, const value_t *args)
 
 static bool file_method_invoke(const obj_string_t *method, const int argc, const value_t *args)
 {
-    obj_file_t *file __unused__ = AS_FILE(args[0]);
+    obj_file_t *file = AS_FILE(args[0]);
     if (file->fd == -1) {
         runtime_error(gettext("Invalid file descriptor."));
         return false;

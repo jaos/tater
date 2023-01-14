@@ -20,9 +20,10 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "memory.h"
 #include "vm.h"
 
-void *reallocate(void *pointer, const size_t old_size __unused__, const size_t new_size)
+void *reallocate(void *pointer, const size_t old_size, const size_t new_size)
 {
     vm.bytes_allocated += new_size - old_size;
     if (new_size > old_size) {

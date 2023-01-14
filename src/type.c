@@ -232,7 +232,7 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
         case OBJ_BOUND_METHOD: {
             obj_function_t *function = AS_BOUND_METHOD(value)->method->function;
             if (function->name == NULL) {
-                snprintf(buffer, 255, "<script>"); // or main ?
+                snprintf(buffer, 255, "<main>");
             } else {
                 snprintf(buffer, 255, "<boundmethod %s>", function->name->chars);
             }
@@ -245,7 +245,7 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
         case OBJ_CLOSURE: {
             obj_function_t *function = AS_CLOSURE(value)->function;
             if (function->name == NULL) {
-                snprintf(buffer, 255, "<script>"); // or main ?
+                snprintf(buffer, 255, "<main>");
             } else {
                 snprintf(buffer, 255, "<closure %s>", function->name->chars);
             }
@@ -254,7 +254,7 @@ obj_string_t *obj_t_to_obj_string_t(const value_t value)
         case OBJ_FUNCTION: {
             obj_function_t *function = AS_FUNCTION(value);
             if (function->name == NULL) {
-                snprintf(buffer, 255, "<script>"); // or main ?
+                snprintf(buffer, 255, "<main>");
             } else {
                 snprintf(buffer, 255, "<fn %s>", function->name->chars);
             }
