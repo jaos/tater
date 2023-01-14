@@ -39,10 +39,22 @@
 
 static char *complete(const char *input, const int state)
 {
-    static int list_index, len;
+    static int list_index, len, vm_globals_index;
     if (!state) {
         list_index = 0;
         len = strlen(input);
+        vm_globals_index = 0;
+    }
+
+    for (; vm_globals_index < vm.globals.capacity; vm_globals_index++) {
+        table_entry_t e = vm.globals.entries[vm_globals_index];
+        if (!IS_EMPTY(e.key) && IS_STRING(e.key)) {
+            const char *str = AS_STRING(e.key)->chars;
+            if (strncmp(str, input, len) == 0) {
+                vm_globals_index++;
+                return strdup(str);
+            }
+        }
     }
 
     char *name;
@@ -87,10 +99,13 @@ static int repl(void)
 
     int status = EXIT_SUCCESS;
     bool is_a_tty = isatty(fileno(stdin));
+    if (is_a_tty)
+        rl_initialize();
 
     for (;;) {
         char *line = NULL;
         if (is_a_tty) {
+            rl_reset_screen_size();
             line = readline(TATER_PROMPT);
         } else {
             size_t getline_len = 0;
