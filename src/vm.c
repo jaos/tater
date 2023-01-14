@@ -1261,7 +1261,6 @@ static vm_t_interpret_result_t run(void)
         vm_push(value_type_wrapper((double)((long long)a op (long long)b))); \
     } while (false)
 
-    // TODO revisit with jump table, computed goto, or direct threaded code techniques
     for (;;) {
         if (vm.flags & VM_FLAG_STACK_TRACE) {
             printf("                    ");
@@ -1285,28 +1284,45 @@ static vm_t_interpret_result_t run(void)
         assert(frame);
         assert(ip);
 
-        uint8_t instruction;
-        switch (instruction = READ_BYTE()) {
-            case OP_CONSTANT: {
+        # pragma GCC diagnostic push
+        # pragma GCC diagnostic ignored "-Wpedantic"
+        static void* computed_goto_dispatch[] __unused__ = {
+            &&OP_CONSTANT_LABEL, &&OP_CONSTANT_LONG_LABEL, &&OP_NIL_LABEL, &&OP_TRUE_LABEL, &&OP_FALSE_LABEL,
+            &&OP_POP_LABEL, &&OP_POPN_LABEL, &&OP_DUP_LABEL, &&OP_GET_LOCAL_LABEL, &&OP_SET_LOCAL_LABEL,
+            &&OP_GET_GLOBAL_LABEL, &&OP_DEFINE_GLOBAL_LABEL, &&OP_SET_GLOBAL_LABEL, &&OP_GET_UPVALUE_LABEL,
+            &&OP_SET_UPVALUE_LABEL, &&OP_GET_PROPERTY_LABEL, &&OP_SET_PROPERTY_LABEL, &&OP_GET_SUPER_LABEL,
+            &&OP_EQUAL_LABEL, &&OP_GREATER_LABEL, &&OP_LESS_LABEL, &&OP_ADD_LABEL, &&OP_SUBTRACT_LABEL,
+            &&OP_MULTIPLY_LABEL, &&OP_DIVIDE_LABEL, &&OP_BITWISE_AND_LABEL, &&OP_BITWISE_OR_LABEL,
+            &&OP_BITWISE_NOT_LABEL, &&OP_BITWISE_XOR_LABEL, &&OP_SHIFT_LEFT_LABEL, &&OP_SHIFT_RIGHT_LABEL,
+            &&OP_NOT_LABEL, &&OP_MOD_LABEL, &&OP_NEGATE_LABEL, &&OP_PRINT_LABEL, &&OP_ERROR_LABEL,
+            &&OP_JUMP_LABEL, &&OP_JUMP_IF_FALSE_LABEL, &&OP_LOOP_LABEL, &&OP_CALL_LABEL, &&OP_INVOKE_LABEL,
+            &&OP_SUPER_INVOKE_LABEL, &&OP_CLOSURE_LABEL, &&OP_CLOSE_UPVALUE_LABEL, &&OP_RETURN_LABEL, &&OP_EXIT_LABEL,
+            &&OP_TYPE_LABEL, &&OP_INHERIT_LABEL, &&OP_METHOD_LABEL, &&OP_FIELD_LABEL,
+        };
+        #define DISPATCH() goto *computed_goto_dispatch[READ_BYTE()]
+
+        DISPATCH();
+        while (1) {
+            OP_CONSTANT_LABEL: {
                 const value_t v = READ_CONSTANT();
                 vm_push(v);
-                break;
+                DISPATCH();
             }
-            case OP_NIL: vm_push(NIL_VAL); break;
-            case OP_TRUE: vm_push(TRUE_VAL); break;
-            case OP_FALSE: vm_push(FALSE_VAL); break;
-            case OP_POP: vm_pop(); break;
-            case OP_GET_LOCAL: {
+            OP_NIL_LABEL: vm_push(NIL_VAL); DISPATCH();
+            OP_TRUE_LABEL: vm_push(TRUE_VAL); DISPATCH();
+            OP_FALSE_LABEL: vm_push(FALSE_VAL); DISPATCH();
+            OP_POP_LABEL: vm_pop(); DISPATCH();
+            OP_GET_LOCAL_LABEL: {
                 const uint8_t slot = READ_BYTE();
                 vm_push(frame->slots[slot]);
-                break;
+                DISPATCH();
             }
-            case OP_SET_LOCAL: {
+            OP_SET_LOCAL_LABEL: {
                 const uint8_t slot = READ_BYTE();
                 frame->slots[slot] = peek(0);
-                break;
+                DISPATCH();
             }
-            case OP_GET_GLOBAL: {
+            OP_GET_GLOBAL_LABEL: {
                 const obj_string_t *name = READ_STRING();
                 value_t value;
                 if (!table_t_get(&vm.globals, OBJ_VAL(name), &value)) {
@@ -1315,15 +1331,15 @@ static vm_t_interpret_result_t run(void)
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 vm_push(value);
-                break;
+                DISPATCH();
             }
-            case OP_DEFINE_GLOBAL: {
+            OP_DEFINE_GLOBAL_LABEL: {
                 obj_string_t *name = READ_STRING();
                 table_t_set(&vm.globals, OBJ_VAL(name), peek(0));
                 vm_pop();
-                break;
+                DISPATCH();
             }
-            case OP_SET_GLOBAL: {
+            OP_SET_GLOBAL_LABEL: {
                 obj_string_t *name = READ_STRING();
                 if (table_t_set(&vm.globals, OBJ_VAL(name), peek(0))) {
                     table_t_delete(&vm.globals, OBJ_VAL(name));
@@ -1331,19 +1347,19 @@ static vm_t_interpret_result_t run(void)
                     runtime_error(gettext("Undefined variable '%s'."), name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                break;
+                DISPATCH();
             }
-            case OP_GET_UPVALUE: {
+            OP_GET_UPVALUE_LABEL: {
                 const uint8_t slot = READ_BYTE();
                 vm_push(*frame->closure->upvalues[slot]->location);
-                break;
+                DISPATCH();
             }
-            case OP_SET_UPVALUE: {
+            OP_SET_UPVALUE_LABEL: {
                 const uint8_t slot = READ_BYTE();
                 *frame->closure->upvalues[slot]->location = peek(0);
-                break;
+                DISPATCH();
             }
-            case OP_GET_PROPERTY: {
+            OP_GET_PROPERTY_LABEL: {
                 frame->ip = ip; // if it calls runtime_error, we need this restored
 
                 // native helpers
@@ -1352,21 +1368,21 @@ static vm_t_interpret_result_t run(void)
                     obj_bound_native_method_t *m = obj_bound_native_method_t_allocate(peek(0), name, string_method_invoke);
                     vm_pop();
                     vm_push(OBJ_VAL(m));
-                    break;
+                    DISPATCH();
                 }
                 else if (IS_LIST(peek(0))) {
                     obj_string_t *name = READ_STRING();
                     obj_bound_native_method_t *m = obj_bound_native_method_t_allocate(peek(0), name, list_method_invoke);
                     vm_pop();
                     vm_push(OBJ_VAL(m));
-                    break;
+                    DISPATCH();
                 }
                 else if (IS_MAP(peek(0))) {
                     obj_string_t *name = READ_STRING();
                     obj_bound_native_method_t *m = obj_bound_native_method_t_allocate(peek(0), name, map_method_invoke);
                     vm_pop();
                     vm_push(OBJ_VAL(m));
-                    break;
+                    DISPATCH();
                 }
                 // TODO number, bool?
 
@@ -1380,7 +1396,7 @@ static vm_t_interpret_result_t run(void)
                     if (table_t_get(&instance->fields, OBJ_VAL(name), &value)) {
                         vm_pop(); // instance
                         vm_push(value);
-                        break;
+                        DISPATCH();
                     }
 
                     // otherwise methods
@@ -1398,7 +1414,7 @@ static vm_t_interpret_result_t run(void)
                     if (table_t_get(&type->fields, OBJ_VAL(name), &type_field)) {
                         vm_pop(); // type
                         vm_push(type_field);
-                        break;
+                        DISPATCH();
                     }
                     runtime_error(gettext("%s does not have a %s field."), type->name->chars, name->chars);
                     return INTERPRET_RUNTIME_ERROR;
@@ -1408,9 +1424,9 @@ static vm_t_interpret_result_t run(void)
                     runtime_error(gettext("Only instances have properties."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                break;
+                DISPATCH();
             }
-            case OP_SET_PROPERTY: {
+            OP_SET_PROPERTY_LABEL: {
                 frame->ip = ip;
                 if (IS_TYPECLASS(peek(1))) {
                     runtime_error(gettext("Type fields are read only."));
@@ -1424,9 +1440,9 @@ static vm_t_interpret_result_t run(void)
                 const value_t value = vm_pop(); // pop the value
                 vm_pop(); // pop the instance
                 vm_push(value); // push the value so we leave the value as the return
-                break;
+                DISPATCH();
             }
-            case OP_GET_SUPER: {
+            OP_GET_SUPER_LABEL: {
                 frame->ip = ip; // if it calls runtime_error, we need this restored
                 const obj_string_t *method_name = READ_STRING();
                 obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
@@ -1434,17 +1450,17 @@ static vm_t_interpret_result_t run(void)
                 if (!bind_method(super_type_obj, method_name)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                break;
+                DISPATCH();
             }
-            case OP_EQUAL: {
+            OP_EQUAL_LABEL: {
                 const value_t b = vm_pop();
                 const value_t a = vm_pop();
                 vm_push(BOOL_VAL(value_t_equal(a,b)));
-                break;
+                DISPATCH();
             }
-            case OP_GREATER: BINARY_OP(BOOL_VAL, >); break;
-            case OP_LESS: BINARY_OP(BOOL_VAL, <); break;
-            case OP_ADD: {
+            OP_GREATER_LABEL: BINARY_OP(BOOL_VAL, >); DISPATCH();
+            OP_LESS_LABEL: BINARY_OP(BOOL_VAL, <); DISPATCH();
+            OP_ADD_LABEL: {
                 if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
                     concatenate();
                 } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
@@ -1456,21 +1472,21 @@ static vm_t_interpret_result_t run(void)
                     runtime_error(gettext("Operands must be two numbers or two strings."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                break;
+                DISPATCH();
             }
-            case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
-            case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
-            case OP_DIVIDE: {
+            OP_SUBTRACT_LABEL: BINARY_OP(NUMBER_VAL, -); DISPATCH();
+            OP_MULTIPLY_LABEL: BINARY_OP(NUMBER_VAL, *); DISPATCH();
+            OP_DIVIDE_LABEL: {
                 if (IS_NUMBER(peek(0)) && AS_NUMBER(peek(0)) == 0) {
                     frame->ip = ip;
                     runtime_error(gettext("Illegal divide by zero."));
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                BINARY_OP(NUMBER_VAL, /); break;
+                BINARY_OP(NUMBER_VAL, /); DISPATCH();
             }
-            case OP_NOT: vm_push(BOOL_VAL(is_falsey(vm_pop()))); break;
-            case OP_BITWISE_NOT: vm_push(NUMBER_VAL((double)(~(long long)AS_NUMBER(vm_pop())))); break;
-            case OP_MOD: {
+            OP_NOT_LABEL: vm_push(BOOL_VAL(is_falsey(vm_pop()))); DISPATCH();
+            OP_BITWISE_NOT_LABEL: vm_push(NUMBER_VAL((double)(~(long long)AS_NUMBER(vm_pop())))); DISPATCH();
+            OP_MOD_LABEL: {
                 if (IS_NUMBER(peek(0)) && AS_NUMBER(peek(0)) == 0) {
                     frame->ip = ip;
                     runtime_error(gettext("Illegal divide by zero."));
@@ -1480,14 +1496,14 @@ static vm_t_interpret_result_t run(void)
                 const double b = AS_NUMBER(vm_pop());
                 const double r = fmod(a,b);
                 vm_push(NUMBER_VAL(r));
-                break;
+                DISPATCH();
             }
-            case OP_BITWISE_OR: BINARY_OP_BIT(NUMBER_VAL, |); break;
-            case OP_BITWISE_AND: BINARY_OP_BIT(NUMBER_VAL, &); break;
-            case OP_BITWISE_XOR: BINARY_OP_BIT(NUMBER_VAL, ^); break;
-            case OP_SHIFT_LEFT: BINARY_OP_BIT(NUMBER_VAL, <<); break;
-            case OP_SHIFT_RIGHT: BINARY_OP_BIT(NUMBER_VAL, >>); break;
-            case OP_NEGATE: {
+            OP_BITWISE_OR_LABEL: BINARY_OP_BIT(NUMBER_VAL, |); DISPATCH();
+            OP_BITWISE_AND_LABEL: BINARY_OP_BIT(NUMBER_VAL, &); DISPATCH();
+            OP_BITWISE_XOR_LABEL: BINARY_OP_BIT(NUMBER_VAL, ^); DISPATCH();
+            OP_SHIFT_LEFT_LABEL: BINARY_OP_BIT(NUMBER_VAL, <<); DISPATCH();
+            OP_SHIFT_RIGHT_LABEL: BINARY_OP_BIT(NUMBER_VAL, >>); DISPATCH();
+            OP_NEGATE_LABEL: {
                 if (!IS_NUMBER(peek(0))) {
                     frame->ip = ip;
                     runtime_error(gettext("Operand must be a number."));
@@ -1495,35 +1511,35 @@ static vm_t_interpret_result_t run(void)
                 }
                 value_t *v = vm.stack_top - 1;
                 v->as.number = -v->as.number;
-                break;
+                DISPATCH();
             }
-            case OP_PRINT: {
+            OP_PRINT_LABEL: {
                 value_t_print(stdout, vm_pop());
                 printf("\n");
-                break;
+                DISPATCH();
             }
-            case OP_ERROR: {
+            OP_ERROR_LABEL: {
                 value_t_print(stderr, vm_pop());
                 fprintf(stderr, "\n");
-                break;
+                DISPATCH();
             }
-            case OP_JUMP: {
+            OP_JUMP_LABEL: {
                 const uint16_t offset = READ_SHORT();
                 ip += offset;
-                break;
+                DISPATCH();
             }
-            case OP_JUMP_IF_FALSE: {
+            OP_JUMP_IF_FALSE_LABEL: {
                 const uint16_t offset = READ_SHORT();
                 if (is_falsey(peek(0)))
                     ip += offset;
-                break;
+                DISPATCH();
             }
-            case OP_LOOP: {
+            OP_LOOP_LABEL: {
                 const uint16_t offset = READ_SHORT();
                 ip -= offset;
-                break;
+                DISPATCH();
             }
-            case OP_CALL: {
+            OP_CALL_LABEL: {
                 const int argc = READ_BYTE();
                 frame->ip = ip;
                 if (!call_value(peek(argc), argc)) {
@@ -1531,9 +1547,9 @@ static vm_t_interpret_result_t run(void)
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 ip = frame->ip;
-                break;
+                DISPATCH();
             }
-            case OP_INVOKE: { // combined OP_GET_PROPERTY and OP_CALL
+            OP_INVOKE_LABEL: { // combined OP_GET_PROPERTY and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
                 const int argc = READ_BYTE();
                 frame->ip = ip;
@@ -1542,9 +1558,9 @@ static vm_t_interpret_result_t run(void)
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 ip = frame->ip;
-                break;
+                DISPATCH();
             }
-            case OP_SUPER_INVOKE: { // combined OP_GET_SUPER and OP_CALL
+            OP_SUPER_INVOKE_LABEL: { // combined OP_GET_SUPER and OP_CALL
                 const obj_string_t *method_name = READ_STRING();
                 const int argc = READ_BYTE();
                 obj_typeobj_t *super_type_obj = AS_TYPECLASS(vm_pop());
@@ -1554,9 +1570,9 @@ static vm_t_interpret_result_t run(void)
                 }
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 ip = frame->ip;
-                break;
+                DISPATCH();
             }
-            case OP_CLOSURE: {
+            OP_CLOSURE_LABEL: {
                 obj_closure_t *closure = obj_closure_t_allocate(AS_FUNCTION(READ_CONSTANT()));
                 vm_push(OBJ_VAL(closure));
                 for (int i = 0; i < closure->upvalue_count; i++) {
@@ -1568,14 +1584,14 @@ static vm_t_interpret_result_t run(void)
                         closure->upvalues[i] = frame->closure->upvalues[index];
                     }
                 }
-                break;
+                DISPATCH();
             }
-            case OP_CLOSE_UPVALUE: {
+            OP_CLOSE_UPVALUE_LABEL: {
                 close_upvalues(vm.stack_top - 1);
                 vm_pop();
-                break;
+                DISPATCH();
             }
-            case OP_RETURN: {
+            OP_RETURN_LABEL: {
                 const value_t result = vm_pop();
                 close_upvalues(frame->slots); // close the remaining open upvalues owned by the returning function
                 vm.frame_count--;
@@ -1588,9 +1604,9 @@ static vm_t_interpret_result_t run(void)
                 vm_push(result);
                 frame = &vm.frames[vm.frame_count - 1]; // move to new call_frame_t
                 ip = frame->ip;
-                break;
+                DISPATCH();
             }
-            case OP_EXIT: {
+            OP_EXIT_LABEL: {
                 frame->ip = ip;
                 const value_t exit_code = vm_pop();
                 if (!IS_NUMBER(exit_code)) {
@@ -1602,11 +1618,11 @@ static vm_t_interpret_result_t run(void)
                 }
                 return INTERPRET_EXIT_OK;
             }
-            case OP_TYPE: {
+            OP_TYPE_LABEL: {
                 vm_push(OBJ_VAL(obj_typeobj_t_allocate(READ_STRING())));
-                break;
+                DISPATCH();
             }
-            case OP_INHERIT: {
+            OP_INHERIT_LABEL: {
                 const value_t super_type_obj = peek(1);
                 if (!IS_TYPECLASS(super_type_obj)) {
                     frame->ip = ip;
@@ -1619,17 +1635,17 @@ static vm_t_interpret_result_t run(void)
                 table_t_copy_to(&AS_TYPECLASS(super_type_obj)->fields, &sub_type_obj->fields);
                 table_t_copy_to(&AS_TYPECLASS(super_type_obj)->methods, &sub_type_obj->methods);
                 vm_pop();
-                break;
+                DISPATCH();
             }
-            case OP_METHOD: {
+            OP_METHOD_LABEL: {
                 define_method(READ_STRING());
-                break;
+                DISPATCH();
             }
-            case OP_FIELD: {
+            OP_FIELD_LABEL: {
                 define_field(READ_STRING());
-                break;
+                DISPATCH();
             }
-            case OP_CONSTANT_LONG: {
+            OP_CONSTANT_LONG_LABEL: {
                 assert(false);
                 const uint8_t p1 = READ_BYTE();
                 const uint8_t p2 = READ_BYTE();
@@ -1637,23 +1653,19 @@ static vm_t_interpret_result_t run(void)
                 const uint32_t idx = p1 | (p2 << 8) | (p3 << 16);
                 const value_t v = frame->closure->function->chunk.constants.values[idx];
                 vm_push(v);
-                break;
+                DISPATCH();
             }
-            case OP_POPN: { uint8_t pop_count = READ_BYTE(); popn(pop_count); break;}
-            case OP_DUP: vm_push(peek(0)); break;
-            default:
-                DEBUG_LOGGER("Unhandled default for instruction %d, %s\n",
-                    instruction,
-                    op_code_name[instruction]
-                );
-                exit(EXIT_FAILURE);
+            OP_POPN_LABEL: { uint8_t pop_count = READ_BYTE(); popn(pop_count); DISPATCH();}
+            OP_DUP_LABEL: vm_push(peek(0)); DISPATCH();
         }
+        # pragma GCC diagnostic pop
     }
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
 #undef READ_STRING
 #undef BINARY_OP
+#undef DISPATCH
 }
 
 vm_t_interpret_result_t vm_t_interpret(const char *source)

@@ -66,12 +66,12 @@ typedef enum {
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
-    OP_ASSERT,
     OP_EXIT,
     OP_TYPE,
     OP_INHERIT,
     OP_METHOD,
     OP_FIELD,
+    OP_ASSERT,
     INVALID_OPCODE,
 } op_code_t;
 
