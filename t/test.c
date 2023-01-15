@@ -332,9 +332,10 @@ START_TEST(test_vm)
         "let a = list(1,2,3,4,5); while (a.len() !=0){ a.remove(-1);} assert(a.len() == 0);",
         "let a = list(); a.remove(0); assert(a.len() == 0);",
         "let a = list(1,2,3,4,5); a.remove(2); assert(a.len() == 4); assert(a.get(2) == 4); a.remove(-1); assert(a.get(-1) == 4);",
-        "let a = list(1,2,3); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
-        "let a = [1, \"two\", 3, \"four\"]; assert(a[0] == 1); assert(a[-1] == \"four\"); assert(in(1, a)); assert(!in(4, a));",
+        "let a = list(1,2,3,); assert(a[0] == 1); assert(a[2] == 3); assert(a[-1] == 3);",
+        "let a = [1, \"two\", 3, \"four\",]; assert(a[0] == 1); assert(a[-1] == \"four\"); assert(in(1, a)); assert(!in(4, a));",
 
+        "let test = false; let value = test ? 1 : 0; assert(value == 0); test = true; value = test ? 1 : 0; assert(value == 1);",
         "let counters = [0]; counters[0]++; assert(counters[0] == 1);",
         "let counters = {\"start\": 0}; counters[\"start\"]++; assert(counters[\"start\"] == 1);",
         "type Foo { let counter = 0; fn increment() { self.counter++;}}; let f = Foo(); f.increment(); assert(f.counter == 1);",

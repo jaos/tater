@@ -29,6 +29,7 @@ typedef enum {
     TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
     TOKEN_BIT_AND, TOKEN_BIT_OR, TOKEN_BIT_NOT, TOKEN_BIT_XOR,
     // several characters
+    TOKEN_QUESTION_MARK,
     TOKEN_BANG, TOKEN_BANG_EQUAL,
     TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
     TOKEN_GREATER, TOKEN_GREATER_EQUAL,
@@ -70,7 +71,8 @@ static const char *const token_keyword_names[] = {
     [TOKEN_BIT_OR] = "|",
     [TOKEN_BIT_NOT] = "~",
     [TOKEN_BIT_XOR] = "^",
-    // one or two characters
+    // several characters
+    [TOKEN_QUESTION_MARK] = "?",
     [TOKEN_BANG] = "!",
     [TOKEN_BANG_EQUAL] = "!=",
     [TOKEN_EQUAL] = "=",
@@ -124,7 +126,7 @@ static const char *const token_keyword_names[] = {
     [TOKEN_PERROR] = "error",
     [TOKEN_IN] = "in",
     [TOKEN_IS] = "is",
-    [TOKEN_ERROR] = "error",
+    [TOKEN_ERROR] = "<ERROR>",
     [TOKEN_EOF] = "<EOF>",
     "&&", // equiv to TOKEN_AND
     "||", // equiv to TOKEN_OR

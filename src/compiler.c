@@ -41,6 +41,7 @@ typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT,    // =
     PREC_ASSIGNMENT_BY, // +=, -=, *=, /=
+    PREC_TERNARY,       // ? :
     PREC_OR,            // or
     PREC_AND,           // and
     PREC_EQUALITY,      // == !=
@@ -451,8 +452,13 @@ static void define_variable(const uint8_t variable)
 static uint8_t argument_list(void)
 {
     uint8_t arg_count = 0;
+    bool trailing = false; // trailing comma is ok
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
+            if (match(TOKEN_RIGHT_PAREN)) {
+                trailing = true;
+                break;
+            }
             expression();
             if (arg_count >= MAX_PARAMETERS) {
                 error(gettext("Exceeded maximum number of arguments."));
@@ -460,7 +466,8 @@ static uint8_t argument_list(void)
             arg_count++;
         } while (match(TOKEN_COMMA));
     }
-    consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after arguments."));
+    if (!trailing)
+        consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after arguments."));
     return arg_count;
 }
 
@@ -480,6 +487,24 @@ static token_t synthetic_token(const char *text)
     token.start = text;
     token.length = strlen(text);
     return token;
+}
+
+static void ternary(const bool)
+{
+    const int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+    expression();
+
+    const int else_jump = emit_jump(OP_JUMP);
+
+    patch_jump(then_jump);
+
+    emit_byte(OP_POP);
+
+    consume(TOKEN_COLON, gettext("Expected colon with expression."));
+    expression();
+
+    patch_jump(else_jump);
 }
 
 static void binary(const bool)
@@ -541,11 +566,17 @@ static void list(const bool)
 
     int arg_count = 0;
     if (!match(TOKEN_RIGHT_BRACKET)) {
+        bool trailing = false; // trailing comma is ok
         do {
+            if (match(TOKEN_RIGHT_BRACKET)) {
+                trailing = true;
+                break;
+            }
             expression();
             arg_count++;
         } while (match(TOKEN_COMMA));
-        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+        if (!trailing)
+            consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
     }
     emit_bytes(OP_CALL, arg_count);
 }
@@ -876,6 +907,7 @@ const parse_rule_t rules[] = {
     [TOKEN_AND_EQUAL]           = {NULL,        NULL,       PREC_ASSIGNMENT_BY},
     [TOKEN_BIT_XOR]             = {NULL,        binary,     PREC_BITWISE},
     [TOKEN_XOR_EQUAL]           = {NULL,        NULL,       PREC_ASSIGNMENT_BY},
+    [TOKEN_QUESTION_MARK]       = {NULL,        ternary,    PREC_TERNARY},
     [TOKEN_SHIFT_LEFT]          = {NULL,        binary,     PREC_BITWISE},
     [TOKEN_SHIFT_LEFT_EQUAL]    = {NULL,        NULL,       PREC_BITWISE},
     [TOKEN_SHIFT_RIGHT]         = {NULL,        binary,     PREC_BITWISE},

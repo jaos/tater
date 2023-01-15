@@ -371,6 +371,7 @@ token_t scanner_t_scan_token(void)
             }
         }
         case '%': return make_token(TOKEN_MOD);
+        case '?': return make_token(TOKEN_QUESTION_MARK);
         case '~': return make_token(TOKEN_BIT_NOT);
         case '^': return make_token(match('=') ? TOKEN_XOR_EQUAL : TOKEN_BIT_XOR);
         default: return error_token(gettext("Unexpected character."));

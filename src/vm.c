@@ -331,7 +331,7 @@ static bool map_native(const int argc, const value_t *args)
 static bool number_native(const int argc, const value_t *args)
 {
     if (argc != 1) {
-        runtime_error(gettext("number requires on argument."));
+        runtime_error(gettext("number requires one argument."));
         return false;
     }
 
@@ -361,7 +361,7 @@ static bool number_native(const int argc, const value_t *args)
 static bool bool_native(const int argc, const value_t *args)
 {
     if (argc != 1) {
-        runtime_error(gettext("bool requires on argument."));
+        runtime_error(gettext("bool requires one argument."));
         return false;
     }
 

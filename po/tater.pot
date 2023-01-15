@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tater\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-01-11 23:41-0500\n"
+"POT-Creation-Date: 2023-01-15 13:57-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -264,6 +264,9 @@ msgstr ""
 msgid "Expected 0 arguments but got %d to initialize %s."
 msgstr ""
 
+msgid "Expected colon with expression."
+msgstr ""
+
 msgid "Failed to read file size."
 msgstr ""
 
@@ -382,6 +385,9 @@ msgstr ""
 msgid "[line %d] Error"
 msgstr ""
 
+msgid "bool requires one argument."
+msgstr ""
+
 msgid "failed to close file."
 msgstr ""
 
@@ -403,7 +409,13 @@ msgstr ""
 msgid "file.readline failed to read."
 msgstr ""
 
+msgid "file.rewind failed."
+msgstr ""
+
 msgid "file.size requires no arguments."
+msgstr ""
+
+msgid "file.tell requires no arguments."
 msgstr ""
 
 msgid "file.write requires a string to write."
@@ -463,7 +475,7 @@ msgstr ""
 msgid "map.len takes no arguments."
 msgstr ""
 
-msgid "map.remove requires a single string argument."
+msgid "map.remove requires a single key argument."
 msgstr ""
 
 msgid "map.set requires a key and a value argument."
@@ -478,7 +490,7 @@ msgstr ""
 msgid "number argument invalid."
 msgstr ""
 
-msgid "number requires on argument."
+msgid "number requires one argument."
 msgstr ""
 
 msgid "set_field requires instance, field name, and value."
