@@ -821,6 +821,12 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
             return true;
         }
     }
+    #undef FILE_SIZE_METHOD
+    #undef FILE_SIZE_METHOD_LEN
+    #undef FILE_READ_METHOD
+    #undef FILE_READ_METHOD_LEN
+    #undef FILE_TELL_METHOD
+    #undef FILE_TELL_METHOD_LEN
 
     #define FILE_WRITE_METHOD "write"
     #define FILE_WRITE_METHOD_LEN 5
@@ -884,6 +890,10 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
             return true;
         }
     }
+    #undef FILE_WRITE_METHOD
+    #undef FILE_WRITE_METHOD_LEN
+    #undef FILE_CLOSE_METHOD
+    #undef FILE_CLOSE_METHOD_LEN
 
     #define FILE_READLINE_METHOD "readline"
     #define FILE_READLINE_METHOD_LEN 8
@@ -955,6 +965,9 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
 
         }
     }
+    #undef FILE_READLINE_METHOD
+    #undef FILE_READLINE_METHOD_LEN
+    #undef FILE_READLINE_METHOD_BUFSIZE
 
     #define FILE_REWIND_METHOD "rewind"
     #define FILE_REWIND_METHOD_LEN 6
@@ -969,6 +982,8 @@ static bool file_method_invoke(const obj_string_t *method, const int argc, const
             return true;
         }
     }
+    #undef FILE_REWIND_METHOD
+    #undef FILE_REWIND_METHOD_LEN
 
     runtime_error(gettext("No such file method %.*s"), method->length, method->chars);
     return false;
@@ -1355,6 +1370,23 @@ static void concatenate(void)
     vm_push(OBJ_VAL(result));
 }
 
+static void dump_tracing(const call_frame_t *frame, const uint8_t *ip)
+{
+    if (vm.flags & VM_FLAG_STACK_TRACE) {
+        printf("           ");
+        for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
+            printf("[ ");
+            value_t_print(stdout, *slot);
+            printf(" ]");
+        }
+        printf("\n");
+        chunk_t_disassemble_instruction(
+            &frame->closure->function->chunk,
+            (int)(ip - frame->closure->function->chunk.code)
+        );
+    }
+}
+
 static vm_t_interpret_result_t run(void)
 {
     call_frame_t *frame = &vm.frames[vm.frame_count - 1];
@@ -1389,25 +1421,6 @@ static vm_t_interpret_result_t run(void)
     } while (false)
 
     for (;;) {
-        if (vm.flags & VM_FLAG_STACK_TRACE) {
-            printf("                    ");
-            for (value_t *slot = vm.stack; slot < vm.stack_top; slot++) {
-                printf("[ ");
-                value_t_print(stdout, *slot);
-                printf(" ]");
-            }
-            printf("\n");
-
-            // TODO on errors we might end up with nothing here and blow up, including the instruction READ_BYTE below...
-            if (!ip) {
-                fprintf(stderr, "FIXME I am a work in progress!\n");
-                exit(EXIT_FAILURE);
-            }
-            chunk_t_disassemble_instruction(
-                &frame->closure->function->chunk,
-                (int)(ip - frame->closure->function->chunk.code)
-            );
-        }
         assert(frame);
         assert(ip);
 
@@ -1426,7 +1439,7 @@ static vm_t_interpret_result_t run(void)
             &&OP_SUPER_INVOKE_LABEL, &&OP_CLOSURE_LABEL, &&OP_CLOSE_UPVALUE_LABEL, &&OP_RETURN_LABEL, &&OP_EXIT_LABEL,
             &&OP_TYPE_LABEL, &&OP_INHERIT_LABEL, &&OP_METHOD_LABEL, &&OP_FIELD_LABEL,
         };
-        #define DISPATCH() goto *computed_goto_dispatch[READ_BYTE()]
+        #define DISPATCH() do { dump_tracing(frame, ip); goto *computed_goto_dispatch[READ_BYTE()]; } while (false);
 
         DISPATCH();
         while (1) {
@@ -1971,6 +1984,7 @@ static void vm_t_free_object(obj_t *o)
             obj_file_t *f = (obj_file_t*)o;
             if (f->fd > -1)
                 close(f->fd);
+            FREE(obj_file_t, o);
             break;
         }
         default: return; // unreachable
@@ -2028,3 +2042,4 @@ static void sweep(void)
         }
     }
 }
+#undef GC_HEAP_GROW_FACTOR

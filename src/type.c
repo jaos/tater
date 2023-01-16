@@ -744,3 +744,5 @@ void write_constant(chunk_t *chunk, const value_t value, const int line)
     }
 }
 */
+#undef TABLE_MAX_LOAD
+#undef ALLOCATE_OBJ
