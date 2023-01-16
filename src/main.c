@@ -118,7 +118,7 @@ static int repl(void)
         char *line = linenoise(TATER_PROMPT);
 
         if (line != NULL) {
-            if (line && *line && is_a_tty) {
+            if (is_a_tty) {
                 linenoiseHistoryAdd(line);
             }
 
@@ -213,11 +213,11 @@ static void version(const char *name)
 static void help(const char *name)
 {
     printf(gettext("Usage: %s [options] [path | -]\n"), name);
-    printf("  -d, --debug     %s\n", gettext("Enable debugging"));
-    printf("  -s, --gc-stress %s\n", gettext("Enable garbage collector stress testing"));
-    printf("  -t, --gc-trace  %s\n", gettext("Enable garbage collector tracing"));
-    printf("  -v, --version   %s\n", gettext("Show version"));
-    printf("  -h, --help      %s\n", gettext("This help"));
+    printf("  -d, %s\n", gettext("Enable debugging"));
+    printf("  -s, %s\n", gettext("Enable garbage collector stress testing"));
+    printf("  -t, %s\n", gettext("Enable garbage collector tracing"));
+    printf("  -v, %s\n", gettext("Show version"));
+    printf("  -h, %s\n", gettext("This help"));
 }
 
 #define HELP_OPT 'h'
@@ -241,7 +241,7 @@ int main(const int argc, const char *argv[])
             case GC_STRESS_OPT: gc_stress = true; break;
             case VERSION_OPT: version(argv[0]); return EXIT_SUCCESS;
             case HELP_OPT: help(argv[0]); return EXIT_SUCCESS;
-            default: break; help(argv[0]); return EXIT_FAILURE;
+            default: help(argv[0]); return EXIT_FAILURE;
         }
     }
 
