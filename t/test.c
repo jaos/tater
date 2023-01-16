@@ -923,6 +923,17 @@ START_TEST(test_debug)
     chunk_t_write(&chunk, i, 1);
     chunk_t_disassemble_instruction(&chunk, 3);
 
+    // unused but tested here
+    i = chunk_t_add_constant(&chunk, NUMBER_VAL(1));
+    chunk_t_write(&chunk, OP_CONSTANT_LONG, 1); // +4
+    chunk_t_write(&chunk, (uint8_t)(i & 0xff), 1);
+    chunk_t_write(&chunk, (uint8_t)((i >> 8) & 0xff), 1);
+    chunk_t_write(&chunk, (uint8_t)((i >> 16) & 0xff), 1);
+    chunk_t_disassemble_instruction(&chunk, 5);
+    // not a real op... but covered here
+    chunk_t_write(&chunk, OP_ASSERT, 1); // +4
+    chunk_t_disassemble_instruction(&chunk, 9);
+
     chunk_t_free(&chunk);
 
     vm_toggle_gc_stress();
@@ -932,6 +943,7 @@ START_TEST(test_debug)
     // trigger gc
     const char *program =
         "let log = file(\"gc.tmp\", \"w\"); log.write(\"200\");"
+        "error(\"testing\");"
         "let x = 1; let y = 2; let z = x + y; let z2 = z - 1; let t = true; let f = false; let invalid = !true;"
         "let alist = list(\"one\", \"two\", 3); assert(alist.len() == 3); assert(str(alist.get(-1)) == \"3\"); str(alist);"
         "type Bit { let v = 0; fn init() { self.v = (((((0x4 | 0x8) & 0x64) ^ 0x2) >> 2) << 6) % 63; } }; let bit = Bit(); assert(bit.v == 1); assert(~bit.v == -2);"

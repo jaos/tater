@@ -32,11 +32,14 @@ set -feuo pipefail
 
 ${tater} /tmp/nosuchfileordir || true # expected failure
 ${tater} /tmp/nosuchfileordir noarg || true # expected failure
+echo -e "invalidsyntax;" | ${tater} --debug --gc-trace --gc-stress || true
 
 TEST_TMPDIR=$(mktemp -d)
 trap "rm -rf ${TEST_TMPDIR};" err exit
 echo -e "let a = 1;\nprint a;" > "${TEST_TMPDIR}/t.tot"
 ${tater} --debug --gc-trace --gc-stress "${TEST_TMPDIR}/t.tot"
+echo -e "garbage" >> "${TEST_TMPDIR}/garbage.tot"
+${tater} --debug --gc-trace --gc-stress "${TEST_TMPDIR}/garbage.tot" || true
 ${tater} --version
 ${tater} --help
 ${tater} --debug --gc-trace --gc-stress --invalid-option-will-fail || true
