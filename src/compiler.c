@@ -1322,6 +1322,7 @@ static void synchronize(void)
             case TOKEN_FOR:
             case TOKEN_IF:
             case TOKEN_WHILE:
+            case TOKEN_SWITCH:
             case TOKEN_PRINT:
             case TOKEN_PERROR:
             case TOKEN_RETURN:
@@ -1356,60 +1357,43 @@ static void switch_statement(void)
     consume(TOKEN_RIGHT_PAREN, gettext("Expect ')' after value."));
     consume(TOKEN_LEFT_BRACE, gettext("Expect '{' before switch cases."));
 
-    int state = 0; // 0: before all cases, 1: before default, 2: after default.
     int case_ends[MAX_CASES];
     int case_count = 0;
-    int previous_case_skip = -1;
+    bool seen_default = false;
 
     while (!match(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-        if (match(TOKEN_CASE) || match(TOKEN_DEFAULT)) {
-            token_type_t case_type = parser.previous.type;
+        if (seen_default) {
+            error_at_current(gettext("Can't have another case or default after the default case."));
+        }
 
-            if (state == 2) {
-                error(gettext("Can't have another case or default after the default case."));
+        int jump = -1;
+        if (match(TOKEN_CASE)) {
+            if (case_count == MAX_CASES) {
+                error(gettext("Too many case statements."));
+                return;
             }
-
-            if (state == 1) {
-                // At the end of the previous case, jump over the others.
-                case_ends[case_count++] = emit_jump(OP_JUMP);
-
-                // Patch its condition to jump to the next case (this one).
-                patch_jump(previous_case_skip);
-                emit_byte(OP_POP);
-            }
-
-            if (case_type == TOKEN_CASE) {
-                state = 1;
-
-                // See if the case is equal to the value.
-                emit_byte(OP_DUP);
-                expression();
-
-                consume(TOKEN_COLON, gettext("Expect ':' after case value."));
-
-                emit_byte(OP_EQUAL);
-                previous_case_skip = emit_jump(OP_JUMP_IF_FALSE);
-
-                // Pop the comparison result.
-                emit_byte(OP_POP);
-            } else {
-                state = 2;
-                consume(TOKEN_COLON, gettext("Expect ':' after default."));
-                previous_case_skip = -1;
-            }
+            emit_byte(OP_DUP); // dup the switch value to compare against
+            expression();
+            consume(TOKEN_COLON, gettext("Expect ':' after case value."));
+            emit_byte(OP_EQUAL);
+            jump = emit_jump(OP_JUMP_IF_FALSE);
+            emit_byte(OP_POP); // Pop the comparison result.
         } else {
-            // Otherwise, it's a statement inside the current case.
-            if (state == 0) {
-                error(gettext("Can't have statements before any case."));
-            }
+            consume(TOKEN_DEFAULT, gettext("Expect 'case' or 'default'."));
+            consume(TOKEN_COLON, gettext("Expect ':' after default."));
+            seen_default = true;
+        }
+
+        while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_CASE) && !check(TOKEN_DEFAULT)) {
             statement();
         }
-    }
 
-    // If we ended without a default case, patch its condition jump.
-    if (state == 1) {
-        patch_jump(previous_case_skip);
-        //emit_byte(OP_POP); // book says to do this... but we pop one too many if this calls
+        case_ends[case_count++] = emit_jump(OP_JUMP);
+
+        if (jump != -1) {
+            patch_jump(jump);
+            emit_byte(OP_POP);
+        }
     }
 
     // Patch all the case jumps to the end.
@@ -1419,6 +1403,7 @@ static void switch_statement(void)
 
     emit_byte(OP_POP); // The switch value.
 }
+#undef MAX_CASES
 
 static void break_statement(void)
 {
@@ -1549,3 +1534,5 @@ void compiler_t_mark_roots(void)
         compiler = compiler->enclosing;
     }
 }
+#undef MAX_COMPILERS
+#undef MAX_PARAMETERS

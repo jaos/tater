@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tater\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-01-15 13:57-0500\n"
+"POT-Creation-Date: 2023-01-16 17:22-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -55,9 +55,6 @@ msgid "Can only call functions and classes."
 msgstr ""
 
 msgid "Can't have another case or default after the default case."
-msgstr ""
-
-msgid "Can't have statements before any case."
 msgstr ""
 
 msgid "Can't read local variable in its own initializer."
@@ -207,6 +204,9 @@ msgstr ""
 msgid "Expect ';' after variable declaration."
 msgstr ""
 
+msgid "Expect 'case' or 'default'."
+msgstr ""
+
 msgid "Expect '{' before function body."
 msgstr ""
 
@@ -270,10 +270,12 @@ msgstr ""
 msgid "Failed to read file size."
 msgstr ""
 
-msgid "Failed to ready history file"
+#, c-format
+msgid "Failed to ready history file\n"
 msgstr ""
 
-msgid "Failed to write history file"
+#, c-format
+msgid "Failed to write history file\n"
 msgstr ""
 
 msgid "Illegal divide by zero."
@@ -338,6 +340,9 @@ msgid "Super type must be a type."
 msgstr ""
 
 msgid "This help"
+msgstr ""
+
+msgid "Too many case statements."
 msgstr ""
 
 msgid "Too many closure variables in function."
