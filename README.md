@@ -71,8 +71,7 @@ wc.work(workorder);
 
 Requires:
 
-* libreadline
-* libcheck (build time, unit tests)
+* libcheck (build time only, unit tests)
 
 ```sh
 meson setup build -Ddebugging=enabled -Db_coverage=true --prefix=/usr --sysconfdir=/etc

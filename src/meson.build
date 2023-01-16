@@ -17,7 +17,8 @@ sources = [
 ]
 
 libtatertot = library('libtatertot', sources, install: true, dependencies: [libm, libintl], version: meson.project_version(), soversion: 0, name_prefix: '')
-tater = executable('tater', sources + ['main.c'], dependencies: [readline, libm, libintl], install: true)
+libtatertota = static_library('libtatertot', sources, install: true, name_prefix: '')
+tater = executable('tater', sources + ['main.c'], dependencies: [liblinenoise, libm, libintl], install: true)
 
 pkgconfig = import('pkgconfig')
-pkgconfig.generate(libtatertot, name: 'libtatertot', description: 'Library for tater, a simple scripting language.')
+pkgconfig.generate(libtatertot, name: 'libtatertot', description: 'Library for tater, a simple scripting language because everyone loves tots.')

@@ -14,7 +14,6 @@ project('tater', 'c',
 
 cc = meson.get_compiler('c')
 i18n = import('i18n')
-readline = dependency('readline')
 libm = cc.find_library('m')
 libintl = cc.find_library('intl', required: false)
 
@@ -57,11 +56,7 @@ cflags = [
   '-Wswitch-default',
   '-Wtrampolines',
   '-Wundef',
-  '-Wshadow',
   '-Wwrite-strings',
-  '-Wduplicated-branches',
-  '-Wduplicated-cond',
-  '-Wno-common',
 ]
 add_project_arguments(cc.get_supported_arguments(cflags), language: 'c')
 add_project_link_arguments(cc.get_supported_link_arguments(cflags), language: 'c')
@@ -78,6 +73,9 @@ if get_option('debugging').enabled()
   add_global_arguments('-DDEBUG', language : 'c')
 endif
 add_project_arguments('-DVERSION="' + meson.project_version() + '"', language: 'c')
+
+linenoise = subproject('linenoise')
+liblinenoise = linenoise.get_variable('liblinenoise_dep')
 
 subdir('po')
 subdir('src')

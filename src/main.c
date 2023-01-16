@@ -22,107 +22,110 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wstrict-prototypes"
-#include <readline/readline.h>
-#include <readline/history.h>
-# pragma GCC diagnostic pop
+#include <limits.h>
 
 #include "common.h"
 #include "debug.h"
 #include "vm.h"
 #include "vmopcodes.h"
 
+#include "linenoise.h"
+
 #define TATER_PROMPT "tater> "
 #define TATER_HISTORY_FILE ".tater_history"
 
-static char *complete(const char *input, const int state)
+static void completion(const char *input, linenoiseCompletions *completions)
 {
-    static int list_index, len, vm_globals_index;
-    if (!state) {
-        list_index = 0;
-        len = strlen(input);
-        vm_globals_index = 0;
+    const size_t input_len = strlen(input);
+    // only complete the last word
+    size_t len = input_len;
+    size_t prefix_len = input_len;
+    char *word = rindex(input, ' ');
+    if (word != NULL) {
+        word++;
+        len = strlen(word);
+        prefix_len = input_len - len;
+    } else {
+        word = (char *)input;
+        prefix_len = 0;
     }
 
-    for (; vm_globals_index < vm.globals.capacity; vm_globals_index++) {
-        table_entry_t e = vm.globals.entries[vm_globals_index];
-        if (!IS_EMPTY(e.key) && IS_STRING(e.key)) {
-            const char *str = AS_STRING(e.key)->chars;
-            if (strncmp(str, input, len) == 0) {
-                vm_globals_index++;
-                return strdup(str);
+    for (int i = 0; i < vm.globals.capacity; i++) {
+        table_entry_t e = vm.globals.entries[i];
+        if (IS_EMPTY(e.key))
+            continue;
+
+        if (IS_STRING(e.key)) {
+            const char *keyword = AS_STRING(e.key)->chars;
+            const size_t keyword_len = strlen(keyword);
+            if ((keyword_len >= len) && memcmp(keyword, word, len) == 0) {
+                size_t str_size = prefix_len + keyword_len;
+                char *full = malloc(sizeof *full *str_size + 1);
+                snprintf(full, str_size + 1, "%.*s%s", (int)prefix_len, input, keyword);
+                linenoiseAddCompletion(completions, full);
+                free(full);
             }
         }
     }
 
-    char *name;
-    while ((name = (char *)token_keyword_names[list_index++]) != NULL) {
-        if (strncmp(name, input, len) == 0) {
-            return strdup(name);
+    int keyword_counter = 0;
+    const char *keyword = NULL;
+    while ((keyword = token_keyword_names[keyword_counter++]) != NULL) {
+        if ((strlen(keyword) >= len) && memcmp(keyword, word, len) == 0) {
+            const size_t keyword_len = strlen(keyword);
+            size_t str_size = prefix_len + keyword_len;
+            char *full = malloc(sizeof *full *str_size + 1);
+            snprintf(full, str_size + 1, "%.*s%s", (int)prefix_len, input, keyword);
+            linenoiseAddCompletion(completions, full);
+            free(full);
         }
     }
-
-    return NULL;
-}
-
-static char **completer(const char *input, const int start __unused__, const int end __unused__)
-{
-    rl_attempted_completion_over = 1;
-    return rl_completion_matches(input, complete);
 }
 
 static int repl(void)
 {
-    rl_attempted_completion_function = completer;
-
-    char history_path[255] = {0};
-    char *home = getenv("HOME");
-    if (home != NULL) {
-        if (snprintf(history_path, 255, "%s/%s", home, TATER_HISTORY_FILE) == -1) {
-            exit(EXIT_FAILURE);
-        }
-        FILE *h = fopen(history_path, "a");
-        if (h == NULL) {
-            history_path[0] = '\0';
-        } else {
-            fclose(h);
-        }
-    }
-
-    if (*history_path) {
-        if (read_history(history_path)) {
-            perror(gettext("Failed to ready history file"));
-        }
-    }
-
     int status = EXIT_SUCCESS;
     bool is_a_tty = isatty(fileno(stdin));
-    if (is_a_tty)
-        rl_initialize();
 
-    for (;;) {
-        char *line = NULL;
-        if (is_a_tty) {
-            rl_reset_screen_size();
-            line = readline(TATER_PROMPT);
-        } else {
-            size_t getline_len = 0;
-            ssize_t getline_size = getline(&line, &getline_len, stdin);
-            if (getline_size == -1) {
-                line = NULL;
+    char history_path[255] = {0};
+    if (is_a_tty) {
+        linenoiseSetMultiLine(1);
+        linenoiseSetCompletionCallback(completion);
+
+        char *home = getenv("HOME");
+        if (home != NULL) {
+            if (snprintf(history_path, 255, "%s/%s", home, TATER_HISTORY_FILE) == -1) {
+                exit(EXIT_FAILURE);
+            }
+            FILE *h = fopen(history_path, "a");
+            if (h == NULL) {
+                history_path[0] = '\0';
             } else {
-                line[getline_size - 1] = '\0'; // chop newline
+                fclose(h);
             }
         }
 
+        linenoiseHistorySetMaxLen(10000);
+        if (*history_path) {
+            if (linenoiseHistoryLoad(history_path)) {
+                fprintf(stderr, gettext("Failed to ready history file\n"));
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    for (;;) {
+        char *line = linenoise(TATER_PROMPT);
+
         if (line != NULL) {
-            if (line && *line && is_a_tty)
-                add_history(line);
+            if (line && *line && is_a_tty) {
+                linenoiseHistoryAdd(line);
+            }
 
             const vm_t_interpret_result_t rv = vm_t_interpret(line);
-            if (is_a_tty) printf("\n");
+            if (is_a_tty) {
+                printf("\n");
+            }
             free(line);
 
             if (rv == INTERPRET_EXIT || rv == INTERPRET_RUNTIME_ERROR) {
@@ -135,11 +138,14 @@ static int repl(void)
             break;
         }
     }
-    if (*history_path) {
-        if (write_history(history_path)) {
-            perror(gettext("Failed to write history file"));
+
+    if (*history_path && is_a_tty) {
+        if (linenoiseHistorySave(history_path)) {
+            fprintf(stderr, gettext("Failed to write history file\n"));
+            exit(EXIT_FAILURE);
         }
     }
+
     return (status);
 }
 
