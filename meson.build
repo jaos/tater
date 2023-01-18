@@ -89,3 +89,4 @@ datadocs = [
 install_data_dir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name() + '-' + meson.project_version())
 install_data(datadocs, install_dir: install_data_dir)
 install_subdir('data/vim', install_dir: install_data_dir)
+install_man(['data/man/tater.1'])

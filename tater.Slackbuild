@@ -1,0 +1,58 @@
+#!/bin/sh
+set -fexuo pipefail
+# Slackware build script for tater
+# Copyright (C) 2022-2023 Jason Woodward <woodwardj at jaos dot org>
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Library General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+VERSION=${1:-$(grep '^\s*version:' meson.build | cut -f2 -d\')}
+BUILD=${BUILD:-1}
+
+if [ -z "${ARCH:=}" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i586 ;;
+    arm*) ARCH=arm ;;
+    aarch64*) ARCH=aarch64 ;;
+    *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+TOP="${PWD}"
+DESTDIR="${TOP}/pkg"
+rm -rf "${DESTDIR}"
+
+meson setup slackbuild --prefix=/usr --sysconfdir=/etc --mandir=/usr/man --buildtype=debugoptimized
+meson compile -C slackbuild
+meson install -C slackbuild --destdir="${DESTDIR}"
+# meson >= 1.0 also has --strip build into install
+
+find "${DESTDIR}" -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
+
+find "${DESTDIR}/usr/man" -type f -exec gzip -9 {} \; || true
+
+mkdir -p "${DESTDIR}/install"
+cat <<EOF > "${DESTDIR}"/install/slack-desc
+tater: tater (a simple scripting lanaguage for tot lovers)
+tater:
+tater: tater is a simple scripting language.
+tater:  
+tater: https://software.jaos.org/git/tater
+tater:
+tater:
+tater:
+tater:
+tater:
+tater:
+EOF
+(cd "${DESTDIR}" && /sbin/makepkg -l y -c n "${TOP}/tater-${VERSION}-${ARCH}-${BUILD}.txz")
