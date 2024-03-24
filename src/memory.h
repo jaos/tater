@@ -1,7 +1,7 @@
 #ifndef tater_memory_h
 #define tater_memory_h
 /*
- * Copyright (C) 2022-2023 Jason Woodward <woodwardj at jaos dot org>
+ * Copyright (C) 2022-2024 Jason Woodward <woodwardj at jaos dot org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

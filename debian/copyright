@@ -6,13 +6,13 @@ Upstream-Contact: woodwardj@jaos.org
 Files:
  *
 Copyright:
- 2022-2023 Jason Woodward <woodwardj at jaos dot org>
+ 2022-2024 Jason Woodward <woodwardj at jaos dot org>
 License: GPL-2.0+
 
 Files:
  debian/*
 Copyright:
- 2023 Jason Woodward <woodwardj@jaos.org>
+ 2024 Jason Woodward <woodwardj@jaos.org>
 License: GPL-2.0+
 
 License: GPL-2.0+
