@@ -81,14 +81,14 @@ typedef enum {
 } function_type_t;
 
 typedef struct compiler {
+    local_t locals[UINT8_COUNT];
+    upvalue_t upvalues[UINT8_COUNT];
+    table_t string_constants;
     struct compiler *enclosing;
     obj_function_t *function;
     function_type_t type;
-    local_t locals[UINT8_COUNT];
     int local_count;
-    upvalue_t upvalues[UINT8_COUNT];
     int scope_depth;
-    table_t string_constants;
 } compiler_t;
 
 typedef struct type_compiler {

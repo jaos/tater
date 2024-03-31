@@ -442,7 +442,7 @@ obj_string_t *value_t_to_obj_string_t(const value_t value)
 {
     char buffer[255];
     switch (value.type) {
-        case VAL_BOOL: snprintf(buffer, 255, AS_BOOL(value) ? "true" : "false"); break;
+        case VAL_BOOL: snprintf(buffer, 255, "%s", AS_BOOL(value) ? "true" : "false"); break;
         case VAL_NIL: snprintf(buffer, 255, "nil"); break;
         case VAL_NUMBER: snprintf(buffer, 255, "%g", AS_NUMBER(value)); break;
         case VAL_OBJ: return obj_t_to_obj_string_t(value);

@@ -39,7 +39,7 @@ static void completion(const char *input, linenoiseCompletions *completions)
     const size_t input_len = strlen(input);
     // only complete the last word
     size_t len = input_len;
-    size_t prefix_len = input_len;
+    size_t prefix_len = 0;
     char *word = rindex(input, ' ');
     if (word != NULL) {
         word++;
@@ -47,7 +47,6 @@ static void completion(const char *input, linenoiseCompletions *completions)
         prefix_len = input_len - len;
     } else {
         word = (char *)input;
-        prefix_len = 0;
     }
 
     for (int i = 0; i < vm.globals.capacity; i++) {
